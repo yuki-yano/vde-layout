@@ -25,12 +25,19 @@ export type TerminalPane = Pane & {
 }
 
 // Utility type guards using runtime checks
-export function isSplitPane(pane: Pane): pane is SplitPane {
-  return "type" in pane && "panes" in pane && "ratio" in pane
+export function isSplitPane(pane: unknown): pane is SplitPane {
+  return (
+    typeof pane === "object" &&
+    pane !== null &&
+    "type" in pane &&
+    "panes" in pane &&
+    "ratio" in pane &&
+    ((pane as any).type === "horizontal" || (pane as any).type === "vertical")
+  )
 }
 
-export function isTerminalPane(pane: Pane): pane is TerminalPane {
-  return "name" in pane && !("panes" in pane)
+export function isTerminalPane(pane: unknown): pane is TerminalPane {
+  return typeof pane === "object" && pane !== null && "name" in pane && !("panes" in pane)
 }
 
 // Type definition for CLI options

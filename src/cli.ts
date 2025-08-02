@@ -35,7 +35,7 @@ export class CLI {
     this.createLayoutEngine = options.createLayoutEngine || ((opts): LayoutEngine => new LayoutEngine(opts))
     this.createCommandExecutor =
       options.createCommandExecutor ||
-      ((opts): CommandExecutor => {
+      ((opts): ICommandExecutor => {
         if (opts.dryRun) {
           return new DryRunExecutor({ verbose: opts.verbose })
         }

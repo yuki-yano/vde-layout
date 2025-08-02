@@ -109,8 +109,20 @@ export class LayoutEngine implements ILayoutEngine {
     parentPaneId: string,
     _isFirst = true,
   ): Promise<PaneInfo[]> {
+    // Type guard to check if layout is a Layout type
+    const isLayout = (l: Layout | Pane): l is Layout => {
+      return (
+        typeof l === "object" &&
+        l !== null &&
+        "type" in l &&
+        "panes" in l &&
+        "ratio" in l &&
+        (l.type === "horizontal" || l.type === "vertical")
+      )
+    }
+
     // For terminal pane
-    if (!("type" in layout) || (layout.type !== "horizontal" && layout.type !== "vertical")) {
+    if (!isLayout(layout)) {
       return [
         {
           pane: layout,
