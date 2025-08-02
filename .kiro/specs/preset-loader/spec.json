@@ -1,0 +1,23 @@
+{
+  "feature_name": "preset-loader",
+  "project_description": "CLIでユーザが指定したpresetを設定ファイルから読み込んで、現在のウィンドウでそこで指定されているレイアウトの再現を行う機能を作りたい",
+  "created_at": "2025-01-27T10:29:00+09:00",
+  "updated_at": "2025-01-27T11:20:00+09:00",
+  "language": "japanese",
+  "phase": "implementation",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

@@ -1,0 +1,58 @@
+{
+  "name": "vde-layout",
+  "version": "0.0.1",
+  "description": "Terminal multiplexer layout management tool for VDE (Vibe Coding Development Environment)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "vde-layout": "./bin/vde-layout"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "compile": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run clean && bun run build"
+  },
+  "keywords": [
+    "tmux",
+    "layout",
+    "terminal",
+    "multiplexer",
+    "vde",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "execa": "^9.6.0",
+    "fs-extra": "^11.2.0",
+    "yaml": "^2.3.4",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.11.5",
+    "@vitest/coverage-v8": "^1.2.1",
+    "@vitest/runner": "^3.2.4",
+    "eslint": "^9.32.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^16.3.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^1.2.1"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

@@ -1,0 +1,101 @@
+# VDE Layout Configuration Sample - New Format
+
+presets:
+  # 3-pane layout for development environment
+  dev:
+    name: dev
+    description: "Development environment (Editor + Server + Logs)"
+    layout:
+      type: horizontal
+      ratio: [60, 40]
+      panes:
+        - command: nvim
+          name: Editor
+          focus: true
+        - type: vertical
+          ratio: [70, 30]
+          panes:
+            - command: npm run dev
+              name: Server
+              cwd: .
+              delay: 1000
+            - command: tail -f logs/app.log
+              name: Logs
+
+  # 4-pane layout for monitoring
+  monitor:
+    name: monitor
+    description: "System monitoring"
+    layout:
+      type: horizontal
+      ratio: [50, 50]
+      panes:
+        - type: vertical
+          ratio: [50, 50]
+          panes:
+            - command: htop
+              name: CPU Monitor
+            - command: watch -n 1 df -h
+              name: Disk Usage
+        - type: vertical
+          ratio: [50, 50]
+          panes:
+            - command: docker ps -a
+              name: Docker
+            - command: journalctl -f
+              name: System Logs
+
+  # Simple 2-pane layout
+  simple:
+    name: simple
+    description: "Editor and terminal"
+    layout:
+      type: vertical
+      ratio: [70, 30]
+      panes:
+        - command: nvim
+          name: Editor
+          focus: true
+        - name: Terminal
+
+  # Layout for test execution
+  test:
+    name: test
+    description: "Test execution environment"
+    layout:
+      type: horizontal
+      ratio: [33, 34, 33]
+      panes:
+        - command: npm test -- --watch
+          name: Unit Tests
+        - command: npm run test:e2e
+          name: E2E Tests
+          delay: 2000
+        - command: npm run coverage
+          name: Coverage
+
+  # Default preset
+  default:
+    name: "Development Default Layout"
+    description: "Neovim + 3-split terminal on the left, Claude Code on the right"
+    layout:
+      type: horizontal  # Left-right split
+      ratio: [70, 30]
+      panes:
+        - type: vertical  # Split left side vertically
+          ratio: [70, 30]
+          panes:
+            - name: "neovim"
+              command: "nvim"
+              focus: true
+            - type: horizontal  # Split bottom-left horizontally into 3
+              ratio: [1, 1, 1]
+              panes:
+                - name: "term1"
+                  command: "bash"
+                - name: "term2"
+                  command: "bash"
+                - name: "term3"
+                  command: "bash"
+        - name: "claude-code1"  # Right side
+          command: "claude"
