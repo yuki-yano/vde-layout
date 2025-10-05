@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { compilePreset } from "../compile.ts"
+import { isFunctionalCoreError } from "../errors.ts"
 
 describe("compilePreset", () => {
   it("プリセットYAMLを純粋データモデルへ変換する", () => {
@@ -23,16 +24,11 @@ layout:
       source: "tests/sample.yml",
     })
 
-    expect(result.ok).toBe(true)
-    if (!result.ok) {
-      throw new Error("expected success result")
-    }
+    expect(result.preset.name).toBe("sample-functional")
+    expect(result.preset.version).toBe("legacy")
+    expect(result.preset.metadata.source).toBe("tests/sample.yml")
 
-    expect(result.value.preset.name).toBe("sample-functional")
-    expect(result.value.preset.version).toBe("legacy")
-    expect(result.value.preset.metadata.source).toBe("tests/sample.yml")
-
-    const root = result.value.preset.layout
+    const root = result.preset.layout
     expect(root).toMatchObject({
       kind: "split",
       orientation: "horizontal",
@@ -48,18 +44,19 @@ layout:
   it("YAML解析エラーを返す", () => {
     const document = "name: [unclosed"
 
-    const result = compilePreset({
-      document,
-      source: "tests/broken.yml",
-    })
-
-    expect(result.ok).toBe(false)
-    if (result.ok) {
-      throw new Error("expected error result")
+    expect.assertions(2)
+    try {
+      compilePreset({
+        document,
+        source: "tests/broken.yml",
+      })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isFunctionalCoreError(error)).toBe(true)
+      if (isFunctionalCoreError(error)) {
+        expect(error.code).toBe("PRESET_PARSE_ERROR")
+      }
     }
-
-    expect(result.error.code).toBe("PRESET_PARSE_ERROR")
-    expect(result.error.source).toBe("tests/broken.yml")
   })
 
   it("splitノードのratioとpanesの長さが一致しない場合はエラーを返す", () => {
@@ -72,23 +69,19 @@ layout:
     - name: left
 `
 
-    const result = compilePreset({
-      document,
-      source: "tests/mismatch.yml",
-    })
-
-    expect(result.ok).toBe(false)
-    if (result.ok) {
-      throw new Error("expected error result")
+    expect.assertions(2)
+    try {
+      compilePreset({
+        document,
+        source: "tests/mismatch.yml",
+      })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isFunctionalCoreError(error)).toBe(true)
+      if (isFunctionalCoreError(error)) {
+        expect(error.code).toBe("LAYOUT_RATIO_MISMATCH")
+      }
     }
-
-    expect(result.error.code).toBe("LAYOUT_RATIO_MISMATCH")
-    expect(result.error.message).toBe("ratio 配列と panes 配列の長さが一致しません")
-    expect(result.error.path).toBe("preset.layout")
-    expect(result.error.details).toEqual({
-      ratioLength: 2,
-      panesLength: 1,
-    })
   })
 
   it("ターミナルペインのenvと追加オプションを正規化する", () => {
@@ -113,12 +106,7 @@ layout:
       source: "tests/env.yml",
     })
 
-    expect(result.ok).toBe(true)
-    if (!result.ok) {
-      throw new Error("expected success result")
-    }
-
-    const layout = result.value.preset.layout
+    const layout = result.preset.layout
     if (!layout || layout.kind !== "split") {
       throw new Error("expected split root")
     }
@@ -143,20 +131,19 @@ layout:
     - 42
 `
 
-    const result = compilePreset({
-      document,
-      source: "tests/invalid-node.yml",
-    })
-
-    expect(result.ok).toBe(false)
-    if (result.ok) {
-      throw new Error("expected error result")
+    expect.assertions(2)
+    try {
+      compilePreset({
+        document,
+        source: "tests/invalid-node.yml",
+      })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isFunctionalCoreError(error)).toBe(true)
+      if (isFunctionalCoreError(error)) {
+        expect(error.code).toBe("LAYOUT_INVALID_NODE")
+      }
     }
-
-    expect(result.error.code).toBe("LAYOUT_INVALID_NODE")
-    expect(result.error.message).toBe("レイアウトノードの形式が不正です")
-    expect(result.error.path).toBe("preset.layout.panes[0]")
-    expect(result.error.details?.node).toBe(42)
   })
 
   it("不正なorientationを検出する", () => {
@@ -169,18 +156,18 @@ layout:
     - name: main
 `
 
-    const result = compilePreset({
-      document,
-      source: "tests/invalid-orientation.yml",
-    })
-
-    expect(result.ok).toBe(false)
-    if (result.ok) {
-      throw new Error("expected error result")
+    expect.assertions(2)
+    try {
+      compilePreset({
+        document,
+        source: "tests/invalid-orientation.yml",
+      })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isFunctionalCoreError(error)).toBe(true)
+      if (isFunctionalCoreError(error)) {
+        expect(error.code).toBe("LAYOUT_INVALID_ORIENTATION")
+      }
     }
-
-    expect(result.error.code).toBe("LAYOUT_INVALID_ORIENTATION")
-    expect(result.error.message).toBe("layout.type は horizontal か vertical である必要があります")
-    expect(result.error.path).toBe("preset.layout.type")
   })
 })

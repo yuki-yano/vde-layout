@@ -2,26 +2,26 @@ import { parse } from "yaml"
 
 export type DiagnosticsSeverity = "high" | "medium" | "low"
 
-export interface DiagnosticsFinding {
+export type DiagnosticsFinding = {
   readonly path: string
   readonly severity: DiagnosticsSeverity
   readonly description: string
 }
 
-export interface DiagnosticsBacklogItem {
+export type DiagnosticsBacklogItem = {
   readonly id: string
   readonly severity: DiagnosticsSeverity
   readonly summary: string
   readonly actions: ReadonlyArray<string>
 }
 
-export interface DiagnosticsReport {
+export type DiagnosticsReport = {
   readonly findings: ReadonlyArray<DiagnosticsFinding>
   readonly nextSteps: ReadonlyArray<string>
   readonly backlog: ReadonlyArray<DiagnosticsBacklogItem>
 }
 
-export interface DiagnosticsInput {
+export type DiagnosticsInput = {
   readonly presetDocument: string
   readonly knownIssues?: ReadonlyArray<string>
 }
@@ -32,7 +32,7 @@ const severityRank: Record<DiagnosticsSeverity, number> = {
   low: 1,
 }
 
-interface FindingAccumulator {
+type FindingAccumulator = {
   add: (args: { path: string; severity: DiagnosticsSeverity; description: string; nextStep?: string }) => void
   readonly findings: DiagnosticsFinding[]
   readonly nextSteps: Set<string>

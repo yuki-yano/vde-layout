@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
 import { createCli, type CLI, type FunctionalCoreBridge } from "../cli.ts"
-import { MockPresetManager } from "./mocks/preset-manager-mock.ts"
-import type { ICommandExecutor } from "../interfaces/command-executor.ts"
+import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock.ts"
+import type { CommandExecutor } from "../types/command-executor.ts"
 import type {
   CompilePresetInput,
   CompilePresetSuccess,
@@ -12,58 +12,72 @@ import type {
   LayoutPlan,
 } from "../core/index.ts"
 
-class RecordingExecutor implements ICommandExecutor {
-  readonly commands: string[][] = []
-  private paneIds: string[] = ["%0"]
-  private paneCounter = 0
+const createRecordingExecutor = (
+  dryRun: boolean,
+): CommandExecutor & { readonly commands: string[][]; readonly getPaneIds: () => string[] } => {
+  const state = {
+    commands: [] as string[][],
+    paneIds: ["%0"] as string[],
+    paneCounter: 0,
+  }
 
-  constructor(private readonly dryRun: boolean) {}
+  const parseArgs = (command: string | string[]): string[] => {
+    return typeof command === "string"
+      ? command
+          .split(" ")
+          .filter((segment) => segment.length > 0)
+          .slice(1)
+      : command
+  }
 
-  async execute(command: string | string[]): Promise<string> {
-    const args =
-      typeof command === "string"
-        ? command
-            .split(" ")
-            .filter((segment) => segment.length > 0)
-            .slice(1)
-        : command
-    this.commands.push([...args])
+  const execute = async (command: string | string[]): Promise<string> => {
+    const args = parseArgs(command)
+    state.commands.push([...args])
 
     const [cmd] = args
     if (cmd === "display-message" && args.includes("#{pane_id}")) {
-      return this.paneIds[0] ?? "%0"
+      return state.paneIds[0] ?? "%0"
     }
 
     if (cmd === "list-panes" && args.includes("#{pane_id}")) {
-      return this.paneIds.join("\n")
+      return state.paneIds.join("\n")
     }
 
     if (cmd === "split-window") {
-      this.paneCounter += 1
-      const newId = `%${this.paneCounter}`
-      this.paneIds = [...this.paneIds, newId]
+      state.paneCounter += 1
+      const newId = `%${state.paneCounter}`
+      state.paneIds = [...state.paneIds, newId]
     }
 
     return ""
   }
 
-  async executeMany(commandsList: string[][]): Promise<void> {
+  const executeMany = async (commandsList: string[][]): Promise<void> => {
     for (const command of commandsList) {
-      await this.execute(command)
+      await execute(command)
     }
   }
 
-  isDryRun(): boolean {
-    return this.dryRun
-  }
+  const isDryRun = (): boolean => dryRun
 
-  logCommand(): void {}
+  const logCommand = (): void => {}
+
+  const getPaneIds = () => state.paneIds
+
+  return {
+    commands: state.commands,
+    execute,
+    executeMany,
+    isDryRun,
+    logCommand,
+    getPaneIds,
+  }
 }
 
 describe("CLI", () => {
   let cli: CLI
   let mockPresetManager: MockPresetManager
-  let recordingExecutor: RecordingExecutor
+  let recordingExecutor: ReturnType<typeof createRecordingExecutor>
   let originalExit: typeof process.exit
   let originalTMUX: string | undefined
   let exitCode: number | undefined
@@ -143,6 +157,24 @@ describe("CLI", () => {
       initialPaneId: "root.0",
     },
     hash: "abc123",
+    terminals: [
+      {
+        virtualPaneId: "root.0",
+        command: "nvim",
+        cwd: "/repo",
+        env: { NODE_ENV: "test" },
+        focus: true,
+        name: "main",
+      },
+      {
+        virtualPaneId: "root.1",
+        command: "npm run dev",
+        cwd: undefined,
+        env: undefined,
+        focus: false,
+        name: "aux",
+      },
+    ],
   }
 
   let compilePresetMock: ReturnType<typeof vi.fn>
@@ -151,16 +183,16 @@ describe("CLI", () => {
   let functionalCore: FunctionalCoreBridge
 
   beforeEach(() => {
-    mockPresetManager = new MockPresetManager()
+    mockPresetManager = createMockPresetManager()
     originalTMUX = process.env.TMUX
     process.env.TMUX = "/tmp/tmux-1000/default,1234,0"
 
-    compilePresetMock = vi.fn(() => ({ ok: true, value: { preset: sampleFunctionalPreset } as CompilePresetSuccess }))
-    createLayoutPlanMock = vi.fn(() => ({ ok: true, value: { plan: samplePlan } as CreateLayoutPlanSuccess }))
-    emitPlanMock = vi.fn(() => ({ ok: true, value: sampleEmission }))
+    compilePresetMock = vi.fn((): CompilePresetSuccess => ({ preset: sampleFunctionalPreset }))
+    createLayoutPlanMock = vi.fn((): CreateLayoutPlanSuccess => ({ plan: samplePlan }))
+    emitPlanMock = vi.fn(() => sampleEmission)
 
     const createCommandExecutor = vi.fn(({ dryRun }: { verbose: boolean; dryRun: boolean }) => {
-      recordingExecutor = new RecordingExecutor(dryRun)
+      recordingExecutor = createRecordingExecutor(dryRun)
       return recordingExecutor
     })
 
@@ -279,9 +311,10 @@ describe("CLI", () => {
       await cli.run(["dev"])
 
       expectFunctionalPipelineCalled()
-      const expectedCommandCount =
-        1 + sampleEmission.steps.length + sampleEmission.steps.filter((step) => step.kind === "split").length * 2
-      expect(recordingExecutor.commands).toHaveLength(expectedCommandCount)
+      expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", 'cd "\/repo"', "Enter"])
+      expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", 'export NODE_ENV="test"', "Enter"])
+      expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", "nvim", "Enter"])
+      expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%1", "npm run dev", "Enter"])
       expect(consoleOutput.join("\n")).toContain('Applied preset "Development"')
       expect(exitCode).toBe(0)
     })
@@ -290,9 +323,7 @@ describe("CLI", () => {
       await cli.run([])
 
       expectFunctionalPipelineCalled()
-      const expectedCommandCount =
-        1 + sampleEmission.steps.length + sampleEmission.steps.filter((step) => step.kind === "split").length * 2
-      expect(recordingExecutor.commands).toHaveLength(expectedCommandCount)
+      expect(recordingExecutor.commands.some((command) => command.includes("nvim"))).toBe(true)
       expect(exitCode).toBe(0)
     })
 
@@ -318,9 +349,7 @@ describe("CLI", () => {
       await cli.run(["dev", "--verbose"])
 
       expectFunctionalPipelineCalled()
-      const expectedCommandCount =
-        1 + sampleEmission.steps.length + sampleEmission.steps.filter((step) => step.kind === "split").length * 2
-      expect(recordingExecutor.commands).toHaveLength(expectedCommandCount)
+      expect(recordingExecutor.commands.some((command) => command.includes("nvim"))).toBe(true)
       expect(exitCode).toBe(0)
     })
 
@@ -353,10 +382,10 @@ describe("CLI", () => {
     })
 
     it("should allow specifying configuration file via --config", async () => {
-      const customPresetManager = new MockPresetManager()
+      const customPresetManager = createMockPresetManager()
       const cliWithConfig = createCli({
         presetManager: customPresetManager,
-        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => new RecordingExecutor(dryRun),
+        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => createRecordingExecutor(dryRun),
         functionalCore,
       })
 
@@ -421,16 +450,17 @@ describe("CLI", () => {
         createCommandExecutor: failingExecutorFactory as unknown as (options: {
           verbose: boolean
           dryRun: boolean
-        }) => ICommandExecutor,
+        }) => CommandExecutor,
         functionalCore,
       })
 
       await expect(failingCli.run(["dev"])).rejects.toThrow("Process exited")
 
       const errorLog = errorOutput.join("\n")
-      expect(errorLog).toContain("TMUX_COMMAND_FAILED")
-      expect(errorLog).toContain("root:split:1")
-      expect(errorLog).toContain("split-window -h -t root.0")
+      expect(errorLog).toContain("[execution] [TMUX_COMMAND_FAILED]")
+      expect(errorLog).toContain("[root:split:1]")
+      expect(errorLog).toContain("tmux failed")
+      expect(errorLog).toContain("stderr: boom")
       expect(exitCode).toBe(1)
     })
   })

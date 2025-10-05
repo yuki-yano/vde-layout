@@ -1,38 +1,51 @@
 import { vi } from "vitest"
 import type { Result } from "execa"
 
-interface TmuxMockCommand {
-  command: string
-  args: string[]
-  response: string | Error
-  exitCode?: number
+type TmuxMockCommand = {
+  readonly command: string
+  readonly args: string[]
+  readonly response: string | Error
+  readonly exitCode?: number
 }
 
-export class TmuxMock {
-  private commands: TmuxMockCommand[] = []
-  private defaultResponse = ""
-  private isInsideTmux = true
+const createExecaResult = (stdout: string, exitCode: number): Result => {
+  return {
+    stdout,
+    stderr: "",
+    exitCode,
+    command: "tmux",
+    escapedCommand: "tmux",
+    failed: exitCode !== 0,
+    timedOut: false,
+    killed: false,
+    isCanceled: false,
+    pipedFrom: [],
+  } as Result
+}
 
-  setIsInsideTmux(value: boolean): void {
-    this.isInsideTmux = value
+export const createTmuxMock = () => {
+  let commands: TmuxMockCommand[] = []
+  let defaultResponse = ""
+  let isInsideTmux = true
+
+  const setIsInsideTmux = (value: boolean) => {
+    isInsideTmux = value
   }
 
-  addCommand(command: string, args: string[], response: string | Error, exitCode = 0): void {
-    this.commands.push({ command, args, response, exitCode })
+  const addCommand = (command: string, args: string[], response: string | Error, exitCode = 0) => {
+    commands.push({ command, args, response, exitCode })
   }
 
-  setDefaultResponse(response: string): void {
-    this.defaultResponse = response
+  const setDefaultResponse = (response: string) => {
+    defaultResponse = response
   }
 
-  async execute(command: string, args: string[] = []): Promise<Result> {
-    // tmux environment check
-    if (command === "tmux" && args[0] === "info" && !this.isInsideTmux) {
+  const execute = async (command: string, args: string[] = []): Promise<Result> => {
+    if (command === "tmux" && args[0] === "info" && !isInsideTmux) {
       throw new Error("sessions should be nested with care, unset $TMUX to force")
     }
 
-    // Search for registered command
-    const mockCommand = this.commands.find(
+    const mockCommand = commands.find(
       (cmd) => cmd.command === command && JSON.stringify(cmd.args) === JSON.stringify(args),
     )
 
@@ -40,41 +53,31 @@ export class TmuxMock {
       if (mockCommand.response instanceof Error) {
         throw mockCommand.response
       }
-      return this.createExecaResult(mockCommand.response, mockCommand.exitCode ?? 0)
+      return createExecaResult(mockCommand.response, mockCommand.exitCode ?? 0)
     }
 
-    // Default response
-    return this.createExecaResult(this.defaultResponse, 0)
+    return createExecaResult(defaultResponse, 0)
   }
 
-  private createExecaResult(stdout: string, exitCode: number): Result {
-    return {
-      stdout,
-      stderr: "",
-      exitCode,
-      command: "tmux",
-      escapedCommand: "tmux",
-      failed: exitCode !== 0,
-      timedOut: false,
-      killed: false,
-      isCanceled: false,
-      pipedFrom: [],
-    } as Result
+  const reset = () => {
+    commands = []
+    defaultResponse = ""
+    isInsideTmux = true
   }
 
-  reset(): void {
-    this.commands = []
-    this.defaultResponse = ""
-    this.isInsideTmux = true
+  return {
+    setIsInsideTmux,
+    addCommand,
+    setDefaultResponse,
+    execute,
+    reset,
   }
 }
 
-// Global mock instance
-export const tmuxMock = new TmuxMock()
+export const tmuxMock = createTmuxMock()
 
-// execa mock
 export const mockExeca = (): ReturnType<typeof vi.fn> => {
   return vi.fn().mockImplementation(async (command: string, args?: string[]) => {
-    return tmuxMock.execute(command, args || [])
+    return tmuxMock.execute(command, args ?? [])
   })
 }

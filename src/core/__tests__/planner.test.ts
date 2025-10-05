@@ -1,6 +1,7 @@
 import type { FunctionalPreset } from "../compile.ts"
 import { describe, expect, it } from "vitest"
 import { compilePreset, createLayoutPlan } from "../index.ts"
+import { isFunctionalCoreError } from "../errors.ts"
 
 describe("createLayoutPlan", () => {
   it("比率を正規化し決定的なペインIDとフォーカスを付与する", () => {
@@ -20,18 +21,8 @@ layout:
         - name: shell
 `
 
-    const compiled = compilePreset({ document, source: "tests/sample.yml" })
-    if (!compiled.ok) {
-      throw compiled.error
-    }
-
-    const planResult = createLayoutPlan({ preset: compiled.value.preset })
-    expect(planResult.ok).toBe(true)
-    if (!planResult.ok) {
-      throw planResult.error
-    }
-
-    const plan = planResult.value.plan
+    const { preset } = compilePreset({ document, source: "tests/sample.yml" })
+    const { plan } = createLayoutPlan({ preset })
     expect(plan.focusPaneId).toBe("root.0")
 
     const root = plan.root
@@ -65,19 +56,18 @@ layout:
       focus: true
 `
 
-    const compiled = compilePreset({ document, source: "tests/conflict.yml" })
-    if (!compiled.ok) {
-      throw compiled.error
-    }
+    const { preset } = compilePreset({ document, source: "tests/conflict.yml" })
 
-    const planResult = createLayoutPlan({ preset: compiled.value.preset })
-    expect(planResult.ok).toBe(false)
-    if (planResult.ok) {
-      throw new Error("expected error result")
+    expect.assertions(2)
+    try {
+      createLayoutPlan({ preset })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isFunctionalCoreError(error)).toBe(true)
+      if (isFunctionalCoreError(error)) {
+        expect(error.code).toBe("FOCUS_CONFLICT")
+      }
     }
-
-    expect(planResult.error.code).toBe("FOCUS_CONFLICT")
-    expect(planResult.error.path).toBe("preset.layout")
   })
 
   it("フォーカス未指定の場合は最初のターミナルへフォーカスを割り当てる", () => {
@@ -91,18 +81,8 @@ layout:
     - name: aux
 `
 
-    const compiled = compilePreset({ document, source: "tests/no-focus.yml" })
-    if (!compiled.ok) {
-      throw compiled.error
-    }
-
-    const planResult = createLayoutPlan({ preset: compiled.value.preset })
-    expect(planResult.ok).toBe(true)
-    if (!planResult.ok) {
-      throw planResult.error
-    }
-
-    const plan = planResult.value.plan
+    const { preset } = compilePreset({ document, source: "tests/no-focus.yml" })
+    const { plan } = createLayoutPlan({ preset })
     expect(plan.focusPaneId).toBe("root.0")
 
     const root = plan.root
@@ -122,18 +102,8 @@ layout:
 name: single-pane
 `
 
-    const compiled = compilePreset({ document, source: "tests/single.yml" })
-    if (!compiled.ok) {
-      throw compiled.error
-    }
-
-    const planResult = createLayoutPlan({ preset: compiled.value.preset })
-    expect(planResult.ok).toBe(true)
-    if (!planResult.ok) {
-      throw planResult.error
-    }
-
-    const plan = planResult.value.plan
+    const { preset } = compilePreset({ document, source: "tests/single.yml" })
+    const { plan } = createLayoutPlan({ preset })
     expect(plan.focusPaneId).toBe("root")
     expect(plan.root).toMatchObject({
       kind: "terminal",
@@ -159,13 +129,8 @@ name: single-pane
       },
     }
 
-    const result = createLayoutPlan({ preset })
-    expect(result.ok).toBe(true)
-    if (!result.ok) {
-      throw result.error
-    }
-
-    const root = result.value.plan.root
+    const { plan } = createLayoutPlan({ preset })
+    const root = plan.root
     if (root.kind !== "split") {
       throw new Error("expected split root")
     }
@@ -193,13 +158,15 @@ name: single-pane
       },
     }
 
-    const result = createLayoutPlan({ preset })
-    expect(result.ok).toBe(false)
-    if (result.ok) {
-      throw new Error("expected error result")
+    expect.assertions(2)
+    try {
+      createLayoutPlan({ preset })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isFunctionalCoreError(error)).toBe(true)
+      if (isFunctionalCoreError(error)) {
+        expect(error.code).toBe("NO_TERMINAL_PANES")
+      }
     }
-
-    expect(result.error.code).toBe("NO_TERMINAL_PANES")
-    expect(result.error.path).toBe("preset.layout")
   })
 })

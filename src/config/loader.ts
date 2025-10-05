@@ -3,160 +3,74 @@ import path from "path"
 import os from "os"
 import * as yaml from "yaml"
 import type { Config } from "../models/types.ts"
-import { ConfigError, ErrorCodes } from "../utils/errors.ts"
+import { createConfigError, ErrorCodes } from "../utils/errors.ts"
 import { validateYAML } from "./validator.ts"
 
-export interface ConfigLoaderOptions {
-  configPaths?: string[]
+export type ConfigLoaderOptions = {
+  readonly configPaths?: string[]
 }
 
-export class ConfigLoader {
-  private readonly explicitConfigPaths?: string[]
+export type ConfigLoader = {
+  readonly loadYAML: () => Promise<string>
+  readonly loadConfig: () => Promise<Config>
+  readonly findConfigFile: () => Promise<string | null>
+  readonly getSearchPaths: () => string[]
+}
 
-  constructor(options: ConfigLoaderOptions = {}) {
-    this.explicitConfigPaths = options.configPaths
-  }
+export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoader => {
+  const explicitConfigPaths = options.configPaths
 
-  /**
-   * Loads the YAML string from the configuration file
-   * @returns YAML string
-   * @throws {ConfigError} When file is not found or cannot be read
-   */
-  async loadYAML(): Promise<string> {
-    const config = await this.loadCombinedConfig()
-    return yaml.stringify(config)
-  }
-
-  /**
-   * Load and parse configuration files
-   */
-  async loadConfig(): Promise<Config> {
-    return this.loadCombinedConfig()
-  }
-
-  /**
-   * Search for configuration file and return the path of the first file found
-   */
-  async findConfigFile(): Promise<string | null> {
-    const searchPaths = await this.computeSearchPaths()
-    for (const searchPath of searchPaths) {
-      if (await fs.pathExists(searchPath)) {
-        return searchPath
-      }
-    }
-    return null
-  }
-
-  /**
-   * Get search paths (for testing)
-   */
-  getSearchPaths(): string[] {
-    return this.computeCachedSearchPaths()
-  }
-
-  /**
-   * Build default search paths
-   * Supports XDG Base Directory specification in a simple way
-   */
-  private buildDefaultSearchPaths(): string[] {
-    const paths: string[] = []
-
-    const vdeConfigPath = process.env.VDE_CONFIG_PATH
-    if (vdeConfigPath !== undefined) {
-      paths.push(path.join(vdeConfigPath, "layout.yml"))
-    }
-
-    const homeDir = process.env.HOME ?? os.homedir()
-    const xdgConfigHome = process.env.XDG_CONFIG_HOME ?? path.join(homeDir, ".config")
-    paths.push(path.join(xdgConfigHome, "vde", "layout.yml"))
-
-    return [...new Set(paths)]
-  }
-
-  private computeCachedSearchPaths(): string[] {
-    if (this.explicitConfigPaths && this.explicitConfigPaths.length > 0) {
-      return [...this.explicitConfigPaths]
+  const computeCachedSearchPaths = (): string[] => {
+    if (explicitConfigPaths && explicitConfigPaths.length > 0) {
+      return [...explicitConfigPaths]
     }
 
     const candidates: string[] = []
-    const projectCandidate = this.findProjectConfigCandidate()
+    const projectCandidate = findProjectConfigCandidate()
     if (projectCandidate !== null) {
       candidates.push(projectCandidate)
     }
 
-    candidates.push(...this.buildDefaultSearchPaths())
+    candidates.push(...buildDefaultSearchPaths())
 
     return [...new Set(candidates)]
   }
 
-  private async computeSearchPaths(): Promise<string[]> {
-    if (this.explicitConfigPaths && this.explicitConfigPaths.length > 0) {
-      return [...this.explicitConfigPaths]
-    }
-
-    return this.computeCachedSearchPaths()
-  }
-
-  private findProjectConfigCandidate(): string | null {
-    let currentDir = process.cwd()
-    const { root } = path.parse(currentDir)
-
-    while (true) {
-      const candidate = path.join(currentDir, ".vde", "layout.yml")
-      if (fs.existsSync(candidate)) {
-        return candidate
-      }
-
-      if (currentDir === root) {
-        break
-      }
-
-      const parent = path.dirname(currentDir)
-      if (parent === currentDir) {
-        break
-      }
-
-      currentDir = parent
-    }
-
-    return null
-  }
-
-  private async loadCombinedConfig(): Promise<Config> {
-    if (this.explicitConfigPaths && this.explicitConfigPaths.length > 0) {
-      const filePath = await this.findFirstExisting(this.explicitConfigPaths)
+  const loadConfig = async (): Promise<Config> => {
+    if (explicitConfigPaths && explicitConfigPaths.length > 0) {
+      const filePath = await findFirstExisting(explicitConfigPaths)
       if (filePath === null) {
-        throw new ConfigError("Configuration file not found", ErrorCodes.CONFIG_NOT_FOUND, {
-          searchPaths: this.explicitConfigPaths,
+        throw createConfigError("Configuration file not found", ErrorCodes.CONFIG_NOT_FOUND, {
+          searchPaths: explicitConfigPaths,
         })
       }
 
-      const content = await this.safeReadFile(filePath)
+      const content = await safeReadFile(filePath)
       return validateYAML(content)
     }
 
-    const searchPaths = this.computeCachedSearchPaths()
-    const existingPaths = await this.filterExistingPaths(searchPaths)
+    const searchPaths = computeCachedSearchPaths()
+    const existingPaths = await filterExistingPaths(searchPaths)
 
     if (existingPaths.length === 0) {
-      throw new ConfigError("Configuration file not found", ErrorCodes.CONFIG_NOT_FOUND, {
+      throw createConfigError("Configuration file not found", ErrorCodes.CONFIG_NOT_FOUND, {
         searchPaths,
       })
     }
 
-    const projectPath = this.findProjectConfigCandidate()
+    const projectPath = findProjectConfigCandidate()
     const globalPaths = existingPaths.filter((filePath) => filePath !== projectPath)
 
     let mergedConfig: Config = { presets: {} }
 
     for (const globalPath of globalPaths) {
-      const content = await this.safeReadFile(globalPath)
+      const content = await safeReadFile(globalPath)
       const config = validateYAML(content)
       mergedConfig = mergeConfigs(mergedConfig, config)
     }
 
     if (projectPath !== null && (await fs.pathExists(projectPath))) {
-      const content = await this.safeReadFile(projectPath)
+      const content = await safeReadFile(projectPath)
       const config = validateYAML(content)
       mergedConfig = mergeConfigs(mergedConfig, config)
     }
@@ -164,35 +78,95 @@ export class ConfigLoader {
     return mergedConfig
   }
 
-  private async findFirstExisting(paths: string[]): Promise<string | null> {
-    for (const candidate of paths) {
-      if (await fs.pathExists(candidate)) {
-        return candidate
+  return {
+    loadYAML: async (): Promise<string> => {
+      const config = await loadConfig()
+      return yaml.stringify(config)
+    },
+    loadConfig,
+    findConfigFile: async (): Promise<string | null> => {
+      const searchPaths =
+        explicitConfigPaths && explicitConfigPaths.length > 0 ? [...explicitConfigPaths] : computeCachedSearchPaths()
+
+      for (const searchPath of searchPaths) {
+        if (await fs.pathExists(searchPath)) {
+          return searchPath
+        }
       }
-    }
-    return null
+      return null
+    },
+    getSearchPaths: (): string[] => computeCachedSearchPaths(),
+  }
+}
+
+const buildDefaultSearchPaths = (): string[] => {
+  const paths: string[] = []
+
+  const vdeConfigPath = process.env.VDE_CONFIG_PATH
+  if (vdeConfigPath !== undefined) {
+    paths.push(path.join(vdeConfigPath, "layout.yml"))
   }
 
-  private async filterExistingPaths(paths: string[]): Promise<string[]> {
-    const existing: string[] = []
-    for (const candidate of paths) {
-      if (await fs.pathExists(candidate)) {
-        existing.push(candidate)
-      }
+  const homeDir = process.env.HOME ?? os.homedir()
+  const xdgConfigHome = process.env.XDG_CONFIG_HOME ?? path.join(homeDir, ".config")
+  paths.push(path.join(xdgConfigHome, "vde", "layout.yml"))
+
+  return [...new Set(paths)]
+}
+
+const findProjectConfigCandidate = (): string | null => {
+  let currentDir = process.cwd()
+  const { root } = path.parse(currentDir)
+
+  while (true) {
+    const candidate = path.join(currentDir, ".vde", "layout.yml")
+    if (fs.existsSync(candidate)) {
+      return candidate
     }
-    return existing
+
+    if (currentDir === root) {
+      break
+    }
+
+    const parent = path.dirname(currentDir)
+    if (parent === currentDir) {
+      break
+    }
+
+    currentDir = parent
   }
 
-  private async safeReadFile(filePath: string): Promise<string> {
-    try {
-      return await fs.readFile(filePath, "utf8")
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      throw new ConfigError(`Failed to read configuration file`, ErrorCodes.CONFIG_PERMISSION_ERROR, {
-        filePath,
-        error: errorMessage,
-      })
+  return null
+}
+
+const findFirstExisting = async (paths: ReadonlyArray<string>): Promise<string | null> => {
+  for (const candidate of paths) {
+    if (await fs.pathExists(candidate)) {
+      return candidate
     }
+  }
+  return null
+}
+
+const filterExistingPaths = async (paths: ReadonlyArray<string>): Promise<string[]> => {
+  const existing: string[] = []
+  for (const candidate of paths) {
+    if (await fs.pathExists(candidate)) {
+      existing.push(candidate)
+    }
+  }
+  return existing
+}
+
+const safeReadFile = async (filePath: string): Promise<string> => {
+  try {
+    return await fs.readFile(filePath, "utf8")
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    throw createConfigError(`Failed to read configuration file`, ErrorCodes.CONFIG_PERMISSION_ERROR, {
+      filePath,
+      error: errorMessage,
+    })
   }
 }
 

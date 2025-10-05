@@ -1,17 +1,11 @@
-import type {
-  FunctionalLayoutNode,
-  FunctionalPreset,
-  FunctionalSplitPane,
-  FunctionalTerminalPane,
-  Result,
-  StructuredError,
-} from "./compile.ts"
+import type { FunctionalLayoutNode, FunctionalPreset, FunctionalSplitPane, FunctionalTerminalPane } from "./compile.ts"
+import { createFunctionalError, type FunctionalCoreError } from "./errors.ts"
 
-export interface CreateLayoutPlanInput {
+export type CreateLayoutPlanInput = {
   readonly preset: FunctionalPreset
 }
 
-export interface PlanTerminal {
+export type PlanTerminal = {
   readonly kind: "terminal"
   readonly id: string
   readonly name: string
@@ -22,7 +16,7 @@ export interface PlanTerminal {
   readonly options?: Readonly<Record<string, unknown>>
 }
 
-export interface PlanSplit {
+export type PlanSplit = {
   readonly kind: "split"
   readonly id: string
   readonly orientation: "horizontal" | "vertical"
@@ -32,18 +26,16 @@ export interface PlanSplit {
 
 export type PlanNode = PlanTerminal | PlanSplit
 
-export interface LayoutPlan {
+export type LayoutPlan = {
   readonly root: PlanNode
   readonly focusPaneId: string
 }
 
-export interface CreateLayoutPlanSuccess {
+export type CreateLayoutPlanSuccess = {
   readonly plan: LayoutPlan
 }
 
-export const createLayoutPlan = (input: CreateLayoutPlanInput): Result<CreateLayoutPlanSuccess, StructuredError> => {
-  const { preset } = input
-
+export const createLayoutPlan = ({ preset }: CreateLayoutPlanInput): CreateLayoutPlanSuccess => {
   if (!preset.layout) {
     const terminal = createTerminalNode({
       id: "root",
@@ -55,39 +47,31 @@ export const createLayoutPlan = (input: CreateLayoutPlanInput): Result<CreateLay
       focusOverride: true,
     })
 
-    return success({
+    return {
       plan: {
         root: terminal,
         focusPaneId: terminal.id,
       },
-    })
+    }
   }
 
-  const builtResult = buildLayoutNode(preset.layout, {
+  const { node, focusPaneIds, terminalPaneIds } = buildLayoutNode(preset.layout, {
     parentId: "root",
     path: "preset.layout",
     source: preset.metadata.source,
   })
 
-  if (!builtResult.ok) {
-    return builtResult
-  }
-
-  const { node, focusPaneIds, terminalPaneIds } = builtResult.value
-
   if (focusPaneIds.length > 1) {
-    return fail("FOCUS_CONFLICT", {
+    throw planError("FOCUS_CONFLICT", {
       message: "複数のペインでfocusが指定されています",
       path: "preset.layout",
       source: preset.metadata.source,
-      details: {
-        focusPaneIds,
-      },
+      details: { focusPaneIds },
     })
   }
 
   if (terminalPaneIds.length === 0) {
-    return fail("NO_TERMINAL_PANES", {
+    throw planError("NO_TERMINAL_PANES", {
       message: "ターミナルペインが存在しません",
       path: "preset.layout",
       source: preset.metadata.source,
@@ -97,15 +81,15 @@ export const createLayoutPlan = (input: CreateLayoutPlanInput): Result<CreateLay
   const focusPaneId = focusPaneIds[0] ?? terminalPaneIds[0]!
   const root = ensureFocus(node, focusPaneId)
 
-  return success({
+  return {
     plan: {
       root,
       focusPaneId,
     },
-  })
+  }
 }
 
-interface BuildResult {
+type BuildResult = {
   readonly node: PlanNode
   readonly focusPaneIds: ReadonlyArray<string>
   readonly terminalPaneIds: ReadonlyArray<string>
@@ -114,23 +98,23 @@ interface BuildResult {
 const buildLayoutNode = (
   node: FunctionalLayoutNode,
   context: { readonly parentId: string; readonly path: string; readonly source: string },
-): Result<BuildResult, StructuredError> => {
+): BuildResult => {
   if (node.kind === "split") {
     return buildSplitNode(node, context)
   }
 
-  return success({
+  return {
     node: createTerminalNode({ id: context.parentId, terminal: node }),
     focusPaneIds: node.focus === true ? [context.parentId] : [],
     terminalPaneIds: [context.parentId],
-  })
+  }
 }
 
 const buildSplitNode = (
   node: FunctionalSplitPane,
   context: { readonly parentId: string; readonly path: string; readonly source: string },
-): Result<BuildResult, StructuredError> => {
-  const ratio = normalizeRatio(node.ratio)
+): BuildResult => {
+  const ratio = normalizeRatio(node.ratio, context)
 
   const panes: PlanNode[] = []
   const focusPaneIds: string[] = []
@@ -145,28 +129,22 @@ const buildSplitNode = (
     }
 
     const childResult = buildLayoutNode(node.panes[index]!, childContext)
-    if (!childResult.ok) {
-      return childResult
-    }
-
-    panes.push(childResult.value.node)
-    focusPaneIds.push(...childResult.value.focusPaneIds)
-    terminalPaneIds.push(...childResult.value.terminalPaneIds)
+    panes.push(childResult.node)
+    focusPaneIds.push(...childResult.focusPaneIds)
+    terminalPaneIds.push(...childResult.terminalPaneIds)
   }
 
-  const splitNode: PlanSplit = {
-    kind: "split",
-    id: context.parentId,
-    orientation: node.orientation,
-    ratio,
-    panes,
-  }
-
-  return success({
-    node: splitNode,
+  return {
+    node: {
+      kind: "split",
+      id: context.parentId,
+      orientation: node.orientation,
+      ratio,
+      panes,
+    },
     focusPaneIds,
     terminalPaneIds,
-  })
+  }
 }
 
 const createTerminalNode = ({
@@ -204,34 +182,43 @@ const ensureFocus = (node: PlanNode, focusPaneId: string): PlanNode => {
   }
 }
 
-const normalizeRatio = (ratio: ReadonlyArray<number>): number[] => {
-  const total = ratio.reduce((sum, value) => sum + value, 0)
+const normalizeRatio = (
+  ratio: ReadonlyArray<number>,
+  context: { readonly path: string; readonly source: string },
+): number[] => {
+  const total = ratio.reduce((sum, value, index) => {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      throw planError("RATIO_INVALID_VALUE", {
+        message: "ratio の値が非負の数値ではありません",
+        path: `${context.path}.ratio[${index}]`,
+        source: context.source,
+        details: { value },
+      })
+    }
+    return sum + value
+  }, 0)
+
   if (total === 0) {
     return ratio.map(() => 1 / ratio.length)
   }
+
   return ratio.map((value) => value / total)
 }
 
-const success = <T>(value: T): Result<T, StructuredError> => ({
-  ok: true,
-  value,
-})
-
-const fail = (
+const planError = (
   code: string,
   error: {
     readonly message: string
     readonly source?: string
     readonly path?: string
-    readonly details?: Record<string, unknown>
+    readonly details?: Readonly<Record<string, unknown>>
   },
-): Result<never, StructuredError> => ({
-  ok: false,
-  error: {
+): FunctionalCoreError => {
+  return createFunctionalError("plan", {
     code,
     message: error.message,
     source: error.source,
     path: error.path,
     details: error.details,
-  },
-})
+  })
+}

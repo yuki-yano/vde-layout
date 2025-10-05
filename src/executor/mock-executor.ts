@@ -1,13 +1,14 @@
-import type { ICommandExecutor } from "../interfaces/command-executor.ts"
-import type { ITmuxExecutor } from "../interfaces/index.ts"
-import { EnvironmentError, ErrorCodes } from "../utils/errors.ts"
+import type { CommandExecutor } from "../types/command-executor.ts"
+import type { TmuxExecutorContract } from "../types/tmux.ts"
+import { createEnvironmentError, ErrorCodes } from "../utils/errors.ts"
 
-export interface MockExecutor extends ICommandExecutor, ITmuxExecutor {
-  getExecutedCommands(): string[][]
-  clearExecutedCommands(): void
-  setMockPaneIds(paneIds: string[]): void
-  getPaneIds(): string[]
-}
+export type MockExecutor = CommandExecutor &
+  TmuxExecutorContract & {
+    readonly getExecutedCommands: () => string[][]
+    readonly clearExecutedCommands: () => void
+    readonly setMockPaneIds: (paneIds: string[]) => void
+    readonly getPaneIds: () => string[]
+  }
 
 const parseCommand = (commandOrArgs: string | string[]): string[] => {
   return typeof commandOrArgs === "string"
@@ -86,7 +87,7 @@ export const createMockExecutor = (): MockExecutor => {
     isInTmuxSession,
     async verifyTmuxEnvironment(): Promise<void> {
       if (!isInTmuxSession()) {
-        throw new EnvironmentError("Must be run inside a tmux session", ErrorCodes.NOT_IN_TMUX, {
+        throw createEnvironmentError("Must be run inside a tmux session", ErrorCodes.NOT_IN_TMUX, {
           hint: "Please start a tmux session and try again",
         })
       }

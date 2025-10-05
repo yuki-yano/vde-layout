@@ -1,21 +1,12 @@
 import { parse } from "yaml"
+import { createFunctionalError, type FunctionalCoreError } from "./errors.ts"
 
-export interface CompilePresetInput {
+export type CompilePresetInput = {
   readonly document: string
   readonly source: string
 }
 
-export type Result<T, E> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: E }
-
-export interface StructuredError {
-  readonly code: string
-  readonly message: string
-  readonly source?: string
-  readonly path?: string
-  readonly details?: Record<string, unknown>
-}
-
-export interface FunctionalTerminalPane {
+export type FunctionalTerminalPane = {
   readonly kind: "terminal"
   readonly name: string
   readonly command?: string
@@ -25,7 +16,7 @@ export interface FunctionalTerminalPane {
   readonly options?: Readonly<Record<string, unknown>>
 }
 
-export interface FunctionalSplitPane {
+export type FunctionalSplitPane = {
   readonly kind: "split"
   readonly orientation: "horizontal" | "vertical"
   readonly ratio: ReadonlyArray<number>
@@ -34,11 +25,11 @@ export interface FunctionalSplitPane {
 
 export type FunctionalLayoutNode = FunctionalTerminalPane | FunctionalSplitPane
 
-export interface FunctionalPresetMetadata {
+export type FunctionalPresetMetadata = {
   readonly source: string
 }
 
-export interface FunctionalPreset {
+export type FunctionalPreset = {
   readonly name: string
   readonly version: string
   readonly command?: string
@@ -46,18 +37,16 @@ export interface FunctionalPreset {
   readonly metadata: FunctionalPresetMetadata
 }
 
-export interface CompilePresetSuccess {
+export type CompilePresetSuccess = {
   readonly preset: FunctionalPreset
 }
 
-export const compilePreset = (input: CompilePresetInput): Result<CompilePresetSuccess, StructuredError> => {
-  const { document, source } = input
-
+export const compilePreset = ({ document, source }: CompilePresetInput): CompilePresetSuccess => {
   let parsed: unknown
   try {
     parsed = parse(document)
   } catch (error) {
-    return fail("PRESET_PARSE_ERROR", {
+    throw compileError("PRESET_PARSE_ERROR", {
       source,
       message: `YAMLの解析に失敗しました: ${(error as Error).message}`,
       details: {
@@ -67,7 +56,7 @@ export const compilePreset = (input: CompilePresetInput): Result<CompilePresetSu
   }
 
   if (!isRecord(parsed)) {
-    return fail("PRESET_INVALID_DOCUMENT", {
+    throw compileError("PRESET_INVALID_DOCUMENT", {
       source,
       message: "プリセット定義がオブジェクトではありません",
       path: "preset",
@@ -76,71 +65,71 @@ export const compilePreset = (input: CompilePresetInput): Result<CompilePresetSu
 
   const name = typeof parsed.name === "string" && parsed.name.trim().length > 0 ? parsed.name : "Unnamed preset"
 
-  let layout: FunctionalLayoutNode | undefined
-  if ("layout" in parsed && parsed.layout !== undefined) {
-    const converted = convertLayoutNode(parsed.layout, {
-      source,
-      path: "preset.layout",
-    })
-    if (!converted.ok) {
-      return converted
-    }
-    layout = converted.value
-  }
+  const layout = parseLayoutNode(parsed.layout, {
+    source,
+    path: "preset.layout",
+  })
 
-  return success({
+  return {
     preset: {
       name,
       version: "legacy",
       command: typeof parsed.command === "string" ? parsed.command : undefined,
-      layout,
-      metadata: {
-        source,
-      },
+      layout: layout ?? undefined,
+      metadata: { source },
     },
-  })
+  }
 }
 
-const convertLayoutNode = (
+const parseLayoutNode = (
   node: unknown,
   context: { readonly source: string; readonly path: string },
-): Result<FunctionalLayoutNode, StructuredError> => {
-  if (isRecord(node) && typeof node.type === "string" && "panes" in node) {
-    return convertSplitPane(node, context)
+): FunctionalLayoutNode | null => {
+  if (node === undefined || node === null) {
+    return null
   }
 
-  if (isRecord(node) && typeof node.name === "string") {
-    return success(asTerminalPane(node))
+  if (!isRecord(node)) {
+    throw compileError("LAYOUT_INVALID_NODE", {
+      source: context.source,
+      message: "レイアウトノードの形式が不正です",
+      path: context.path,
+      details: { node },
+    })
   }
 
-  return fail("LAYOUT_INVALID_NODE", {
+  if (typeof node.type === "string" && Array.isArray(node.panes)) {
+    return parseSplitPane(node, context)
+  }
+
+  if (typeof node.name === "string") {
+    return parseTerminalPane(node)
+  }
+
+  throw compileError("LAYOUT_INVALID_NODE", {
     source: context.source,
     message: "レイアウトノードの形式が不正です",
     path: context.path,
-    details: {
-      node,
-    },
+    details: { node },
   })
 }
 
-const convertSplitPane = (
+const parseSplitPane = (
   node: Record<string, unknown>,
   context: { readonly source: string; readonly path: string },
-): Result<FunctionalLayoutNode, StructuredError> => {
+): FunctionalSplitPane => {
   const orientation = node.type
   if (orientation !== "horizontal" && orientation !== "vertical") {
-    return fail("LAYOUT_INVALID_ORIENTATION", {
+    throw compileError("LAYOUT_INVALID_ORIENTATION", {
       source: context.source,
       message: "layout.type は horizontal か vertical である必要があります",
       path: `${context.path}.type`,
-      details: {
-        type: orientation,
-      },
+      details: { type: orientation },
     })
   }
 
   if (!Array.isArray(node.panes) || node.panes.length === 0) {
-    return fail("LAYOUT_PANES_MISSING", {
+    throw compileError("LAYOUT_PANES_MISSING", {
       source: context.source,
       message: "panes 配列が存在しません",
       path: `${context.path}.panes`,
@@ -148,7 +137,7 @@ const convertSplitPane = (
   }
 
   if (!Array.isArray(node.ratio) || node.ratio.length === 0) {
-    return fail("LAYOUT_RATIO_MISSING", {
+    throw compileError("LAYOUT_RATIO_MISSING", {
       source: context.source,
       message: "ratio 配列が存在しません",
       path: `${context.path}.ratio`,
@@ -156,7 +145,7 @@ const convertSplitPane = (
   }
 
   if (node.ratio.length !== node.panes.length) {
-    return fail("LAYOUT_RATIO_MISMATCH", {
+    throw compileError("LAYOUT_RATIO_MISMATCH", {
       source: context.source,
       message: "ratio 配列と panes 配列の長さが一致しません",
       path: context.path,
@@ -167,48 +156,38 @@ const convertSplitPane = (
     })
   }
 
-  const ratio: number[] = []
-  for (let index = 0; index < node.ratio.length; index += 1) {
-    const value = node.ratio[index]
+  const ratio = node.ratio.map((value, index) => {
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-      return fail("RATIO_INVALID_VALUE", {
+      throw compileError("RATIO_INVALID_VALUE", {
         source: context.source,
         message: "ratio の値が正の数値ではありません",
         path: `${context.path}.ratio[${index}]`,
-        details: {
-          value,
-        },
+        details: { value },
       })
     }
-    ratio.push(value)
-  }
+    return value
+  })
 
-  const panes: FunctionalLayoutNode[] = []
-  for (let index = 0; index < node.panes.length; index += 1) {
-    const childContext = {
+  const panes = node.panes.map((child, index) =>
+    parseLayoutNode(child, {
       source: context.source,
       path: `${context.path}.panes[${index}]`,
-    }
-    const converted = convertLayoutNode(node.panes[index], childContext)
-    if (!converted.ok) {
-      return converted
-    }
-    panes.push(converted.value)
-  }
+    }),
+  )
 
-  return success({
+  return {
     kind: "split",
     orientation,
     ratio,
-    panes,
-  })
+    panes: panes.filter((pane): pane is FunctionalLayoutNode => pane !== null),
+  }
 }
 
-const asTerminalPane = (node: Record<string, unknown>): FunctionalTerminalPane => {
+const parseTerminalPane = (node: Record<string, unknown>): FunctionalTerminalPane => {
   const name = typeof node.name === "string" ? node.name : ""
   const command = typeof node.command === "string" ? node.command : undefined
   const cwd = typeof node.cwd === "string" ? node.cwd : undefined
-  const focus = node.focus === true
+  const focus = node.focus === true ? true : undefined
   const env = normalizeEnv(node.env)
 
   const knownKeys = new Set(["name", "command", "cwd", "env", "focus", "options", "title", "delay"])
@@ -220,7 +199,7 @@ const asTerminalPane = (node: Record<string, unknown>): FunctionalTerminalPane =
     command,
     cwd,
     env,
-    focus: focus || undefined,
+    focus,
     options,
   }
 }
@@ -259,26 +238,20 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null
 }
 
-const success = <T>(value: T): Result<T, StructuredError> => ({
-  ok: true,
-  value,
-})
-
-const fail = (
+const compileError = (
   code: string,
   error: {
-    readonly message: string
     readonly source?: string
+    readonly message: string
     readonly path?: string
-    readonly details?: Record<string, unknown>
+    readonly details?: Readonly<Record<string, unknown>>
   },
-): Result<never, StructuredError> => ({
-  ok: false,
-  error: {
+): FunctionalCoreError => {
+  return createFunctionalError("compile", {
     code,
     message: error.message,
     source: error.source,
     path: error.path,
     details: error.details,
-  },
-})
+  })
+}

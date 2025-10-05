@@ -49,7 +49,7 @@ export function isTerminalPane(pane: unknown): pane is TerminalPane {
 }
 
 // Type definition for CLI options
-export interface CLIOptions {
+export type CLIOptions = {
   preset?: string
   list?: boolean
   dryRun?: boolean
@@ -57,7 +57,7 @@ export interface CLIOptions {
 }
 
 // Type definition for preset information (for list display)
-export interface PresetInfo {
+export type PresetInfo = {
   key: string
   name: string
   description?: string

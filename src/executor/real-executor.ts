@@ -1,9 +1,9 @@
 import { execa } from "execa"
-import { TmuxError, ErrorCodes } from "../utils/errors.ts"
-import type { ICommandExecutor } from "../interfaces/command-executor.ts"
+import { createTmuxError, ErrorCodes } from "../utils/errors.ts"
+import type { CommandExecutor } from "../types/command-executor.ts"
 import { createLogger, LogLevel } from "../utils/logger.ts"
 
-export interface RealExecutorOptions {
+export type RealExecutorOptions = {
   readonly verbose?: boolean
 }
 
@@ -20,7 +20,7 @@ const toCommandString = (args: string[]): string => {
   return ["tmux", ...args].join(" ")
 }
 
-export const createRealExecutor = (options: RealExecutorOptions = {}): ICommandExecutor => {
+export const createRealExecutor = (options: RealExecutorOptions = {}): CommandExecutor => {
   const verbose = options.verbose ?? false
   const logger = createLogger({
     level: verbose ? LogLevel.INFO : LogLevel.WARN,
@@ -39,7 +39,7 @@ export const createRealExecutor = (options: RealExecutorOptions = {}): ICommandE
     } catch (error) {
       const execaError = error as { exitCode?: number; stderr?: string; message: string }
 
-      throw new TmuxError("Failed to execute tmux command", ErrorCodes.TMUX_COMMAND_FAILED, {
+      throw createTmuxError("Failed to execute tmux command", ErrorCodes.TMUX_COMMAND_FAILED, {
         command: commandString,
         exitCode: execaError.exitCode,
         stderr: execaError.stderr,

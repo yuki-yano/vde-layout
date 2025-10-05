@@ -1,8 +1,16 @@
-import type { IPresetManager } from "../../interfaces/index.ts"
 import type { Preset, PresetInfo } from "../../models/types.ts"
+import type { PresetManager } from "../../types/preset-manager.ts"
 
-export class MockPresetManager implements IPresetManager {
-  private presets: Record<string, Preset> = {
+export type MockPresetManager = PresetManager & {
+  readonly setPresets: (presets: Record<string, Preset>) => void
+  readonly setShouldFailOnLoad: (shouldFail: boolean) => void
+  readonly wasLoadConfigCalled: () => boolean
+  readonly resetLoadConfigCalled: () => void
+  readonly getConfigPath: () => string | undefined
+}
+
+export const createMockPresetManager = (): MockPresetManager => {
+  let presets: Record<string, Preset> = {
     default: {
       name: "Default Layout",
       layout: {
@@ -21,59 +29,66 @@ export class MockPresetManager implements IPresetManager {
     },
   }
 
-  private loadConfigCalled = false
-  private shouldFailOnLoad = false
-  private configPath: string | undefined
+  let loadConfigCalled = false
+  let shouldFailOnLoad = false
+  let configPath: string | undefined
 
-  async loadConfig(): Promise<void> {
-    this.loadConfigCalled = true
-    if (this.shouldFailOnLoad) {
+  const loadConfig = async () => {
+    loadConfigCalled = true
+    if (shouldFailOnLoad) {
       throw new Error("Configuration file not found")
     }
   }
 
-  setConfigPath(path: string): void {
-    this.configPath = path
+  const setConfigPath = (path: string) => {
+    configPath = path
   }
 
-  getPreset(name: string): Preset {
-    const preset = this.presets[name]
+  const getPreset = (name: string): Preset => {
+    const preset = presets[name]
     if (!preset) {
       throw new Error(`Preset "${name}" not found`)
     }
     return preset
   }
 
-  getDefaultPreset(): Preset {
-    return this.presets.default!
+  const getDefaultPreset = (): Preset => {
+    return presets.default!
   }
 
-  listPresets(): PresetInfo[] {
-    return Object.entries(this.presets).map(([key, preset]) => ({
-      key: key,
+  const listPresets = (): PresetInfo[] => {
+    return Object.entries(presets).map(([key, preset]) => ({
+      key,
       name: preset.name,
       description: preset.description,
     }))
   }
 
-  // Test helper methods
-  setPresets(presets: Record<string, Preset>): void {
-    this.presets = presets
+  const setPresets = (next: Record<string, Preset>) => {
+    presets = next
   }
 
-  setShouldFailOnLoad(shouldFail: boolean): void {
-    this.shouldFailOnLoad = shouldFail
+  const setShouldFailOnLoad = (shouldFail: boolean) => {
+    shouldFailOnLoad = shouldFail
   }
 
-  wasLoadConfigCalled(): boolean {
-    return this.loadConfigCalled
+  const wasLoadConfigCalled = () => loadConfigCalled
+  const resetLoadConfigCalled = () => {
+    loadConfigCalled = false
   }
 
-  resetLoadConfigCalled(): void {
-    this.loadConfigCalled = false
-  }
+  const getConfigPath = () => configPath
 
-  getConfigPath(): string | undefined {
-    return this.configPath
+  return {
+    loadConfig,
+    getPreset,
+    getDefaultPreset,
+    listPresets,
+    setConfigPath,
+    setPresets,
+    setShouldFailOnLoad,
+    wasLoadConfigCalled,
+    resetLoadConfigCalled,
+    getConfigPath,
   }
 }

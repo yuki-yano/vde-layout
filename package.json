@@ -64,18 +64,18 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@eslint/js": "^9.32.0",
+    "@eslint/js": "^9.37.0",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.11.5",
     "@vitest/coverage-v8": "^1.2.1",
     "@vitest/runner": "^3.2.4",
-    "eslint": "^9.32.0",
-    "eslint-config-prettier": "^9.1.0",
-    "globals": "^16.3.0",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
     "prettier": "^3.2.4",
     "tsdown": "^0.15.6",
     "typescript": "^5.3.3",
-    "typescript-eslint": "^8.38.0",
+    "typescript-eslint": "^8.45.0",
     "vitest": "^1.2.1"
   },
   "engines": {

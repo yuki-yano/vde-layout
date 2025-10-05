@@ -1,11 +1,11 @@
 import { describe, expect, it, beforeEach } from "vitest"
-import { TmuxCommandGenerator } from "../commands.ts"
+import { createTmuxCommandGenerator } from "../commands.ts"
 
-describe("TmuxCommandGenerator", () => {
-  let generator: TmuxCommandGenerator
+describe("createTmuxCommandGenerator", () => {
+  let generator: ReturnType<typeof createTmuxCommandGenerator>
 
   beforeEach(() => {
-    generator = new TmuxCommandGenerator()
+    generator = createTmuxCommandGenerator()
   })
 
   describe("splitWindow", () => {

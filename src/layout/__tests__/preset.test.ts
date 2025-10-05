@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { PresetManager } from "../preset.ts"
-import { ConfigError } from "../../utils/errors.ts"
+import { createPresetManager } from "../preset.ts"
 import * as fs from "fs/promises"
 import * as path from "path"
 import * as os from "os"
+import type { PresetManager } from "../../types/preset-manager.ts"
 
 describe("PresetManager", () => {
   let presetManager: PresetManager
@@ -16,7 +16,7 @@ describe("PresetManager", () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "vde-layout-test-"))
 
     // Specify only specific path to PresetManager for testing
-    presetManager = new PresetManager({
+    presetManager = createPresetManager({
       configPaths: [path.join(tempDir, "layout.yml")],
     })
 
@@ -85,7 +85,7 @@ presets:
 
     it("should handle configuration loading errors", async () => {
       // When configuration file does not exist
-      await expect(presetManager.loadConfig()).rejects.toThrow(ConfigError)
+      await expect(presetManager.loadConfig()).rejects.toThrow(/Configuration file not found/)
     })
 
     it("should handle validation errors", async () => {
@@ -152,13 +152,11 @@ presets:
       await fs.writeFile(path.join(tempDir, "layout.yml"), yamlContent)
       await presetManager.loadConfig()
 
-      expect(() => presetManager.getPreset("nonexistent")).toThrow(ConfigError)
-      expect(() => presetManager.getPreset("nonexistent")).toThrow('Preset "nonexistent" not found')
+      expect(() => presetManager.getPreset("nonexistent")).toThrow(/Preset "nonexistent" not found/)
     })
 
     it("should throw error if config not loaded", () => {
-      expect(() => presetManager.getPreset("default")).toThrow(ConfigError)
-      expect(() => presetManager.getPreset("default")).toThrow("Configuration not loaded")
+      expect(() => presetManager.getPreset("default")).toThrow(/Configuration not loaded/)
     })
   })
 

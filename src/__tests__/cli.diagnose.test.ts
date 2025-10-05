@@ -1,25 +1,34 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi, type Mock } from "vitest"
 import { createCli } from "../cli.ts"
-import type { IPresetManager } from "../interfaces/index.ts"
 import type { Preset, PresetInfo } from "../models/types.ts"
+import type { PresetManager } from "../types/preset-manager.ts"
 
-class StubPresetManager implements IPresetManager {
-  private readonly preset: Preset
-  readonly loadConfig = vi.fn(async () => {})
-  readonly getPreset = vi.fn((name: string): Preset => {
-    if (name !== this.preset.name) {
+type StubPresetManager = PresetManager & {
+  readonly loadConfig: Mock<[], Promise<void>>
+  readonly getPreset: Mock<[string], Preset>
+  readonly getDefaultPreset: Mock<[], Preset>
+  readonly listPresets: Mock<[], PresetInfo[]>
+}
+
+const createStubPresetManager = (preset: Preset): StubPresetManager => {
+  const loadConfig = vi.fn(async () => {})
+  const getPreset = vi.fn((name: string): Preset => {
+    if (name !== preset.name) {
       throw new Error("preset not found in stub")
     }
-    return this.preset
+    return preset
   })
-  readonly getDefaultPreset = vi.fn((): Preset => this.preset)
-  readonly listPresets = vi.fn((): PresetInfo[] => [
-    { key: this.preset.name, name: this.preset.name, description: this.preset.description },
+  const getDefaultPreset = vi.fn((): Preset => preset)
+  const listPresets = vi.fn((): PresetInfo[] => [
+    { key: preset.name, name: preset.name, description: preset.description },
   ])
 
-  constructor(preset: Preset) {
-    this.preset = preset
-  }
+  return {
+    loadConfig,
+    getPreset,
+    getDefaultPreset,
+    listPresets,
+  } as StubPresetManager
 }
 
 describe("CLI diagnose command", () => {
@@ -36,7 +45,7 @@ describe("CLI diagnose command", () => {
       },
     }
 
-    const presetManager = new StubPresetManager(preset)
+    const presetManager = createStubPresetManager(preset)
     const cli = createCli({ presetManager })
 
     const loggedLines: string[] = []

@@ -1,122 +1,135 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
 import { createCli, type CLI, type FunctionalCoreBridge } from "../cli.ts"
-import type { IPresetManager } from "../interfaces/index.ts"
 import type { Preset, PresetInfo } from "../models/types.ts"
-import type { ICommandExecutor } from "../interfaces/command-executor.ts"
+import type { CommandExecutor } from "../types/command-executor.ts"
+import type { PresetManager } from "../types/preset-manager.ts"
 import {
   compilePreset as defaultCompilePreset,
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
 } from "../core/index.ts"
 
-class RecordingExecutor implements ICommandExecutor {
-  readonly commands: string[][] = []
-  private paneIds: string[] = ["%0"]
-  private paneCounter = 0
+const createRecordingExecutor = (
+  dryRun: boolean,
+): CommandExecutor & {
+  readonly commands: string[][]
+  readonly verifyTmuxEnvironment: () => Promise<void>
+  readonly isInTmuxSession: () => boolean
+  readonly getCommandString: (args: string[]) => string
+  readonly getCurrentSessionName: () => Promise<string>
+} => {
+  const state = {
+    commands: [] as string[][],
+    paneIds: ["%0"],
+    paneCounter: 0,
+  }
 
-  constructor(private readonly dryRun: boolean) {}
+  const parseArgs = (command: string | string[]): string[] => {
+    return typeof command === "string"
+      ? command
+          .split(" ")
+          .filter((segment) => segment.length > 0)
+          .slice(1)
+      : command
+  }
 
-  async execute(command: string | string[]): Promise<string> {
-    const args =
-      typeof command === "string"
-        ? command
-            .split(" ")
-            .filter((segment) => segment.length > 0)
-            .slice(1)
-        : command
-    this.commands.push([...args])
+  const execute = async (command: string | string[]): Promise<string> => {
+    const args = parseArgs(command)
+    state.commands.push([...args])
 
     const [cmd] = args
     if (cmd === "display-message" && args.includes("#{pane_id}")) {
-      return this.paneIds[0] ?? "%0"
+      return state.paneIds[0] ?? "%0"
     }
 
     if (cmd === "list-panes" && args.includes("#{pane_id}")) {
-      return this.paneIds.join("\n")
+      return state.paneIds.join("\n")
     }
 
     if (cmd === "split-window") {
-      this.paneCounter += 1
-      const newId = `%${this.paneCounter}`
-      this.paneIds = [...this.paneIds, newId]
+      state.paneCounter += 1
+      const newId = `%${state.paneCounter}`
+      state.paneIds = [...state.paneIds, newId]
     }
 
     return ""
   }
 
-  async executeMany(commandsList: string[][]): Promise<void> {
+  const executeMany = async (commandsList: string[][]): Promise<void> => {
     for (const command of commandsList) {
-      await this.execute(command)
+      await execute(command)
     }
   }
 
-  isDryRun(): boolean {
-    return this.dryRun
-  }
+  const isDryRun = () => dryRun
+  const logCommand = () => {}
 
-  logCommand(): void {}
+  const isInTmuxSession = (): boolean => Boolean(process.env.TMUX)
 
-  async verifyTmuxEnvironment(): Promise<void> {
-    if (!this.isInTmuxSession()) {
+  const verifyTmuxEnvironment = async (): Promise<void> => {
+    if (!isInTmuxSession()) {
       throw new Error("Not running inside a tmux session")
     }
   }
 
-  isInTmuxSession(): boolean {
-    return Boolean(process.env.TMUX)
-  }
+  const getCommandString = (args: string[]): string => ["tmux", ...args].join(" ")
+  const getCurrentSessionName = async (): Promise<string> => "plan-comparison"
 
-  getCommandString(args: string[]): string {
-    return ["tmux", ...args].join(" ")
-  }
-
-  async getCurrentSessionName(): Promise<string> {
-    return "plan-comparison"
+  return {
+    commands: state.commands,
+    execute,
+    executeMany,
+    isDryRun,
+    logCommand,
+    verifyTmuxEnvironment,
+    isInTmuxSession,
+    getCommandString,
+    getCurrentSessionName,
   }
 }
 
-class FixturePresetManager implements IPresetManager {
-  private readonly preset: Preset = {
-    name: "Fixture Development Layout",
-    layout: {
-      type: "horizontal",
-      ratio: [1, 1],
-      panes: [
-        { name: "main", command: "nvim", focus: true },
-        { name: "logs", command: "htop" },
-      ],
-    },
-  }
+const fixturePreset: Preset = {
+  name: "Fixture Development Layout",
+  layout: {
+    type: "horizontal",
+    ratio: [1, 1],
+    panes: [
+      { name: "main", command: "nvim", focus: true },
+      { name: "logs", command: "htop" },
+    ],
+  },
+}
 
-  async loadConfig(): Promise<void> {}
-
-  setConfigPath(): void {}
-
-  getPreset(name: string): Preset {
+const createFixturePresetManager = (): PresetManager => {
+  const loadConfig = async () => {}
+  const setConfigPath = () => {}
+  const getPreset = (name: string): Preset => {
     if (name === "fixture") {
-      return this.preset
+      return fixturePreset
     }
     throw new Error(`Preset "${name}" not found`)
   }
+  const getDefaultPreset = (): Preset => fixturePreset
+  const listPresets = (): PresetInfo[] => [
+    {
+      key: "fixture",
+      name: fixturePreset.name ?? "Fixture Development Layout",
+      description: "Fixture preset for plan parity tests",
+    },
+  ]
 
-  getDefaultPreset(): Preset {
-    return this.preset
-  }
-
-  listPresets(): PresetInfo[] {
-    return [
-      {
-        key: "fixture",
-        name: this.preset.name ?? "Fixture Development Layout",
-        description: "Fixture preset for plan parity tests",
-      },
-    ]
+  return {
+    loadConfig,
+    setConfigPath,
+    getPreset,
+    getDefaultPreset,
+    listPresets,
   }
 }
 
 describe("CLI plan parity", () => {
   let cli: CLI
-  let executor: RecordingExecutor | undefined
+  let executor: ReturnType<typeof createRecordingExecutor> | undefined
   let emissionHashes: string[]
   let originalExit: typeof process.exit
   let exitCode: number | undefined
@@ -137,24 +150,22 @@ describe("CLI plan parity", () => {
       return undefined as never
     }) as never
 
-    const presetManager = new FixturePresetManager()
+    const presetManager = createFixturePresetManager()
 
     const functionalCore: FunctionalCoreBridge = {
       compilePreset: defaultCompilePreset,
       createLayoutPlan: defaultCreateLayoutPlan,
       emitPlan: (input) => {
-        const result = defaultEmitPlan(input)
-        if (result.ok) {
-          emissionHashes.push(result.value.hash)
-        }
-        return result
+        const emission = defaultEmitPlan(input)
+        emissionHashes.push(emission.hash)
+        return emission
       },
     }
 
     cli = createCli({
       presetManager,
       createCommandExecutor: ({ dryRun }) => {
-        executor = new RecordingExecutor(dryRun)
+        executor = createRecordingExecutor(dryRun)
         return executor
       },
       functionalCore,

@@ -8,7 +8,7 @@ afterEach(() => {
 })
 
 // Console mocking utilities
-export interface ConsoleCapture {
+export type ConsoleCapture = {
   output: string[]
   errors: string[]
   logSpy: MockInstance

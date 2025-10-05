@@ -7,12 +7,12 @@ export enum LogLevel {
   DEBUG = 3,
 }
 
-export interface LoggerOptions {
+export type LoggerOptions = {
   readonly level?: LogLevel
   readonly prefix?: string
 }
 
-export interface Logger {
+export type Logger = {
   readonly level: LogLevel
   readonly prefix: string
   error: (message: string, error?: Error) => void

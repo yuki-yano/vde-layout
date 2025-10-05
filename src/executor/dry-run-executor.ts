@@ -1,7 +1,7 @@
-import type { ICommandExecutor } from "../interfaces/command-executor.ts"
+import type { CommandExecutor } from "../types/command-executor.ts"
 import { createLogger, LogLevel } from "../utils/logger.ts"
 
-export interface DryRunExecutorOptions {
+export type DryRunExecutorOptions = {
   readonly verbose?: boolean
 }
 
@@ -18,7 +18,7 @@ const toCommandString = (args: string[]): string => {
   return ["tmux", ...args].join(" ")
 }
 
-export const createDryRunExecutor = (options: DryRunExecutorOptions = {}): ICommandExecutor => {
+export const createDryRunExecutor = (options: DryRunExecutorOptions = {}): CommandExecutor => {
   const verbose = options.verbose ?? false
   const logger = createLogger({
     level: verbose ? LogLevel.INFO : LogLevel.WARN,

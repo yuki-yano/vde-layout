@@ -1,112 +1,91 @@
 import { execa } from "execa"
-import { EnvironmentError, ErrorCodes } from "../utils/errors.ts"
-import type { ITmuxExecutor } from "../interfaces/index.ts"
-import type { ICommandExecutor } from "../interfaces/command-executor.ts"
+import { createEnvironmentError, ErrorCodes } from "../utils/errors.ts"
+import type { TmuxExecutorContract } from "../types/tmux.ts"
+import type { CommandExecutor } from "../types/command-executor.ts"
 import { createRealExecutor, createDryRunExecutor, createMockExecutor } from "../executor/index.ts"
 
-export interface TmuxExecutorOptions {
-  verbose?: boolean
-  dryRun?: boolean
-  executor?: ICommandExecutor
+export type TmuxExecutorOptions = {
+  readonly verbose?: boolean
+  readonly dryRun?: boolean
+  readonly executor?: CommandExecutor
 }
 
-/**
- * Class that manages tmux command execution
- * Provides safe command execution and error handling
- */
-export class TmuxExecutor implements ITmuxExecutor {
-  private readonly executor: ICommandExecutor
+export type TmuxExecutor = TmuxExecutorContract & {
+  readonly getExecutor: () => CommandExecutor
+}
 
-  constructor(options: TmuxExecutorOptions = {}) {
-    if (options.executor) {
-      this.executor = options.executor
-    } else if (options.dryRun === true) {
-      this.executor = createDryRunExecutor({ verbose: options.verbose })
-    } else if (this.isTestEnvironment()) {
-      // Automatically use MockExecutor in test environment when not dry-run
-      this.executor = createMockExecutor()
-    } else {
-      this.executor = createRealExecutor({ verbose: options.verbose })
-    }
-  }
+export const createTmuxExecutor = (options: TmuxExecutorOptions = {}): TmuxExecutor => {
+  const executor = resolveExecutor(options)
 
-  private isTestEnvironment(): boolean {
-    return process.env.VDE_TEST_MODE === "true" || process.env.NODE_ENV === "test" || process.env.VITEST === "true"
-  }
-
-  /**
-   * Check if currently inside a tmux session
-   * @returns true if inside a tmux session
-   */
-  isInTmuxSession(): boolean {
+  const isInTmuxSession = (): boolean => {
     return Boolean(process.env.TMUX)
   }
 
-  /**
-   * Verify that tmux environment is properly configured
-   * @throws {EnvironmentError} When outside tmux session or tmux is unavailable
-   */
-  async verifyTmuxEnvironment(): Promise<void> {
-    if (!this.isInTmuxSession()) {
-      throw new EnvironmentError("Must be run inside a tmux session", ErrorCodes.NOT_IN_TMUX, {
+  const verifyTmuxEnvironment = async (): Promise<void> => {
+    if (!isInTmuxSession()) {
+      throw createEnvironmentError("Must be run inside a tmux session", ErrorCodes.NOT_IN_TMUX, {
         hint: "Please start a tmux session and try again",
       })
     }
 
-    // Skip tmux command check in dry-run mode or test mode
-    if (this.executor.isDryRun()) {
+    if (executor.isDryRun()) {
       return
     }
 
-    // Check if tmux command is available
     try {
       await execa("tmux", ["-V"])
     } catch (_error) {
-      throw new EnvironmentError("tmux is not installed", ErrorCodes.TMUX_NOT_FOUND, {
+      throw createEnvironmentError("tmux is not installed", ErrorCodes.TMUX_NOT_FOUND, {
         hint: "Please install tmux",
       })
     }
   }
 
-  /**
-   * Execute tmux command
-   * @param args - Array of tmux command arguments or command string
-   * @returns Standard output of the command
-   * @throws {TmuxError} When command execution fails
-   */
-  async execute(commandOrArgs: string | string[]): Promise<string> {
-    return this.executor.execute(commandOrArgs)
+  const execute = async (commandOrArgs: string | string[]): Promise<string> => {
+    return executor.execute(commandOrArgs)
   }
 
-  /**
-   * Execute multiple tmux commands in sequence
-   * @param commandsList - Array of commands to execute
-   */
-  async executeMany(commandsList: string[][]): Promise<void> {
-    return this.executor.executeMany(commandsList)
+  const executeMany = async (commandsList: string[][]): Promise<void> => {
+    for (const command of commandsList) {
+      await execute(command)
+    }
   }
 
-  /**
-   * Convert command array to string format
-   * @param args - Array of tmux command arguments
-   * @returns Formatted command string
-   */
-  getCommandString(args: string[]): string {
+  const getCommandString = (args: string[]): string => {
     return ["tmux", ...args].join(" ")
   }
 
-  /**
-   * Get current tmux session name
-   * @returns Session name
-   */
-  async getCurrentSessionName(): Promise<string> {
-    return this.execute(["display-message", "-p", "#{session_name}"])
+  const getCurrentSessionName = async (): Promise<string> => {
+    return execute(["display-message", "-p", "#{session_name}"])
   }
 
-  /**
-   * Get the internal executor (for testing purposes)
-   */
-  getExecutor(): ICommandExecutor {
-    return this.executor
+  return {
+    verifyTmuxEnvironment,
+    execute,
+    executeMany,
+    isInTmuxSession,
+    getCurrentSessionName,
+    getCommandString,
+    getExecutor: () => executor,
   }
+}
+
+const resolveExecutor = (options: TmuxExecutorOptions): CommandExecutor => {
+  if (options.executor) {
+    return options.executor
+  }
+
+  if (options.dryRun === true) {
+    return createDryRunExecutor({ verbose: options.verbose })
+  }
+
+  if (isTestEnvironment()) {
+    return createMockExecutor()
+  }
+
+  return createRealExecutor({ verbose: options.verbose })
+}
+
+const isTestEnvironment = (): boolean => {
+  return process.env.VDE_TEST_MODE === "true" || process.env.NODE_ENV === "test" || process.env.VITEST === "true"
 }

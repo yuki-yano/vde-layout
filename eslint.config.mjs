@@ -36,6 +36,7 @@ export default [
       ],
       "@typescript-eslint/explicit-function-return-type": "warn",
       "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/consistent-type-definitions": ["error", "type"],
       "eqeqeq": ["error", "smart"],
     },
   },

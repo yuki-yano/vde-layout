@@ -1,16 +1,15 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
-import { TmuxExecutor } from "../executor.ts"
-import { EnvironmentError } from "../../utils/errors.ts"
+import { createTmuxExecutor, type TmuxExecutor } from "../executor.ts"
 import { createMockExecutor, type MockExecutor } from "../../executor/mock-executor.ts"
 
-describe("TmuxExecutor", () => {
+describe("createTmuxExecutor", () => {
   let executor: TmuxExecutor
   let mockExecutor: MockExecutor
   let originalTMUX: string | undefined
 
   beforeEach(() => {
     mockExecutor = createMockExecutor()
-    executor = new TmuxExecutor({ executor: mockExecutor })
+    executor = createTmuxExecutor({ executor: mockExecutor })
     originalTMUX = process.env.TMUX
   })
 
@@ -23,19 +22,20 @@ describe("TmuxExecutor", () => {
     vi.restoreAllMocks()
   })
 
-  describe("constructor", () => {
-    it("should create an instance with default options", () => {
-      expect(executor).toBeInstanceOf(TmuxExecutor)
+  describe("factory", () => {
+    it("creates executor with default options", () => {
+      const defaultExecutor = createTmuxExecutor()
+      expect(typeof defaultExecutor.execute).toBe("function")
     })
 
-    it("should accept verbose option", () => {
-      const verboseExecutor = new TmuxExecutor({ verbose: true })
-      expect(verboseExecutor).toBeInstanceOf(TmuxExecutor)
+    it("respects verbose option", () => {
+      const verboseExecutor = createTmuxExecutor({ verbose: true })
+      expect(typeof verboseExecutor.getCommandString).toBe("function")
     })
 
-    it("should accept dryRun option", () => {
-      const dryRunExecutor = new TmuxExecutor({ dryRun: true })
-      expect(dryRunExecutor).toBeInstanceOf(TmuxExecutor)
+    it("respects dryRun option", () => {
+      const dryRunExecutor = createTmuxExecutor({ dryRun: true })
+      expect(dryRunExecutor.getExecutor().isDryRun()).toBe(true)
     })
   })
 
@@ -57,11 +57,10 @@ describe("TmuxExecutor", () => {
   })
 
   describe("verifyTmuxEnvironment", () => {
-    it("should throw EnvironmentError when not in tmux session", async () => {
+    it("should throw informative error when not in tmux session", async () => {
       delete process.env.TMUX
 
-      await expect(executor.verifyTmuxEnvironment()).rejects.toThrow(EnvironmentError)
-      await expect(executor.verifyTmuxEnvironment()).rejects.toThrow("Must be run inside a tmux session")
+      await expect(executor.verifyTmuxEnvironment()).rejects.toThrow(/Must be run inside a tmux session/)
     })
 
     // Skip actual tmux command existence check (considering CI environment execution)
@@ -93,7 +92,7 @@ describe("TmuxExecutor", () => {
 
     it("should log commands in verbose dry-run mode", async () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
-      const dryRunExecutor = new TmuxExecutor({ dryRun: true, verbose: true })
+      const dryRunExecutor = createTmuxExecutor({ dryRun: true, verbose: true })
 
       await dryRunExecutor.execute(["new-window"])
       expect(logSpy).toHaveBeenCalledWith("[tmux] [DRY RUN] Would execute: tmux new-window")

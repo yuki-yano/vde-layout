@@ -18,8 +18,6 @@ export type {
   FunctionalPreset,
   FunctionalSplitPane,
   FunctionalTerminalPane,
-  Result,
-  StructuredError,
 } from "./compile.ts"
 
 export type {
@@ -31,10 +29,13 @@ export type {
   PlanTerminal,
 } from "./planner.ts"
 
-export type { CommandStep, PlanEmission, PlanEmissionSummary } from "./emitter.ts"
+export type { CommandStep, PlanEmission, PlanEmissionSummary, EmittedTerminal } from "./emitter.ts"
 
 export type {
   CompileFunctionalCorePipelineSuccess,
   CompileFunctionalCorePipelineInput,
   FunctionalCorePipelineDependencies,
 } from "./pipeline.ts"
+
+export type { FunctionalCoreError, FunctionalCoreErrorKind } from "./errors.ts"
+export { isFunctionalCoreError } from "./errors.ts"

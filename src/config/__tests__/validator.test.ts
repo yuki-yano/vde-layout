@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest"
 import { validateYAML } from "../validator.ts"
-import { ValidationError } from "../../utils/errors.ts"
+import { isVDELayoutError, type VDELayoutError } from "../../utils/errors.ts"
+
+const captureValidationError = (fn: () => unknown): VDELayoutError => {
+  try {
+    fn()
+    expect.fail("ValidationError が投げられることを期待しました")
+  } catch (error) {
+    expect(isVDELayoutError(error)).toBe(true)
+    const vdeError = error as VDELayoutError
+    expect(vdeError.name).toBe("ValidationError")
+    return vdeError
+  }
+
+  throw new Error("unreachable")
+}
 
 describe("validateYAML", () => {
   describe("valid configurations", () => {
@@ -141,8 +155,8 @@ presets:
       type: horizontal
     invalid indentation here
 `
-      expect(() => validateYAML(yaml)).toThrow(ValidationError)
-      expect(() => validateYAML(yaml)).toThrow(/Failed to parse YAML/)
+      const error = captureValidationError(() => validateYAML(yaml))
+      expect(error.message).toMatch(/Failed to parse YAML/)
     })
 
     it("should throw ValidationError for missing presets", () => {
@@ -150,8 +164,8 @@ presets:
 config:
   something: else
 `
-      expect(() => validateYAML(yaml)).toThrow(ValidationError)
-      expect(() => validateYAML(yaml)).toThrow(/presets field is required/)
+      const error = captureValidationError(() => validateYAML(yaml))
+      expect(error.message).toMatch(/presets field is required/)
     })
 
     it("should throw ValidationError for invalid layout type", () => {
@@ -168,7 +182,7 @@ presets:
         - name: monitor
           command: htop
 `
-      expect(() => validateYAML(yaml)).toThrow(ValidationError)
+      captureValidationError(() => validateYAML(yaml))
     })
 
     it("should accept terminal pane without command", () => {
@@ -197,8 +211,8 @@ presets:
       type: horizontal
       ratio: [50, 50]
 `
-      expect(() => validateYAML(yaml)).toThrow(ValidationError)
-      expect(() => validateYAML(yaml)).toThrow()
+      const error = captureValidationError(() => validateYAML(yaml))
+      expect(error.message).toBeTruthy()
     })
 
     it("should throw ValidationError for ratio/panes mismatch", () => {
@@ -215,8 +229,8 @@ presets:
         - name: monitor
           command: htop
 `
-      expect(() => validateYAML(yaml)).toThrow(ValidationError)
-      expect(() => validateYAML(yaml)).toThrow(
+      const error = captureValidationError(() => validateYAML(yaml))
+      expect(error.message).toMatch(
         /Number of elements in ratio array does not match number of elements in panes array/,
       )
     })
@@ -255,7 +269,7 @@ presets:
         - name: monitor
           command: htop
 `
-      expect(() => validateYAML(yaml)).toThrow(ValidationError)
+      captureValidationError(() => validateYAML(yaml))
     })
 
     it("should throw ValidationError for additional unknown fields", () => {
@@ -271,15 +285,15 @@ presets:
           command: vim
           unknownField: value
 `
-      expect(() => validateYAML(yaml)).toThrow(ValidationError)
+      captureValidationError(() => validateYAML(yaml))
     })
 
     it("should throw ValidationError for empty presets", () => {
       const yaml = `
 presets: {}
 `
-      expect(() => validateYAML(yaml)).toThrow(ValidationError)
-      expect(() => validateYAML(yaml)).toThrow(/At least one preset is required/)
+      const error = captureValidationError(() => validateYAML(yaml))
+      expect(error.message).toMatch(/At least one preset is required/)
     })
 
     it("should throw ValidationError for invalid preset structure", () => {
@@ -287,17 +301,17 @@ presets: {}
 presets:
   empty: []
 `
-      expect(() => validateYAML(yaml)).toThrow(ValidationError)
+      captureValidationError(() => validateYAML(yaml))
     })
   })
 
   describe("edge cases", () => {
     it("should handle empty string", () => {
-      expect(() => validateYAML("")).toThrow(ValidationError)
+      captureValidationError(() => validateYAML(""))
     })
 
     it("should handle null input", () => {
-      expect(() => validateYAML(null as unknown as string)).toThrow(ValidationError)
+      captureValidationError(() => validateYAML(null as unknown as string))
     })
 
     it("should handle deeply nested layouts", () => {
@@ -366,19 +380,9 @@ presets:
         - name: invalid-cwd
           cwd: []
 `
-
-      try {
-        validateYAML(yaml)
-        expect.fail("Should have thrown ValidationError")
-      } catch (error) {
-        expect(error).toBeInstanceOf(ValidationError)
-        const validationError = error as ValidationError
-        // Confirm error is ValidationError
-        expect(validationError.message).toBeDefined()
-        expect(validationError.details).toBeDefined()
-        // Confirm error message exists
-        expect(validationError.message.length).toBeGreaterThan(0)
-      }
+      const validationError = captureValidationError(() => validateYAML(yaml))
+      expect(validationError.message).toBeTruthy()
+      expect(validationError.details).toBeDefined()
     })
   })
 })

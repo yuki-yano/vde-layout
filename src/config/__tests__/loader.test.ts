@@ -2,8 +2,7 @@ import fs from "fs-extra"
 import os from "os"
 import path from "path"
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest"
-import { ConfigLoader } from "../loader.ts"
-import { ConfigError } from "../../utils/errors.ts"
+import { createConfigLoader, type ConfigLoader } from "../loader.ts"
 
 describe("ConfigLoader", () => {
   let loader: ConfigLoader
@@ -20,7 +19,7 @@ describe("ConfigLoader", () => {
       delete process.env.XDG_CONFIG_HOME
       process.env.HOME = "/home/user"
 
-      loader = new ConfigLoader()
+      loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
       expect(searchPaths).toHaveLength(1)
@@ -32,7 +31,7 @@ describe("ConfigLoader", () => {
       process.env.XDG_CONFIG_HOME = "/mock/.config"
       process.env.HOME = "/mock/home"
 
-      loader = new ConfigLoader()
+      loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
       expect(searchPaths).toHaveLength(2)
@@ -41,7 +40,7 @@ describe("ConfigLoader", () => {
     })
 
     it("overrides paths with custom options", () => {
-      loader = new ConfigLoader({
+      loader = createConfigLoader({
         configPaths: ["/custom/path/layout.yml"],
       })
 
@@ -55,7 +54,7 @@ describe("ConfigLoader", () => {
       process.env.VDE_CONFIG_PATH = "/vde/config"
       process.env.XDG_CONFIG_HOME = "/xdg/config"
 
-      loader = new ConfigLoader()
+      loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
       expect(searchPaths[0]).toBe("/vde/config/layout.yml")
@@ -65,7 +64,7 @@ describe("ConfigLoader", () => {
       delete process.env.VDE_CONFIG_PATH
       process.env.XDG_CONFIG_HOME = "/xdg/config"
 
-      loader = new ConfigLoader()
+      loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
       expect(searchPaths[0]).toBe("/xdg/config/vde/layout.yml")
@@ -76,7 +75,7 @@ describe("ConfigLoader", () => {
       delete process.env.XDG_CONFIG_HOME
       process.env.HOME = "/home/user"
 
-      loader = new ConfigLoader()
+      loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
       expect(searchPaths).toContain("/home/user/.config/vde/layout.yml")
@@ -87,7 +86,7 @@ describe("ConfigLoader", () => {
       process.env.XDG_CONFIG_HOME = "/home/user/.config"
       process.env.HOME = "/home/user"
 
-      loader = new ConfigLoader()
+      loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
       // Duplicates are removed, leaving only one
@@ -99,11 +98,11 @@ describe("ConfigLoader", () => {
   describe("loadConfig - unit test", () => {
     it("throws ConfigError with appropriate error code", async () => {
       // Simulate file not existing
-      loader = new ConfigLoader({
+      loader = createConfigLoader({
         configPaths: ["/non/existent/path/layout.yml"],
       })
 
-      await expect(loader.loadConfig()).rejects.toThrow(ConfigError)
+      await expect(loader.loadConfig()).rejects.toThrow(/Configuration file not found/)
     })
   })
 
@@ -139,7 +138,7 @@ describe("ConfigLoader", () => {
         "utf8",
       )
 
-      const loaderWithLocal = new ConfigLoader()
+      const loaderWithLocal = createConfigLoader()
       const searchPaths = loaderWithLocal.getSearchPaths()
 
       expect(searchPaths[0]).toBe(localConfigPath)
@@ -160,7 +159,7 @@ describe("ConfigLoader", () => {
         "utf8",
       )
 
-      const loaderWithMerge = new ConfigLoader()
+      const loaderWithMerge = createConfigLoader()
       const config = await loaderWithMerge.loadConfig()
 
       expect(Object.keys(config.presets)).toContain("shared")

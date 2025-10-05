@@ -15,24 +15,9 @@ layout:
       command: node
 `
 
-    const compiled = compilePreset({ document, source: "tests/emit.yml" })
-    if (!compiled.ok) {
-      throw compiled.error
-    }
-
-    const planResult = createLayoutPlan({ preset: compiled.value.preset })
-    if (!planResult.ok) {
-      throw planResult.error
-    }
-
-    const emissionResult = emitPlan({ plan: planResult.value.plan })
-
-    expect(emissionResult.ok).toBe(true)
-    if (!emissionResult.ok) {
-      throw emissionResult.error
-    }
-
-    const emission = emissionResult.value
+    const { preset } = compilePreset({ document, source: "tests/emit.yml" })
+    const { plan } = createLayoutPlan({ preset })
+    const emission = emitPlan({ plan })
     expect(emission.steps).toHaveLength(2)
     expect(emission.steps[0]).toMatchObject({
       kind: "split",
@@ -55,24 +40,11 @@ layout:
     - name: aux
 `
 
-    const compiled = compilePreset({ document, source: "tests/stable.yml" })
-    if (!compiled.ok) {
-      throw compiled.error
-    }
-
-    const planResult = createLayoutPlan({ preset: compiled.value.preset })
-    if (!planResult.ok) {
-      throw planResult.error
-    }
-
-    const emission = emitPlan({ plan: planResult.value.plan })
-    expect(emission.ok).toBe(true)
-    if (!emission.ok) {
-      throw emission.error
-    }
-
-    expect(emission.value.steps).not.toHaveLength(0)
-    expect(emission.value.hash).toMatch(/^[a-f0-9]{64}$/)
+    const { preset } = compilePreset({ document, source: "tests/stable.yml" })
+    const { plan } = createLayoutPlan({ preset })
+    const emission = emitPlan({ plan })
+    expect(emission.steps).not.toHaveLength(0)
+    expect(emission.hash).toMatch(/^[a-f0-9]{64}$/)
   })
 
   it("単一ペインのPlanではフォーカスステップのみを生成する", () => {
@@ -80,30 +52,17 @@ layout:
 name: single
 `
 
-    const compiled = compilePreset({ document, source: "tests/single-emitter.yml" })
-    if (!compiled.ok) {
-      throw compiled.error
-    }
-
-    const planResult = createLayoutPlan({ preset: compiled.value.preset })
-    if (!planResult.ok) {
-      throw planResult.error
-    }
-
-    const emission = emitPlan({ plan: planResult.value.plan })
-    expect(emission.ok).toBe(true)
-    if (!emission.ok) {
-      throw emission.error
-    }
-
-    expect(emission.value.steps).toHaveLength(1)
-    expect(emission.value.steps[0]).toMatchObject({
+    const { preset } = compilePreset({ document, source: "tests/single-emitter.yml" })
+    const { plan } = createLayoutPlan({ preset })
+    const emission = emitPlan({ plan })
+    expect(emission.steps).toHaveLength(1)
+    expect(emission.steps[0]).toMatchObject({
       kind: "focus",
       command: ["select-pane", "-t", "root"],
     })
-    expect(emission.value.summary.stepsCount).toBe(1)
-    expect(emission.value.summary.initialPaneId).toBe("root")
-    expect(emission.value.hash).toMatch(/^[a-f0-9]{64}$/)
+    expect(emission.summary.stepsCount).toBe(1)
+    expect(emission.summary.initialPaneId).toBe("root")
+    expect(emission.hash).toMatch(/^[a-f0-9]{64}$/)
   })
 
   it("複数のsplitを含むPlanで割合を丸めてコマンドを生成する", () => {
@@ -122,23 +81,9 @@ layout:
     - name: third
 `
 
-    const compiled = compilePreset({ document, source: "tests/nested.yml" })
-    if (!compiled.ok) {
-      throw compiled.error
-    }
-
-    const planResult = createLayoutPlan({ preset: compiled.value.preset })
-    if (!planResult.ok) {
-      throw planResult.error
-    }
-
-    const emissionResult = emitPlan({ plan: planResult.value.plan })
-    expect(emissionResult.ok).toBe(true)
-    if (!emissionResult.ok) {
-      throw emissionResult.error
-    }
-
-    const emission = emissionResult.value
+    const { preset } = compilePreset({ document, source: "tests/nested.yml" })
+    const { plan } = createLayoutPlan({ preset })
+    const emission = emitPlan({ plan })
     const splitSteps = emission.steps.filter((step) => step.kind === "split")
     expect(splitSteps).toEqual([
       expect.objectContaining({
@@ -168,23 +113,12 @@ layout:
     - name: aux
 `
 
-    const compiled = compilePreset({ document, source: "tests/hash.yml" })
-    if (!compiled.ok) {
-      throw compiled.error
-    }
+    const { preset } = compilePreset({ document, source: "tests/hash.yml" })
+    const { plan } = createLayoutPlan({ preset })
 
-    const planResult = createLayoutPlan({ preset: compiled.value.preset })
-    if (!planResult.ok) {
-      throw planResult.error
-    }
+    const first = emitPlan({ plan })
+    const second = emitPlan({ plan })
 
-    const first = emitPlan({ plan: planResult.value.plan })
-    const second = emitPlan({ plan: planResult.value.plan })
-
-    if (!first.ok || !second.ok) {
-      throw new Error("expected success")
-    }
-
-    expect(first.value.hash).toBe(second.value.hash)
+    expect(first.hash).toBe(second.hash)
   })
 })
