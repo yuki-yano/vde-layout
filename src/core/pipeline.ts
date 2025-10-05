@@ -5,19 +5,19 @@ import { createLayoutPlan } from "./planner.ts"
 import type { PlanEmission } from "./emitter.ts"
 import { emitPlan } from "./emitter.ts"
 
-export type CompileFunctionalCorePipelineSuccess = {
+type CompileFunctionalCorePipelineSuccess = {
   readonly preset: FunctionalPreset
   readonly plan: LayoutPlan
   readonly emission: PlanEmission
 }
 
-export type FunctionalCorePipelineDependencies = {
+type FunctionalCorePipelineDependencies = {
   readonly compilePreset: typeof compilePreset
   readonly createLayoutPlan: typeof createLayoutPlan
   readonly emitPlan: typeof emitPlan
 }
 
-export type CompileFunctionalCorePipelineInput = CompilePresetInput
+type CompileFunctionalCorePipelineInput = CompilePresetInput
 
 export const compileFunctionalCorePipeline = (
   input: CompileFunctionalCorePipelineInput,

@@ -6,13 +6,13 @@ import { createFunctionalError } from "../core/errors.ts"
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'
 
-export type ExecutePlanInput = {
+type ExecutePlanInput = {
   readonly emission: PlanEmission
   readonly executor: CommandExecutor
   readonly windowName?: string
 }
 
-export type ExecutePlanSuccess = {
+type ExecutePlanSuccess = {
   readonly executedSteps: number
 }
 

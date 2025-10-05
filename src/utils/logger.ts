@@ -7,7 +7,7 @@ export enum LogLevel {
   DEBUG = 3,
 }
 
-export type LoggerOptions = {
+type LoggerOptions = {
   readonly level?: LogLevel
   readonly prefix?: string
 }
@@ -82,5 +82,3 @@ export const createLogger = (options: LoggerOptions = {}): Logger => {
 
   return build(prefix, level)
 }
-
-export const logger = createLogger()

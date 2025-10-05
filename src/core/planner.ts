@@ -1,11 +1,11 @@
 import type { FunctionalLayoutNode, FunctionalPreset, FunctionalSplitPane, FunctionalTerminalPane } from "./compile.ts"
 import { createFunctionalError, type FunctionalCoreError } from "./errors.ts"
 
-export type CreateLayoutPlanInput = {
+type CreateLayoutPlanInput = {
   readonly preset: FunctionalPreset
 }
 
-export type PlanTerminal = {
+type PlanTerminal = {
   readonly kind: "terminal"
   readonly id: string
   readonly name: string
@@ -16,7 +16,7 @@ export type PlanTerminal = {
   readonly options?: Readonly<Record<string, unknown>>
 }
 
-export type PlanSplit = {
+type PlanSplit = {
   readonly kind: "split"
   readonly id: string
   readonly orientation: "horizontal" | "vertical"

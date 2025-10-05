@@ -55,7 +55,7 @@ export const ConfigSchema = z.object({
 })
 
 // Validation result type
-export type ValidationResult<T> = {
+type ValidationResult<T> = {
   success: boolean
   data?: T
   error?: string

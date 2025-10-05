@@ -25,7 +25,7 @@ export type FunctionalSplitPane = {
 
 export type FunctionalLayoutNode = FunctionalTerminalPane | FunctionalSplitPane
 
-export type FunctionalPresetMetadata = {
+type FunctionalPresetMetadata = {
   readonly source: string
 }
 

@@ -2,13 +2,13 @@ import { parse } from "yaml"
 
 export type DiagnosticsSeverity = "high" | "medium" | "low"
 
-export type DiagnosticsFinding = {
+type DiagnosticsFinding = {
   readonly path: string
   readonly severity: DiagnosticsSeverity
   readonly description: string
 }
 
-export type DiagnosticsBacklogItem = {
+type DiagnosticsBacklogItem = {
   readonly id: string
   readonly severity: DiagnosticsSeverity
   readonly summary: string
@@ -21,7 +21,7 @@ export type DiagnosticsReport = {
   readonly backlog: ReadonlyArray<DiagnosticsBacklogItem>
 }
 
-export type DiagnosticsInput = {
+type DiagnosticsInput = {
   readonly presetDocument: string
   readonly knownIssues?: ReadonlyArray<string>
 }

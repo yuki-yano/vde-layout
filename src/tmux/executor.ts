@@ -4,7 +4,7 @@ import type { TmuxExecutorContract } from "../types/tmux.ts"
 import type { CommandExecutor } from "../types/command-executor.ts"
 import { createRealExecutor, createDryRunExecutor, createMockExecutor } from "../executor/index.ts"
 
-export type TmuxExecutorOptions = {
+type TmuxExecutorOptions = {
   readonly verbose?: boolean
   readonly dryRun?: boolean
   readonly executor?: CommandExecutor

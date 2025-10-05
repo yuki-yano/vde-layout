@@ -1,4 +1,4 @@
-export type FunctionalCoreErrorKind = "compile" | "plan" | "emit" | "execution"
+type FunctionalCoreErrorKind = "compile" | "plan" | "emit" | "execution"
 
 export type FunctionalCoreError = {
   readonly kind: FunctionalCoreErrorKind

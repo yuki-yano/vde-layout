@@ -1,6 +1,3 @@
 export { createRealExecutor } from "./real-executor.ts"
 export { createDryRunExecutor } from "./dry-run-executor.ts"
 export { createMockExecutor } from "./mock-executor.ts"
-export type { RealExecutorOptions } from "./real-executor.ts"
-export type { DryRunExecutorOptions } from "./dry-run-executor.ts"
-export type { MockExecutor } from "./mock-executor.ts"

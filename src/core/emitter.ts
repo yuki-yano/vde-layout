@@ -1,11 +1,11 @@
 import { createHash } from "crypto"
-import type { LayoutPlan, PlanNode, PlanSplit } from "./planner.ts"
+import type { LayoutPlan, PlanNode } from "./planner.ts"
 
-export type EmitPlanInput = {
+type EmitPlanInput = {
   readonly plan: LayoutPlan
 }
 
-export type CommandStepKind = "split" | "focus"
+type CommandStepKind = "split" | "focus"
 
 export type CommandStep = {
   readonly id: string
@@ -25,7 +25,7 @@ export type EmittedTerminal = {
   readonly name: string
 }
 
-export type PlanEmissionSummary = {
+type PlanEmissionSummary = {
   readonly stepsCount: number
   readonly focusPaneId: string
   readonly initialPaneId: string
@@ -37,6 +37,8 @@ export type PlanEmission = {
   readonly terminals: ReadonlyArray<EmittedTerminal>
   readonly hash: string
 }
+
+type SplitNode = Extract<PlanNode, { kind: "split" }>
 
 export const emitPlan = ({ plan }: EmitPlanInput): PlanEmission => {
   const steps: CommandStep[] = []
@@ -75,7 +77,7 @@ const collectSplitSteps = (node: PlanNode, steps: CommandStep[]): void => {
   node.panes.forEach((pane) => collectSplitSteps(pane, steps))
 }
 
-const appendSplitSteps = (node: PlanSplit, steps: CommandStep[]): void => {
+const appendSplitSteps = (node: SplitNode, steps: CommandStep[]): void => {
   const directionFlag = node.orientation === "horizontal" ? "-h" : "-v"
 
   for (let index = 1; index < node.panes.length; index += 1) {

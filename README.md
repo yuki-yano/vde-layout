@@ -26,7 +26,7 @@ This separation allows the Functional Core to remain pure and fully testable whi
 
 ## Development Notes
 
-- Runtime modules are authored in ESM with explicit `.ts` extensions. `src/functional-core/index.ts` re-exports the canonical modules under `src/core/` for compatibility.
+- Runtime modules are authored in ESM with explicit `.ts` extensions, and `src/core/` exposes the canonical functional services directly.
 - Boundary adapters (`src/cli`, `src/executor`, `src/tmux`) remain factory-based; avoid新たなクラス導入は避けてください。
 - `npm run build` uses tsdown to emit ESM bundles into `dist/`. `npm test` automatically rebuilds before executing the Vitest suite.
 - Run `npm run typecheck` to validate the TypeScript sources without emitting artifacts.

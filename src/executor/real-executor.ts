@@ -3,7 +3,7 @@ import { createTmuxError, ErrorCodes } from "../utils/errors.ts"
 import type { CommandExecutor } from "../types/command-executor.ts"
 import { createLogger, LogLevel } from "../utils/logger.ts"
 
-export type RealExecutorOptions = {
+type RealExecutorOptions = {
   readonly verbose?: boolean
 }
 
