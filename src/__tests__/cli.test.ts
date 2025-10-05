@@ -388,6 +388,10 @@ describe("CLI", () => {
                     .slice(1)
                 : command
             const [cmd] = args
+            if (cmd === "new-window") {
+              paneIds = ["%0"]
+              return "%0"
+            }
             if (cmd === "display-message" && args.includes("#{pane_id}")) {
               return paneIds[0] ?? "%0"
             }

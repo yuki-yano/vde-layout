@@ -293,7 +293,11 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       if (options.dryRun === true) {
         renderDryRun(emission)
       } else {
-        const executionResult = await executePlan({ emission, executor })
+        const executionResult = await executePlan({
+          emission,
+          executor,
+          windowName: preset.name ?? presetName ?? "vde-layout",
+        })
         if (!executionResult.ok) {
           return handleFunctionalError(executionResult.error)
         }

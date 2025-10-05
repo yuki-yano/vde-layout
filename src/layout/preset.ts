@@ -1,5 +1,4 @@
 import { ConfigLoader, type ConfigLoaderOptions } from "../config/loader.ts"
-import { validateYAML } from "../config/validator.ts"
 import { ConfigError, ErrorCodes } from "../utils/errors.ts"
 import type { Config, Preset, PresetInfo } from "../models/types.ts"
 import type { IPresetManager } from "../interfaces/index.ts"
@@ -27,8 +26,7 @@ export class PresetManager implements IPresetManager {
    */
   async loadConfig(): Promise<void> {
     const loader = new ConfigLoader(this.configLoaderOptions)
-    const yamlContent = await loader.loadYAML()
-    this.config = validateYAML(yamlContent)
+    this.config = await loader.loadConfig()
   }
 
   /**

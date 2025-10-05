@@ -5,6 +5,7 @@ import { ErrorCodes } from "../utils/errors"
 export interface ExecutePlanInput {
   readonly emission: PlanEmission
   readonly executor: ICommandExecutor
+  readonly windowName?: string
 }
 
 export interface ExecutePlanSuccess {
@@ -13,7 +14,7 @@ export interface ExecutePlanSuccess {
 
 export type ExecutePlanResult = { ok: true; value: ExecutePlanSuccess } | { ok: false; error: StructuredError }
 
-export async function executePlan({ emission, executor }: ExecutePlanInput): Promise<ExecutePlanResult> {
+export async function executePlan({ emission, executor, windowName }: ExecutePlanInput): Promise<ExecutePlanResult> {
   const initialVirtualPaneId = emission.summary.initialPaneId
   if (typeof initialVirtualPaneId !== "string" || initialVirtualPaneId.length === 0) {
     return errorResult({
@@ -25,9 +26,14 @@ export async function executePlan({ emission, executor }: ExecutePlanInput): Pro
 
   const paneMap = new Map<string, string>()
 
-  const initialPaneIdResult = await safeExecute(executor, ["display-message", "-p", "#{pane_id}"], {
+  const newWindowCommand: string[] = ["new-window", "-P", "-F", "#{pane_id}"]
+  if (typeof windowName === "string" && windowName.trim().length > 0) {
+    newWindowCommand.push("-n", windowName.trim())
+  }
+
+  const initialPaneIdResult = await safeExecute(executor, newWindowCommand, {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
-    message: "Failed to determine current tmux pane",
+    message: "Failed to create tmux window",
     path: initialVirtualPaneId,
   })
 
@@ -36,7 +42,7 @@ export async function executePlan({ emission, executor }: ExecutePlanInput): Pro
   }
 
   const initialPaneId = normalizePaneId(initialPaneIdResult.value)
-  paneMap.set(initialVirtualPaneId, initialPaneId)
+  registerPane(paneMap, initialVirtualPaneId, initialPaneId)
 
   let executedSteps = 0
 
@@ -51,7 +57,7 @@ export async function executePlan({ emission, executor }: ExecutePlanInput): Pro
         })
       }
 
-      const targetRealId = paneMap.get(targetVirtualId)
+      const targetRealId = resolvePaneId(paneMap, targetVirtualId)
       if (typeof targetRealId !== "string" || targetRealId.length === 0) {
         return errorResult({
           code: ErrorCodes.TMUX_COMMAND_FAILED,
@@ -86,7 +92,7 @@ export async function executePlan({ emission, executor }: ExecutePlanInput): Pro
       }
 
       if (typeof step.createdPaneId === "string" && step.createdPaneId.length > 0) {
-        paneMap.set(step.createdPaneId, newPaneId)
+        registerPane(paneMap, step.createdPaneId, newPaneId)
       }
     } else {
       const targetVirtualId = step.targetPaneId
@@ -98,7 +104,7 @@ export async function executePlan({ emission, executor }: ExecutePlanInput): Pro
         })
       }
 
-      const targetRealId = paneMap.get(targetVirtualId)
+      const targetRealId = resolvePaneId(paneMap, targetVirtualId)
       if (typeof targetRealId !== "string" || targetRealId.length === 0) {
         return errorResult({
           code: ErrorCodes.TMUX_COMMAND_FAILED,
@@ -238,6 +244,45 @@ const normalizePaneId = (raw: string): string => {
     return "%0"
   }
   return trimmed
+}
+
+const registerPane = (paneMap: Map<string, string>, virtualId: string, realId: string): void => {
+  paneMap.set(virtualId, realId)
+}
+
+const resolvePaneId = (paneMap: Map<string, string>, virtualId: string): string | undefined => {
+  const direct = paneMap.get(virtualId)
+  if (typeof direct === "string" && direct.length > 0) {
+    return direct
+  }
+
+  let ancestor = virtualId
+  while (ancestor.includes(".")) {
+    ancestor = ancestor.slice(0, ancestor.lastIndexOf("."))
+    const candidate = paneMap.get(ancestor)
+    if (typeof candidate === "string" && candidate.length > 0) {
+      paneMap.set(virtualId, candidate)
+      return candidate
+    }
+  }
+
+  let bestKey: string | undefined
+  let bestValue: string | undefined
+  for (const [key, value] of paneMap.entries()) {
+    if (key.startsWith(`${virtualId}.`)) {
+      if (bestKey === undefined || key.length < bestKey.length) {
+        bestKey = key
+        bestValue = value
+      }
+    }
+  }
+
+  if (typeof bestValue === "string" && bestValue.length > 0) {
+    paneMap.set(virtualId, bestValue)
+    return bestValue
+  }
+
+  return undefined
 }
 
 const errorResult = ({ code, message, path }: ErrorContext): ExecutePlanResult => ({

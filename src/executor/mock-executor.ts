@@ -35,6 +35,12 @@ export const createMockExecutor = (): MockExecutor => {
     const args = parseCommand(commandOrArgs)
     executedCommands.push(args)
 
+    if (args[0] === "new-window") {
+      mockPaneCounter = 0
+      mockPaneIds = ["%0"]
+      return "%0"
+    }
+
     if (args.includes("display-message") && args.includes("#{pane_id}")) {
       return mockPaneIds[0] ?? "%0"
     }
