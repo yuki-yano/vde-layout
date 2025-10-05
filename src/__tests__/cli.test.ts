@@ -1,14 +1,45 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
 import { CLI } from "../cli"
+import type { CLIOptions } from "../cli"
 import { MockPresetManager } from "./mocks/preset-manager-mock"
-import { MockLayoutEngine } from "./mocks/layout-engine-mock"
-import { MockExecutor } from "../executor/mock-executor"
+import type { ICommandExecutor } from "../interfaces/command-executor"
+import type {
+  CompilePresetInput,
+  CompilePresetSuccess,
+  CreateLayoutPlanSuccess,
+  PlanEmission,
+  FunctionalPreset,
+  PlanNode,
+  LayoutPlan,
+} from "../functional-core"
+
+class RecordingExecutor implements ICommandExecutor {
+  readonly commands: string[][] = []
+  constructor(private readonly dryRun: boolean) {}
+
+  async execute(command: string | string[]): Promise<string> {
+    const args = typeof command === "string" ? command.split(" ").slice(1) : command
+    this.commands.push([...args])
+    return ""
+  }
+
+  async executeMany(commandsList: string[][]): Promise<void> {
+    commandsList.forEach((command) => {
+      this.commands.push([...command])
+    })
+  }
+
+  isDryRun(): boolean {
+    return this.dryRun
+  }
+
+  logCommand(): void {}
+}
 
 describe("CLI", () => {
   let cli: CLI
   let mockPresetManager: MockPresetManager
-  let mockLayoutEngine: MockLayoutEngine
-  let mockExecutor: MockExecutor
+  let recordingExecutor: RecordingExecutor
   let originalExit: typeof process.exit
   let originalTMUX: string | undefined
   let exitCode: number | undefined
@@ -16,34 +47,116 @@ describe("CLI", () => {
   let errorOutput: string[] = []
   let processExitCalled = false
 
+  const sampleFunctionalPreset: FunctionalPreset = {
+    name: "development",
+    version: "legacy",
+    metadata: { source: "preset://dev" },
+    layout: {
+      kind: "split",
+      orientation: "horizontal",
+      ratio: [0.5, 0.5],
+      panes: [
+        {
+          kind: "terminal",
+          name: "main",
+          command: "nvim",
+          focus: true,
+        },
+        {
+          kind: "terminal",
+          name: "aux",
+        },
+      ],
+    },
+  }
+
+  const samplePlan: LayoutPlan = {
+    focusPaneId: "root.0",
+    root: {
+      kind: "split",
+      id: "root",
+      orientation: "horizontal",
+      ratio: [0.5, 0.5],
+      panes: [
+        {
+          kind: "terminal",
+          id: "root.0",
+          name: "main",
+          command: "nvim",
+          focus: true,
+        },
+        {
+          kind: "terminal",
+          id: "root.1",
+          name: "aux",
+          focus: false,
+        },
+      ],
+    },
+  }
+
+  const sampleEmission: PlanEmission = {
+    steps: [
+      {
+        id: "root:split:1",
+        kind: "split",
+        command: ["split-window", "-h", "-t", "root.0", "-p", "50"],
+        summary: "split root.0 (-h)",
+      },
+      {
+        id: "root.0:focus",
+        kind: "focus",
+        command: ["select-pane", "-t", "root.0"],
+        summary: "select pane root.0",
+      },
+    ],
+    summary: {
+      stepsCount: 2,
+      focusPaneId: "root.0",
+    },
+    hash: "abc123",
+  }
+
+  let compilePresetMock: (input: CompilePresetInput) => ReturnType<typeof CLI["prototype"]["functionalCore"]["compilePreset"]>
+  let createLayoutPlanMock: () => ReturnType<typeof CLI["prototype"]["functionalCore"]["createLayoutPlan"]>
+  let emitPlanMock: () => ReturnType<typeof CLI["prototype"]["functionalCore"]["emitPlan"]>
+
   beforeEach(() => {
     mockPresetManager = new MockPresetManager()
-    mockLayoutEngine = new MockLayoutEngine()
-    mockExecutor = new MockExecutor()
     originalTMUX = process.env.TMUX
-    process.env.TMUX = "/tmp/tmux-1000/default,1234,0" // Simulate being in tmux
+    process.env.TMUX = "/tmp/tmux-1000/default,1234,0"
+
+    compilePresetMock = vi.fn(() => ({ ok: true, value: { preset: sampleFunctionalPreset } as CompilePresetSuccess }))
+    createLayoutPlanMock = vi.fn(() => ({ ok: true, value: { plan: samplePlan } as CreateLayoutPlanSuccess }))
+    emitPlanMock = vi.fn(() => ({ ok: true, value: sampleEmission }))
+
+    const createCommandExecutor = vi.fn(({ dryRun }: { verbose: boolean; dryRun: boolean }) => {
+      recordingExecutor = new RecordingExecutor(dryRun)
+      return recordingExecutor
+    })
 
     cli = new CLI({
       presetManager: mockPresetManager,
-      createLayoutEngine: () => mockLayoutEngine,
-      createCommandExecutor: () => mockExecutor,
+      createCommandExecutor,
+      functionalCore: {
+        compilePreset: compilePresetMock,
+        createLayoutPlan: createLayoutPlanMock,
+        emitPlan: emitPlanMock,
+      },
     })
 
-    // Mock process.exit
     originalExit = process.exit
     exitCode = undefined
     processExitCalled = false
     process.exit = ((code?: number) => {
       exitCode = code
       processExitCalled = true
-      // Don't throw for successful exits in list command
       if (code === 0) {
         return
       }
       throw new Error(`Process exited with code ${code}`)
     }) as never
 
-    // Capture console output
     consoleOutput = []
     errorOutput = []
     vi.spyOn(console, "log").mockImplementation((...args) => {
@@ -67,17 +180,20 @@ describe("CLI", () => {
     vi.restoreAllMocks()
   })
 
+  const expectFunctionalPipelineCalled = () => {
+    expect(compilePresetMock).toHaveBeenCalled()
+    expect(createLayoutPlanMock).toHaveBeenCalled()
+    expect(emitPlanMock).toHaveBeenCalled()
+  }
+
   describe("basic commands", () => {
     it("should display version", async () => {
-      // Commander.js may not call process.exit for version display
       await cli.run(["--version"])
-      // Just check that no error was thrown
       expect(processExitCalled || consoleOutput.some((line) => line.includes("0.0.1"))).toBe(true)
     })
 
     it("should display version with -V", async () => {
       await cli.run(["-V"])
-      // Just check that no error was thrown
       expect(processExitCalled || consoleOutput.some((line) => line.includes("0.0.1"))).toBe(true)
     })
 
@@ -85,13 +201,11 @@ describe("CLI", () => {
       try {
         await cli.run(["--help"])
       } catch (error) {
-        // Commander.js throws an error for unknown options
         if (error instanceof Error && error.message.includes("unknown option")) {
           expect(exitCode).toBe(1)
           return
         }
       }
-      // If no error, check for help output
       expect(processExitCalled || consoleOutput.some((line) => line.includes("Usage:"))).toBe(true)
     })
 
@@ -99,13 +213,11 @@ describe("CLI", () => {
       try {
         await cli.run(["-h"])
       } catch (error) {
-        // Commander.js throws an error for unknown options
         if (error instanceof Error && error.message.includes("unknown option")) {
           expect(exitCode).toBe(1)
           return
         }
       }
-      // If no error, check for help output
       expect(processExitCalled || consoleOutput.some((line) => line.includes("Usage:"))).toBe(true)
     })
   })
@@ -135,9 +247,8 @@ describe("CLI", () => {
     it("should execute named preset", async () => {
       await cli.run(["dev"])
 
-      expect(processExitCalled).toBe(true)
-      expect(mockLayoutEngine.getCreatedLayouts()).toHaveLength(1)
-      expect(mockLayoutEngine.getCreatedLayouts()[0]?.name).toBe("Development")
+      expectFunctionalPipelineCalled()
+      expect(recordingExecutor.commands).toHaveLength(sampleEmission.steps.length)
       expect(consoleOutput.join("\n")).toContain('Applied preset "Development"')
       expect(exitCode).toBe(0)
     })
@@ -145,9 +256,8 @@ describe("CLI", () => {
     it("should execute default preset when no name provided", async () => {
       await cli.run([])
 
-      expect(processExitCalled).toBe(true)
-      expect(mockLayoutEngine.getCreatedLayouts()).toHaveLength(1)
-      expect(mockLayoutEngine.getCreatedLayouts()[0]?.name).toBe("Default Layout")
+      expectFunctionalPipelineCalled()
+      expect(recordingExecutor.commands).toHaveLength(sampleEmission.steps.length)
       expect(exitCode).toBe(0)
     })
 
@@ -172,48 +282,107 @@ describe("CLI", () => {
     it("should accept verbose option", async () => {
       await cli.run(["dev", "--verbose"])
 
-      expect(processExitCalled).toBe(true)
-      expect(mockLayoutEngine.getCreatedLayouts()).toHaveLength(1)
+      expectFunctionalPipelineCalled()
+      expect(recordingExecutor.commands).toHaveLength(sampleEmission.steps.length)
       expect(exitCode).toBe(0)
     })
 
     it("should accept dry-run option", async () => {
       await cli.run(["dev", "--dry-run"])
 
-      expect(processExitCalled).toBe(true)
+      expectFunctionalPipelineCalled()
+      expect(recordingExecutor.commands).toHaveLength(0)
       expect(consoleOutput.join("\n")).toContain("[DRY RUN]")
-      expect(mockLayoutEngine.getCreatedLayouts()).toHaveLength(1)
+      expect(consoleOutput.join("\n")).toContain("Planned tmux steps")
       expect(exitCode).toBe(0)
     })
 
-    it("should enable dry-run automatically when outside tmux", async () => {
+    it("should fail when outside tmux without explicit dry-run", async () => {
       delete process.env.TMUX
 
-      await cli.run(["dev"])
+      await expect(cli.run(["dev"])).rejects.toThrow("Process exited")
 
       expect(processExitCalled).toBe(true)
-      expect(consoleOutput.join("\n")).toContain("[DRY RUN]")
-      expect(consoleOutput.join("\n")).toContain("Automatically enabled because not in tmux session")
-      expect(exitCode).toBe(0)
+      expect(exitCode).toBe(1)
+      expect(errorOutput.join("\n")).toContain("Must be run inside a tmux session")
     })
 
     it("should accept both verbose and dry-run options", async () => {
       await cli.run(["dev", "-v", "--dry-run"])
 
-      expect(processExitCalled).toBe(true)
-      expect(consoleOutput.join("\n")).toContain("[DRY RUN]")
+      expectFunctionalPipelineCalled()
+      expect(recordingExecutor.commands).toHaveLength(0)
       expect(exitCode).toBe(0)
+    })
+
+    it("should allow specifying configuration file via --config", async () => {
+      const customPresetManager = new MockPresetManager()
+      const cliWithConfig = new CLI({
+        presetManager: customPresetManager,
+        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => new RecordingExecutor(dryRun),
+        functionalCore: {
+          compilePreset: compilePresetMock,
+          createLayoutPlan: createLayoutPlanMock,
+          emitPlan: emitPlanMock,
+        },
+      })
+
+      await cliWithConfig.run(["dev", "--config", "/tmp/custom.yml", "--dry-run"])
+
+      expect(customPresetManager.getConfigPath()).toBe("/tmp/custom.yml")
     })
   })
 
   describe("error handling", () => {
     it("should handle unexpected errors gracefully", async () => {
-      // Default action is executed even for unknown commands
       await expect(cli.run(["unknown-preset"])).rejects.toThrow("Process exited")
 
-      // Error due to missing configuration file
       const output = errorOutput.join("\n")
       expect(output).toContain("Error:")
+      expect(exitCode).toBe(1)
+    })
+
+    it("should report structured errors when plan execution fails", async () => {
+      const failingExecutorFactory = vi.fn(() => {
+        let callCount = 0
+        return {
+          async execute(command: string | string[]): Promise<string> {
+            const args = typeof command === "string" ? command.split(" ").slice(1) : command
+            callCount += 1
+            if (callCount === 2) {
+              const error = new Error("tmux failed") as Error & { code?: string; details?: Record<string, unknown> }
+              error.code = "TMUX_COMMAND_FAILED"
+              error.details = { stderr: "boom" }
+              throw error
+            }
+            return ""
+          },
+          async executeMany(commandsList: string[][]): Promise<void> {
+            for (const commandArgs of commandsList) {
+              await this.execute(commandArgs)
+            }
+          },
+          isDryRun: () => false,
+          logCommand: () => {},
+        }
+      })
+
+      const failingCli = new CLI({
+        presetManager: mockPresetManager,
+        createCommandExecutor: failingExecutorFactory as unknown as CLIOptions["createCommandExecutor"],
+        functionalCore: {
+          compilePreset: compilePresetMock,
+          createLayoutPlan: createLayoutPlanMock,
+          emitPlan: emitPlanMock,
+        },
+      })
+
+      await expect(failingCli.run(["dev"])).rejects.toThrow("Process exited")
+
+      const errorLog = errorOutput.join("\n")
+      expect(errorLog).toContain("TMUX_COMMAND_FAILED")
+      expect(errorLog).toContain("root.0:focus")
+      expect(errorLog).toContain("select-pane -t root.0")
       expect(exitCode).toBe(1)
     })
   })

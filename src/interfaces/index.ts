@@ -8,6 +8,7 @@ export interface IPresetManager {
   getPreset(name: string): Preset
   getDefaultPreset(): Preset
   listPresets(): PresetInfo[]
+  setConfigPath?(filePath: string): void
 }
 
 /**

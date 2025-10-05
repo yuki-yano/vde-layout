@@ -16,8 +16,6 @@ vde-layout is a tool that allows you to define tmux pane layouts in YAML configu
 
 ## Installation
 
-> **Note**: Currently under development, not yet published to npm.
-
 ```bash
 npm install -g vde-layout
 ```

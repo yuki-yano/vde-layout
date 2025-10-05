@@ -114,10 +114,9 @@ describe("E2E Tests", () => {
         TMUX: "fake-tmux-session",
       })
       expect(result.code).toBe(0)
-      expect(result.stdout).toContain("[tmux] [DRY RUN] Would execute:")
-      expect(result.stdout).toContain("new-window")
-      expect(result.stdout).toContain("split-window")
-      expect(result.stdout).toContain("send-keys")
+      expect(result.stdout).toContain("Planned tmux steps")
+      expect(result.stdout).toContain("split root.0 (-h): tmux split-window")
+      expect(result.stdout).toContain("select pane root.0: tmux select-pane")
     })
 
     it("executes default preset", () => {
@@ -139,12 +138,11 @@ describe("E2E Tests", () => {
   })
 
   describe("Execution outside tmux environment", () => {
-    it("throws error when executing outside tmux environment", () => {
-      // Copy sample configuration file
+    it("falls back to dry-run when executing outside tmux environment", () => {
       const sampleConfig = readFileSync(join(process.cwd(), "examples", "basic-layout.yml"), "utf8")
       writeFileSync(testConfigPath, sampleConfig)
 
-      const result = runCommand("dev --dry-run", {
+      const result = runCommand("dev", {
         TMUX: "", // Simulate outside tmux environment
       })
       expect(result.code).toBe(1)
@@ -197,7 +195,7 @@ presets:
       })
       expect(result.code).toBe(0)
       expect(result.stdout).toContain("[DRY RUN]")
-      expect(result.stdout).toContain("[tmux] [DRY RUN] Would execute:")
+      expect(result.stdout).toContain("Planned tmux steps")
     })
 
     it("short options work correctly", () => {

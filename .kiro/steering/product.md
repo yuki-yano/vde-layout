@@ -1,45 +1,38 @@
-# Product Overview: vde-layout
+# プロダクト概要: vde-layout
 
-## Product Overview
+## 製品概要
+vde-layoutは、VDE (Vibe Coding Development Environment) の作業フロー向けに最適化されたtmuxレイアウト管理CLIです。YAMLファイルで定義したレイアウトを1コマンドで再現し、複雑なペイン構成を再利用可能なプリセットとして共有できます。開発チームや個人がマシンを跨いで同一のターミナル環境を維持できる点が最大の特徴です。
 
-vde-layout is a terminal multiplexer layout management tool for the VDE (Vibe Coding Development Environment). It enables developers to efficiently manage and reproduce tmux pane layouts defined in YAML configuration files, streamlining the setup of terminal-based development environments for Vibe Coding workflows.
+## コア機能
+- **YAMLベースのレイアウト定義**: 人が読みやすい構造で水平・垂直分割や入れ子レイアウトを記述
+- **プリセット管理**: XDG Base Directoryに従い複数プリセットを保存・切り替え
+- **CLI操作性**: `vde-layout [preset]` で即座にレイアウトを展開
+- **tmux連携**: tmuxコマンドを自動生成しペイン作成・サイズ調整・コマンド実行を実施
+- **柔軟なペイン設定**: 作業ディレクトリ・環境変数・初期コマンド・フォーカスを個別に指定
+- **比率ベースの分割**: `[3,2]` のような比率指定を自動正規化してレイアウトを生成
+- **Dry-Runモード**: `--dry-run` で実行内容を事前確認
+- **ログ出力とエラー表現**: ログレベル制御と独自エラーコードで問題箇所を特定
+- **Mock/Dependency Injection**: インターフェース駆動設計によりテストや拡張を容易化
 
-## Core Features
+## 想定ユースケース
+- **Vibe Codingセッション準備**: 標準化された開発用tmuxレイアウトを瞬時に立ち上げる
+- **マシン間の環境同期**: 複数環境で共通の作業窓構成を共有し、オンボーディングを高速化
+- **タスク特化レイアウト**: モニタリング、ビルド監視、レビュー用など用途別プリセットを切り替え
+- **チーム共有**: レポジトリにプリセットを同梱しチーム全体で統一したレイアウトを利用
+- **復旧シナリオ**: tmuxセッション消失後に所定のレイアウトを迅速に復元
 
-- **YAML-Based Layout Definition**: Define tmux pane layouts using human-readable YAML configuration
-- **Preset Management**: Support for multiple layout presets following XDG Base Directory specification
-- **Command Line Interface**: Simple `vde-layout [preset]` command for quick layout execution
-- **tmux Integration**: Seamless integration with tmux for pane creation and arrangement
-- **Layout Reproduction**: Accurately reproduce complex terminal layouts from configuration
-- **Flexible Pane Settings**: Configure commands, working directories, environment variables per pane
-- **Ratio-Based Splitting**: Intuitive ratio specification (e.g., [3, 2] for 60:40 split) with automatic normalization
-- **Nested Layouts**: Freely combine horizontal and vertical splits at any depth
-- **Single Pane Support**: Simple presets for single command execution without layout definition
-- **Dry-Run Mode**: Preview tmux commands without execution using `--dry-run`
-- **Cross-Platform Support**: Works with Node.js and Bun runtime environments
-- **XDG Compliance**: Follows XDG Base Directory specification for configuration storage
-- **Interface-Based Architecture**: Modular design with dependency injection for enhanced testability
-- **Advanced Logging**: Structured logging system with configurable verbosity levels
-- **Mock Testing Support**: Built-in mock implementations for comprehensive testing
+## 価値提案
+- **時間短縮**: 手作業でのペイン再配置を不要にし、コマンド1つで再現
+- **一貫性**: メンバーやマシンが変わっても同じレイアウトを再現
+- **拡張性**: プリセット追加やモジュール差し替えが容易な構成
+- **透明性**: YAMLで定義するためレビューやバージョン管理が容易
+- **学習コスト低減**: 既存のtmux知識に依存せず利用開始可能
 
-## Target Use Case
+## プロジェクトステータス
+2025年10月5日時点では、TypeScript製CLIの基本機能とユニットテスト群が整備された初期開発段階です。npmパッケージとして公開することを前提に、`dist/` 出力とCLIエントリ (`bin/vde-layout`) を備えています。
 
-This project addresses the following scenarios:
-
-- **Vibe Coding Setup**: Quickly set up optimal terminal layouts for Vibe Coding sessions
-- **Consistent Environments**: Reproduce the same terminal layout across different machines
-- **Workflow Optimization**: Switch between different layouts for various development tasks
-- **Team Standardization**: Share layout configurations among team members
-- **Quick Recovery**: Restore complex layouts after terminal restarts or system reboots
-
-## Key Value Proposition
-
-- **Time Savings**: Eliminate manual tmux pane arrangement with single command execution
-- **Consistency**: Ensure identical development environments across sessions and machines
-- **Flexibility**: Support multiple presets for different workflows and projects
-- **Simplicity**: Use familiar YAML syntax for layout configuration
-- **Developer Experience**: Provide intuitive CLI interface for terminal-centric developers
-
-## Project Status
-
-In initial development phase, building on the foundation of the ccde project implementation. The project will provide an npm package that can be installed globally for system-wide availability.
+## 今後の方針 (提案)
+- プリセット共有機能のドキュメント整備と例示
+- tmux未インストール時のガードや診断メッセージ強化
+- VDEエコシステムとの連携ドキュメント（他ツールとの連動事例）
+- 拡張機構（プラグイン/テンプレート）の検討

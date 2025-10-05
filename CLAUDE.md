@@ -12,6 +12,7 @@ This project implements Kiro-style Spec-Driven Development for Claude Code using
 
 ### Active Specifications
 - **preset-loader**: Preset loading and layout reproduction functionality
+- **functional-core-rewrite**: vde-layoutを関数型アーキテクチャで全面改修する
 - Current spec: Check `.kiro/specs/` for active specifications
 - Use `/kiro:spec-status [feature-name]` to check progress
 

@@ -28,8 +28,22 @@
     "vde",
     "cli"
   ],
-  "author": "",
+  "author": "Yuki Yano",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuki-yano/vde-layout.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yuki-yano/vde-layout/issues"
+  },
+  "homepage": "https://github.com/yuki-yano/vde-layout#readme",
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "chalk": "^5.4.1",
     "commander": "^14.0.0",

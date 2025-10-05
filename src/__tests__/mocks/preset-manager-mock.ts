@@ -23,12 +23,17 @@ export class MockPresetManager implements IPresetManager {
 
   private loadConfigCalled = false
   private shouldFailOnLoad = false
+  private configPath: string | undefined
 
   async loadConfig(): Promise<void> {
     this.loadConfigCalled = true
     if (this.shouldFailOnLoad) {
       throw new Error("Configuration file not found")
     }
+  }
+
+  setConfigPath(path: string): void {
+    this.configPath = path
   }
 
   getPreset(name: string): Preset {
@@ -66,5 +71,9 @@ export class MockPresetManager implements IPresetManager {
 
   resetLoadConfigCalled(): void {
     this.loadConfigCalled = false
+  }
+
+  getConfigPath(): string | undefined {
+    return this.configPath
   }
 }

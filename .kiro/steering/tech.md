@@ -1,255 +1,102 @@
-# Technology Stack: vde-layout
+# 技術スタック: vde-layout
 
-## Architecture
+## アーキテクチャ概要
+- **CLI中心構成**: `bin/vde-layout` から `dist/index.js` を実行するNode.js CLIとして配布
+- **設定駆動型**: YAML構成ファイル（XDG Base Directory準拠）を解析し、Zodでバリデーション
+- **tmuxコマンド生成**: レイアウトエンジンがペイン分割・比率計算を行い、executor経由でtmuxを操作
+- **Executor切替**: 本番実行/ドライラン/モックをStrategyパターンで差し替え
+- **ログ&エラー層**: ログレベル別出力と独自エラークラスで診断性を確保
 
-The project follows a CLI tool architecture designed for terminal multiplexer integration:
+## 主要モジュール
+- `src/cli.ts`: Commanderを用いたCLIパラメータ解析とエントリポイント
+- `src/config/loader.ts`: XDGパス解決・YAMLロード・プリセット探索
+- `src/config/validator.ts`: Zodでの構造検証と詳細なエラーハンドリング
+- `src/layout/engine.ts`: レイアウト木構造の再帰的展開と比率正規化
+- `src/tmux/commands.ts`: tmuxサブコマンド生成（分割・ペイン選択・サイズ調整）
+- `src/executor/*.ts`: 実行戦略（リアル/ドライラン/モック）のインターフェース実装
+- `src/utils/logger.ts`: 構造化ログと冗長度制御
+- `src/models/schema.ts`: YAML→内部モデル変換の共通型
 
-- **CLI Interface**: Command-line tool distributed as an npm package
-- **YAML Configuration**: Layout definitions follow XDG Base Directory specification
-- **tmux Integration**: Direct interaction with tmux for pane management
-- **Preset System**: Support for multiple named layout configurations
-- **Modular Design**: Separation between configuration parsing and tmux commands
-- **Interface-Based Architecture**: Dependency injection pattern with TypeScript interfaces
-- **Strategy Pattern**: Multiple executor implementations (Real, DryRun, Mock)
-- **Logger System**: Centralized logging with configurable verbosity levels
+## 言語・ランタイム
+- **TypeScript 5.3+**: 厳格モードで型安全性と補完性を確保
+- **Node.js 22以上**: `engines.node` で明示。ES2022ターゲット、CommonJS出力
+- **Bun (任意)**: `prepublishOnly` スクリプトで `bun run` を利用。リリース前にインストールが必要
+- **tmux 2.0+**: ランタイム要件。存在しない場合のエラーハンドリング強化が課題
 
-## CLI Tool
+## ビルド&テストフロー
+- `bun run clean` → `bun run build`: TypeScriptを`dist/`へトランスパイル（`tsc`）
+- `npm run build` / `npm run compile`: いずれも `tsc`
+- `npm run test`: Vitestでユニット・統合テスト実行
+- `npm run test:coverage`: V8カバレッジ収集
+- `npm run dev`: `tsc --watch` を使った開発ビルド
+- `npm run lint`: ESLint (flat config) で `src/` を検査
+- `npm run format`: Prettierで `src/**/*.ts` を整形
+- `npm run typecheck`: 出力なし型チェック
 
-Primary command-line interface built with Node.js:
-- **Runtime Support**: Both Node.js and Bun compatibility
-- **Global Installation**: Available system-wide via npm/yarn/pnpm
-- **Command Structure**: `vde-layout --preset <preset-name>`
-- **Configuration Loading**: Reads from XDG config directory ($XDG_CONFIG_HOME/vde or ~/.config/vde)
-- **Error Handling**: Clear messages for missing presets or tmux issues
+## 依存関係
+### 本番依存
+- `commander` (CLIコマンド定義)
+- `chalk` (CLI出力装飾)
+- `execa` (tmuxプロセス実行)
+- `fs-extra` (ファイル操作ユーティリティ)
+- `yaml` (YAMLパース)
+- `zod` (スキーマ検証)
 
-## Core Library
+### 開発依存
+- `typescript` / `tsconfig.json` (ビルド/型定義)
+- `vitest` / `@vitest/coverage-v8` (テスト)
+- `eslint` / `typescript-eslint` / `@eslint/js` / `eslint-config-prettier` (Lint)
+- `prettier` (フォーマット)
+- `globals`, `@types/node`, `@types/fs-extra` (型補完)
 
-Internal modules for layout management:
-- **Config Loader**: XDG-compliant configuration discovery and loading
-- **YAML Parser**: Configuration file parsing and validation with Zod schemas
-- **tmux Interface**: Command generation and execution
-- **Layout Engine**: Logic for reproducing pane arrangements
-- **Preset Manager**: Handling multiple layout configurations
-- **Executor Pattern**: Command execution abstraction (Real, DryRun, Mock)
-- **Logger Module**: Structured logging with LogLevel enum
-- **Error System**: Custom error classes with error codes
-- **Type System**: TypeScript interfaces for dependency injection
-- **Validation Layer**: Zod-based schema validation for type safety
+## 設定ファイル
+- `tsconfig.json`: `dist/` 出力、`strict` オン、`declaration`/`sourceMap` 生成
+- `tsconfig.test.json`: テスト対象向け設定（Vitestやモックで利用）
+- `eslint.config.mjs`: Flat Config形式でESLintルール定義
+- `vitest.config.mjs`: `tsconfig.test.json` を読み込み、テストエイリアスを定義
+- `cspell.json`: スペルチェック対象語彙
+- `mise.toml`: miseでのツールバージョン管理（Node/Bunなど）
 
-## Development Environment
-
-### Required Tools
-- **Node.js**: v22+ for package development and runtime
-- **Bun**: Alternative runtime (optional)
-- **tmux**: Terminal multiplexer v2.0+ (required for functionality)
-- **Git**: Version control system
-- **npm/yarn/pnpm/bun**: Package manager
-- **TypeScript**: v5.3.3+ - Primary development language (100% TypeScript codebase)
-
-### Development Tools
-- **ESLint**: Code linting (configured)
-- **Prettier**: Code formatting (configured)
-- **Vitest**: Testing framework
-- **TypeScript ESLint**: TypeScript-specific linting
-
-## Common Commands
-
-### Package Management
+## コマンドチートシート
 ```bash
-# Install all dependencies from package.json
-bun install
+# 依存関係インストール
+npm install
+# または pnpm install / bun install
 
-# Add new dependencies
-bun add commander js-yaml execa chalk fs-extra
+# ビルド
+npm run build
 
-# Add dev dependencies
-bun add -d typescript jest eslint prettier
+# 監視コンパイル
+npm run dev
 
-# Build the package
-bun run build
+# テスト
+npm run test
+npm run test:watch
 
-# Run tests
-bun test
+# Lint & フォーマット
+npm run lint
+npm run format
 
-# Link for local development
-bun link
+# 型チェック
+npm run typecheck
 
-# Publish to npm registry
-npm publish
+# Dry-run実行例
+node dist/index.js dev --dry-run
 ```
 
-### Usage Commands
-```bash
-# Install globally
-npm install -g vde-layout
-# or
-bun add -g vde-layout
-# or
-pnpm add -g vde-layout
+## 環境変数
+- `XDG_CONFIG_HOME`: プリセット探索の基準ディレクトリ
+- `VDE_CONFIG_PATH`: 設定ファイルの検索パスを上書き
+- `VDE_DEBUG`: `true` で詳細ログ
+- `VDE_VERBOSE`: `true` で情報レベルログ
+- `TMUX`: tmux実行中に自動設定される環境変数
 
-# List available presets
-vde-layout list
+## テスト戦略
+- `src/__tests__/*.test.ts`: CLIとユーティリティのE2E/統合テスト
+- 各サブディレクトリの `__tests__/`: モジュール単位ユニットテスト
+- モック (`src/__tests__/mocks/`, `src/executor/mock-executor.ts`): tmux依存部の分離
+- Vitestでのスナップショット・カバレッジ計測を組み込み
 
-# Run with specific preset
-vde-layout dev
-
-# Run with default preset
-vde-layout
-
-# Dry-run mode (preview commands)
-vde-layout dev --dry-run
-
-# Verbose output
-vde-layout dev --verbose
-
-# Show help
-vde-layout --help
-
-# Show version
-vde-layout --version
-```
-
-### Development Commands
-```bash
-# Build TypeScript
-bun run build
-
-# Watch mode for development
-bun run dev
-
-# Run tests
-bun test
-bun run test:watch
-bun run test:coverage
-
-# Run linting
-bun run lint
-
-# Format code
-bun run format
-
-# Type checking
-bun run typecheck
-
-# Clean build artifacts
-bun run clean
-
-# Prepare for publishing
-bun run prepublishOnly
-```
-
-## Environment Variables
-
-### Runtime Variables
-- `XDG_CONFIG_HOME`: Standard XDG config directory (default: `~/.config`)
-- `VDE_CONFIG_PATH`: Override default config path (default: `$XDG_CONFIG_HOME/vde`)
-- `VDE_DEBUG`: Enable debug logging (set to "true" for stack traces)
-- `VDE_VERBOSE`: Enable info-level logging (set to "true")
-- `TMUX`: Automatically set by tmux when running inside a session
-- `VDE_TEST_MODE`: Test environment flag (set automatically)
-
-### Development Variables
-- `NODE_ENV`: Development/production mode
-- `NPM_TOKEN`: For automated publishing
-
-## Port Configuration
-
-No ports are required for this CLI tool.
-
-## Dependencies
-
-### Core Dependencies
-- **commander**: v14.0.0 - CLI argument parsing
-- **yaml**: v2.3.4 - YAML configuration parsing
-- **execa**: v9.6.0 - Process execution for tmux commands
-- **chalk**: v5.4.1 - Terminal output styling
-- **fs-extra**: v11.2.0 - Enhanced file system operations
-- **zod**: v3.22.4 - Schema validation for configurations
-
-### Development Dependencies
-- **typescript**: v5.3.3 - Primary development language
-- **@types/node**: v20.11.5 - Node.js type definitions
-- **@types/fs-extra**: v11.0.4 - fs-extra type definitions
-- **vitest**: v1.2.1 - Testing framework
-- **@vitest/coverage-v8**: v1.2.1 - Code coverage
-- **eslint**: v9.32.0 - Code linting
-- **typescript-eslint**: v8.38.0 - TypeScript ESLint integration
-- **prettier**: v3.2.4 - Code formatting
-- **eslint-config-prettier**: v9.1.0 - ESLint/Prettier compatibility
-
-### Runtime Requirements
-- **tmux**: Must be installed on the system
-- **Node.js/Bun**: JavaScript runtime
-
-## Build Process
-
-The project uses standard npm package build process:
-1. **Source Code**: Written in TypeScript (100% type coverage)
-2. **Compilation**: TypeScript compilation to CommonJS
-3. **Type Definitions**: Auto-generated .d.ts files
-4. **Testing**: Vitest test suite execution with coverage
-5. **Publishing**: npm publish workflow with prepublishOnly hook
-
-### Build Steps
-```bash
-# Clean previous builds
-bun run clean
-
-# Compile TypeScript
-bun run compile
-# or
-bun run build
-
-# Run tests
-bun test
-
-# Type checking
-bun run typecheck
-
-# Build distributable (includes compilation)
-bun run build
-```
-
-## Testing Strategy
-
-### Test Categories
-- **Unit Tests**: Core logic testing
-  - YAML parsing with Zod validation
-  - Configuration validation
-  - Command generation
-  - Interface implementations
-  - Logger behavior
-- **Integration Tests**: Module interaction
-  - Layout engine with executors
-  - Preset manager with config loader
-  - Error handling across modules
-- **E2E Tests**: Full command execution
-  - CLI interface testing
-  - Preset loading and execution
-  - Dry-run mode verification
-
-### Test Tools
-- **Vitest**: Primary testing framework with coverage reporting
-- **Mock Implementations**: Built-in mocks for all interfaces
-- **Test Utils**: Centralized test helpers and console capture
-- **Co-located Tests**: `__tests__/` directories next to source files
-
-## Configuration Management
-
-### XDG Base Directory Specification
-
-The project follows XDG Base Directory specification for configuration files:
-
-1. **Primary Config Location**: `$XDG_CONFIG_HOME/vde/layout.yml`
-   - Falls back to `~/.config/vde/layout.yml` if XDG_CONFIG_HOME is not set
-
-2. **Config Search Order**:
-   - `$VDE_CONFIG_PATH/layout.yml` (if VDE_CONFIG_PATH is set)
-   - `$XDG_CONFIG_HOME/vde/layout.yml`
-   - `~/.config/vde/layout.yml`
-
-3. **Benefits**:
-   - Clean home directory (no dotfiles pollution)
-   - Standard location for user configurations
-   - Consistent with modern Linux/Unix applications
-   - Easy backup and synchronization of configs
+## 配布
+- npmパッケージとして `dist/`, `bin/`, `README.md`, `LICENSE` を公開対象に設定
+- `LICENSE` はMIT。2025年10月5日時点でOSSとして再利用可能な状態。

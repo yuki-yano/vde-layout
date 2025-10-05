@@ -16,6 +16,11 @@ export class PresetManager implements IPresetManager {
     this.configLoaderOptions = options
   }
 
+  setConfigPath(filePath: string): void {
+    this.configLoaderOptions = { configPaths: [filePath] }
+    this.config = null
+  }
+
   /**
    * Load and validate configuration file
    * @throws {ConfigError} When loading or validation fails

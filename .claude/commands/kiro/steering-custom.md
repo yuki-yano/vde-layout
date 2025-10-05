@@ -1,5 +1,6 @@
 ---
 description: Create custom Kiro steering documents for specialized project contexts
+argument-hint: ""
 allowed-tools: Bash, Read, Write, Edit, MultiEdit, Glob, Grep, LS
 ---
 
