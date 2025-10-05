@@ -1,93 +1,91 @@
-import { ConfigLoader, type ConfigLoaderOptions } from "../config/loader.ts"
-import { ConfigError, ErrorCodes } from "../utils/errors.ts"
+import { createConfigLoader, type ConfigLoaderOptions } from "../config/loader.ts"
+import { createConfigError, ErrorCodes } from "../utils/errors.ts"
 import type { Config, Preset, PresetInfo } from "../models/types.ts"
-import type { IPresetManager } from "../interfaces/index.ts"
+import type { PresetManager } from "../types/preset-manager.ts"
 
-/**
- * Preset Manager
- * Loads and manages presets defined in YAML
- */
-export class PresetManager implements IPresetManager {
-  private config: Config | null = null
-  private configLoaderOptions: ConfigLoaderOptions
+type PresetState = {
+  setConfigPath: (filePath: string) => void
+  loadConfig: () => Promise<void>
+  getPreset: (name: string) => Preset
+  listPresets: () => PresetInfo[]
+  getDefaultPreset: () => Preset
+}
 
-  constructor(options: ConfigLoaderOptions = {}) {
-    this.configLoaderOptions = options
+const createState = (options: ConfigLoaderOptions = {}): PresetState => {
+  let loaderOptions: ConfigLoaderOptions = options
+  let cachedConfig: Config | null = null
+
+  const setConfigPath = (filePath: string): void => {
+    loaderOptions = { configPaths: [filePath] }
+    cachedConfig = null
   }
 
-  setConfigPath(filePath: string): void {
-    this.configLoaderOptions = { configPaths: [filePath] }
-    this.config = null
+  const loadConfig = async (): Promise<void> => {
+    const loader = createConfigLoader(loaderOptions)
+    cachedConfig = await loader.loadConfig()
   }
 
-  /**
-   * Load and validate configuration file
-   * @throws {ConfigError} When loading or validation fails
-   */
-  async loadConfig(): Promise<void> {
-    const loader = new ConfigLoader(this.configLoaderOptions)
-    this.config = await loader.loadConfig()
-  }
-
-  /**
-   * Get preset by name
-   * @param name - Preset name
-   * @returns Preset
-   * @throws {ConfigError} When preset is not found
-   */
-  getPreset(name: string): Preset {
-    if (!this.config) {
-      throw new ConfigError("Configuration not loaded", ErrorCodes.CONFIG_NOT_FOUND)
+  const ensureConfig = (): Config => {
+    if (cachedConfig === null) {
+      throw createConfigError("Configuration not loaded", ErrorCodes.CONFIG_NOT_FOUND)
     }
+    return cachedConfig
+  }
 
-    const preset = this.config.presets[name]
-    if (!preset) {
-      throw new ConfigError(`Preset "${name}" not found`, ErrorCodes.PRESET_NOT_FOUND, {
-        availablePresets: Object.keys(this.config.presets),
+  const getPreset = (name: string): Preset => {
+    const config = ensureConfig()
+    const preset = config.presets[name]
+    if (preset === undefined) {
+      throw createConfigError(`Preset "${name}" not found`, ErrorCodes.PRESET_NOT_FOUND, {
+        availablePresets: Object.keys(config.presets),
       })
     }
-
     return preset
   }
 
-  /**
-   * Get information for all available presets
-   * @returns Array of preset information
-   */
-  listPresets(): PresetInfo[] {
-    if (!this.config) {
+  const listPresets = (): PresetInfo[] => {
+    if (cachedConfig === null) {
       return []
     }
 
-    return Object.entries(this.config.presets).map(([key, preset]) => ({
+    return Object.entries(cachedConfig.presets).map(([key, preset]) => ({
       key,
       name: preset.name,
       description: preset.description,
     }))
   }
 
-  /**
-   * Get default preset
-   * Returns the preset named "default" if it exists, otherwise returns the first preset
-   * @returns Default preset
-   * @throws {ConfigError} When no presets are defined
-   */
-  getDefaultPreset(): Preset {
-    if (!this.config) {
-      throw new ConfigError("Configuration not loaded", ErrorCodes.CONFIG_NOT_FOUND)
+  const getDefaultPreset = (): Preset => {
+    const config = ensureConfig()
+
+    if (config.presets.default !== undefined) {
+      return config.presets.default
     }
 
-    // Look for "default" preset
-    if (this.config.presets.default) {
-      return this.config.presets.default
+    const firstKey = Object.keys(config.presets)[0]
+    if (typeof firstKey !== "string" || firstKey.length === 0) {
+      throw createConfigError("No presets defined", ErrorCodes.PRESET_NOT_FOUND)
     }
 
-    // Otherwise return the first preset
-    const firstKey = Object.keys(this.config.presets)[0]
-    if (firstKey === undefined) {
-      throw new ConfigError("No presets defined", ErrorCodes.PRESET_NOT_FOUND)
-    }
+    return config.presets[firstKey]!
+  }
 
-    return this.config.presets[firstKey]!
+  return {
+    setConfigPath,
+    loadConfig,
+    getPreset,
+    listPresets,
+    getDefaultPreset,
+  }
+}
+
+export const createPresetManager = (options: ConfigLoaderOptions = {}): PresetManager => {
+  const state = createState(options)
+  return {
+    setConfigPath: state.setConfigPath,
+    loadConfig: state.loadConfig,
+    getPreset: state.getPreset,
+    listPresets: state.listPresets,
+    getDefaultPreset: state.getDefaultPreset,
   }
 }

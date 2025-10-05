@@ -1,35 +1,45 @@
 import { createHash } from "crypto"
-import type { LayoutPlan, PlanNode } from "./planner.ts"
-import type { Result, StructuredError } from "./compile.ts"
+import type { LayoutPlan, PlanNode, PlanSplit } from "./planner.ts"
 
-export interface EmitPlanInput {
+export type EmitPlanInput = {
   readonly plan: LayoutPlan
 }
 
-export interface CommandStep {
+export type CommandStepKind = "split" | "focus"
+
+export type CommandStep = {
   readonly id: string
-  readonly kind: "split" | "focus"
+  readonly kind: CommandStepKind
   readonly command: ReadonlyArray<string>
   readonly summary: string
   readonly targetPaneId?: string
   readonly createdPaneId?: string
 }
 
-export interface PlanEmissionSummary {
+export type EmittedTerminal = {
+  readonly virtualPaneId: string
+  readonly command?: string
+  readonly cwd?: string
+  readonly env?: Readonly<Record<string, string>>
+  readonly focus: boolean
+  readonly name: string
+}
+
+export type PlanEmissionSummary = {
   readonly stepsCount: number
   readonly focusPaneId: string
   readonly initialPaneId: string
 }
 
-export interface PlanEmission {
+export type PlanEmission = {
   readonly steps: ReadonlyArray<CommandStep>
   readonly summary: PlanEmissionSummary
+  readonly terminals: ReadonlyArray<EmittedTerminal>
   readonly hash: string
 }
 
-export const emitPlan = ({ plan }: EmitPlanInput): Result<PlanEmission, StructuredError> => {
+export const emitPlan = ({ plan }: EmitPlanInput): PlanEmission => {
   const steps: CommandStep[] = []
-
   collectSplitSteps(plan.root, steps)
 
   steps.push({
@@ -42,16 +52,18 @@ export const emitPlan = ({ plan }: EmitPlanInput): Result<PlanEmission, Structur
 
   const hash = createPlanHash(plan, steps)
   const initialPaneId = determineInitialPaneId(plan.root)
+  const terminals = collectTerminals(plan.root)
 
-  return success({
+  return {
     steps,
     summary: {
       stepsCount: steps.length,
       focusPaneId: plan.focusPaneId,
       initialPaneId,
     },
+    terminals,
     hash,
-  })
+  }
 }
 
 const collectSplitSteps = (node: PlanNode, steps: CommandStep[]): void => {
@@ -59,25 +71,45 @@ const collectSplitSteps = (node: PlanNode, steps: CommandStep[]): void => {
     return
   }
 
+  appendSplitSteps(node, steps)
+  node.panes.forEach((pane) => collectSplitSteps(pane, steps))
+}
+
+const appendSplitSteps = (node: PlanSplit, steps: CommandStep[]): void => {
   const directionFlag = node.orientation === "horizontal" ? "-h" : "-v"
 
   for (let index = 1; index < node.panes.length; index += 1) {
     const previousRatioSum = node.ratio.slice(0, index).reduce((sum, value) => sum + value, 0)
-    const percentage = Math.round((1 - previousRatioSum) * 100)
+    const percentage = Math.max(1, Math.round((1 - previousRatioSum) * 100))
     const targetPaneId = node.panes[index - 1]?.id ?? node.id
     const createdPaneId = node.panes[index]?.id
 
     steps.push({
       id: `${node.id}:split:${index}`,
       kind: "split",
-      command: ["split-window", directionFlag, "-t", targetPaneId, "-p", String(percentage)],
+      command: ["split-window", directionFlag, "-t", targetPaneId, "-p", String(Math.min(percentage, 99))],
       summary: `split ${targetPaneId} (${directionFlag})`,
       targetPaneId,
       createdPaneId,
     })
   }
+}
 
-  node.panes.forEach((pane) => collectSplitSteps(pane, steps))
+const collectTerminals = (node: PlanNode): EmittedTerminal[] => {
+  if (node.kind === "terminal") {
+    return [
+      {
+        virtualPaneId: node.id,
+        command: node.command,
+        cwd: node.cwd,
+        env: node.env,
+        focus: node.focus,
+        name: node.name,
+      },
+    ]
+  }
+
+  return node.panes.flatMap((pane) => collectTerminals(pane))
 }
 
 const determineInitialPaneId = (node: PlanNode): string => {
@@ -102,8 +134,3 @@ const createPlanHash = (plan: LayoutPlan, steps: ReadonlyArray<CommandStep>): st
   digest.update(JSON.stringify(normalized))
   return digest.digest("hex")
 }
-
-const success = <T>(value: T): Result<T, StructuredError> => ({
-  ok: true,
-  value,
-})

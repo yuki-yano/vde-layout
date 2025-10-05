@@ -2,7 +2,7 @@ import * as YAML from "yaml"
 import { z } from "zod"
 import { ConfigSchema } from "../models/schema.ts"
 import type { Config } from "../models/types.ts"
-import { ValidationError, ErrorCodes } from "../utils/errors.ts"
+import { createValidationError, ErrorCodes, isVDELayoutError } from "../utils/errors.ts"
 
 /**
  * Parse YAML text into an object
@@ -13,7 +13,7 @@ import { ValidationError, ErrorCodes } from "../utils/errors.ts"
 function parseYAML(yamlText: string): unknown {
   // Input validation
   if (!yamlText || typeof yamlText !== "string") {
-    throw new ValidationError("YAML text not provided", ErrorCodes.CONFIG_PARSE_ERROR, {
+    throw createValidationError("YAML text not provided", ErrorCodes.CONFIG_PARSE_ERROR, {
       received: typeof yamlText,
     })
   }
@@ -21,7 +21,7 @@ function parseYAML(yamlText: string): unknown {
   try {
     return YAML.parse(yamlText)
   } catch (error) {
-    throw new ValidationError("Failed to parse YAML", ErrorCodes.CONFIG_PARSE_ERROR, {
+    throw createValidationError("Failed to parse YAML", ErrorCodes.CONFIG_PARSE_ERROR, {
       parseError: error instanceof Error ? error.message : String(error),
       yamlSnippet: yamlText.substring(0, 200),
     })
@@ -36,7 +36,7 @@ function parseYAML(yamlText: string): unknown {
 function validateConfigStructure(parsed: unknown): void {
   // Check for empty YAML
   if (parsed === null || parsed === undefined || typeof parsed !== "object") {
-    throw new ValidationError("YAML is empty or invalid format", ErrorCodes.CONFIG_PARSE_ERROR, {
+    throw createValidationError("YAML is empty or invalid format", ErrorCodes.CONFIG_PARSE_ERROR, {
       parsed: parsed,
     })
   }
@@ -44,7 +44,7 @@ function validateConfigStructure(parsed: unknown): void {
   // Check for presets field existence
   const parsedObj = parsed as Record<string, unknown>
   if (!("presets" in parsedObj) || parsedObj.presets === undefined || parsedObj.presets === null) {
-    throw new ValidationError("presets field is required", ErrorCodes.INVALID_PRESET, {
+    throw createValidationError("presets field is required", ErrorCodes.INVALID_PRESET, {
       availableFields: Object.keys(parsedObj),
     })
   }
@@ -52,7 +52,7 @@ function validateConfigStructure(parsed: unknown): void {
   // Check for empty presets
   const presetsObj = parsedObj.presets
   if (typeof presetsObj !== "object" || presetsObj === null || Object.keys(presetsObj).length === 0) {
-    throw new ValidationError("At least one preset is required", ErrorCodes.INVALID_PRESET, {
+    throw createValidationError("At least one preset is required", ErrorCodes.INVALID_PRESET, {
       presets: presetsObj,
     })
   }
@@ -157,19 +157,18 @@ export function validateYAML(yamlText: string): Config {
       // Use the first error message as the primary message
       const primaryMessage = issues.length > 0 && issues[0] ? issues[0].message : "Configuration validation failed"
 
-      throw new ValidationError(primaryMessage, ErrorCodes.CONFIG_PARSE_ERROR, {
+      throw createValidationError(primaryMessage, ErrorCodes.CONFIG_PARSE_ERROR, {
         issues,
         rawErrors: error.issues,
       })
     }
 
-    // Re-throw ValidationError as is
-    if (error instanceof ValidationError) {
+    if (isVDELayoutError(error) && error.name === "ValidationError") {
       throw error
     }
 
     // Other errors
-    throw new ValidationError("Unexpected validation error occurred", ErrorCodes.CONFIG_PARSE_ERROR, {
+    throw createValidationError("Unexpected validation error occurred", ErrorCodes.CONFIG_PARSE_ERROR, {
       error: error instanceof Error ? error.message : String(error),
     })
   }

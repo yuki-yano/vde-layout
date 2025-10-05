@@ -1,26 +1,31 @@
-import type { ICommandExecutor } from "../interfaces/command-executor"
-import type { PlanEmission, CommandStep, StructuredError } from "../core/index.ts"
-import { ErrorCodes } from "../utils/errors"
+import type { CommandExecutor } from "../types/command-executor.ts"
+import type { PlanEmission, CommandStep, EmittedTerminal } from "../core/emitter.ts"
+import { ErrorCodes } from "../utils/errors.ts"
+import { createFunctionalError } from "../core/errors.ts"
 
-export interface ExecutePlanInput {
+const DOUBLE_QUOTE = '"'
+const ESCAPED_DOUBLE_QUOTE = '\\"'
+
+export type ExecutePlanInput = {
   readonly emission: PlanEmission
-  readonly executor: ICommandExecutor
+  readonly executor: CommandExecutor
   readonly windowName?: string
 }
 
-export interface ExecutePlanSuccess {
+export type ExecutePlanSuccess = {
   readonly executedSteps: number
 }
 
-export type ExecutePlanResult = { ok: true; value: ExecutePlanSuccess } | { ok: false; error: StructuredError }
-
-export async function executePlan({ emission, executor, windowName }: ExecutePlanInput): Promise<ExecutePlanResult> {
+export const executePlan = async ({
+  emission,
+  executor,
+  windowName,
+}: ExecutePlanInput): Promise<ExecutePlanSuccess> => {
   const initialVirtualPaneId = emission.summary.initialPaneId
   if (typeof initialVirtualPaneId !== "string" || initialVirtualPaneId.length === 0) {
-    return errorResult({
-      code: ErrorCodes.TMUX_COMMAND_FAILED,
+    raiseExecutionError("INVALID_PLAN", {
       message: "Plan emission is missing initial pane metadata",
-      path: "plan",
+      path: "plan.initialPaneId",
     })
   }
 
@@ -31,196 +36,216 @@ export async function executePlan({ emission, executor, windowName }: ExecutePla
     newWindowCommand.push("-n", windowName.trim())
   }
 
-  const initialPaneIdResult = await safeExecute(executor, newWindowCommand, {
-    code: ErrorCodes.TMUX_COMMAND_FAILED,
-    message: "Failed to create tmux window",
-    path: initialVirtualPaneId,
-  })
+  const initialPaneId = normalizePaneId(
+    await executeCommand(executor, newWindowCommand, {
+      code: ErrorCodes.TMUX_COMMAND_FAILED,
+      message: "Failed to create tmux window",
+      path: initialVirtualPaneId,
+    }),
+  )
 
-  if (!initialPaneIdResult.ok) {
-    return initialPaneIdResult
-  }
-
-  const initialPaneId = normalizePaneId(initialPaneIdResult.value)
   registerPane(paneMap, initialVirtualPaneId, initialPaneId)
 
   let executedSteps = 0
 
   for (const step of emission.steps) {
     if (step.kind === "split") {
-      const targetVirtualId = step.targetPaneId
-      if (typeof targetVirtualId !== "string" || targetVirtualId.length === 0) {
-        return errorResult({
-          code: ErrorCodes.TMUX_COMMAND_FAILED,
-          message: "Split step missing target pane metadata",
-          path: step.id,
-        })
-      }
-
-      const targetRealId = resolvePaneId(paneMap, targetVirtualId)
-      if (typeof targetRealId !== "string" || targetRealId.length === 0) {
-        return errorResult({
-          code: ErrorCodes.TMUX_COMMAND_FAILED,
-          message: `Unknown target pane: ${targetVirtualId}`,
-          path: step.id,
-        })
-      }
-
-      const panesBeforeResult = await listPaneIds(executor, step)
-      if (!panesBeforeResult.ok) {
-        return panesBeforeResult
-      }
-
-      const splitCommand = replaceTarget(step.command, targetRealId)
-      const executionResult = await safeExecute(executor, splitCommand, step)
-      if (!executionResult.ok) {
-        return executionResult
-      }
-
-      const panesAfterResult = await listPaneIds(executor, step)
-      if (!panesAfterResult.ok) {
-        return panesAfterResult
-      }
-
-      const newPaneId = findNewPaneId(panesBeforeResult.value, panesAfterResult.value)
-      if (newPaneId === undefined) {
-        return errorResult({
-          code: ErrorCodes.TMUX_COMMAND_FAILED,
-          message: "Unable to determine newly created pane",
-          path: step.id,
-        })
-      }
-
-      if (typeof step.createdPaneId === "string" && step.createdPaneId.length > 0) {
-        registerPane(paneMap, step.createdPaneId, newPaneId)
-      }
-    } else {
-      const targetVirtualId = step.targetPaneId
-      if (typeof targetVirtualId !== "string" || targetVirtualId.length === 0) {
-        return errorResult({
-          code: ErrorCodes.TMUX_COMMAND_FAILED,
-          message: "Focus step missing target pane metadata",
-          path: step.id,
-        })
-      }
-
-      const targetRealId = resolvePaneId(paneMap, targetVirtualId)
-      if (typeof targetRealId !== "string" || targetRealId.length === 0) {
-        return errorResult({
-          code: ErrorCodes.TMUX_COMMAND_FAILED,
-          message: `Unknown focus pane: ${targetVirtualId}`,
-          path: step.id,
-        })
-      }
-
-      const focusCommand = replaceTarget(step.command, targetRealId)
-      const executionResult = await safeExecute(executor, focusCommand, step)
-      if (!executionResult.ok) {
-        return executionResult
-      }
+      await executeSplitStep({ step, executor, paneMap })
+    } else if (step.kind === "focus") {
+      await executeFocusStep({ step, executor, paneMap })
     }
-
     executedSteps += 1
   }
 
-  return {
-    ok: true,
-    value: {
-      executedSteps,
-    },
+  await executeTerminalCommands({ terminals: emission.terminals, executor, paneMap })
+
+  const finalRealFocus = resolvePaneId(paneMap, emission.summary.focusPaneId)
+  if (typeof finalRealFocus === "string" && finalRealFocus.length > 0) {
+    await executeCommand(executor, ["select-pane", "-t", finalRealFocus], {
+      code: ErrorCodes.TMUX_COMMAND_FAILED,
+      message: "Failed to restore focus",
+      path: emission.summary.focusPaneId,
+    })
   }
+
+  return { executedSteps }
 }
 
-const toStructuredError = (error: unknown, step: CommandStep): StructuredError => {
-  if (typeof error === "object" && error !== null) {
-    const candidate = error as {
-      code?: unknown
-      message?: unknown
-      details?: unknown
-    }
-    if (typeof candidate.code === "string" && typeof candidate.message === "string") {
-      const details = candidate.details
-      const recordDetails =
-        typeof details === "object" && details !== null ? (details as Record<string, unknown>) : undefined
-      return {
-        code: candidate.code,
-        message: candidate.message,
-        path: step.id,
-        details: {
-          command: step.command,
-          ...(recordDetails ?? {}),
-        },
-      }
-    }
-  }
+const executeSplitStep = async ({
+  step,
+  executor,
+  paneMap,
+}: {
+  readonly step: CommandStep
+  readonly executor: CommandExecutor
+  readonly paneMap: Map<string, string>
+}): Promise<void> => {
+  const targetVirtualId = ensureNonEmpty(step.targetPaneId, () =>
+    raiseExecutionError("MISSING_TARGET", {
+      message: "Split step missing target pane metadata",
+      path: step.id,
+    }),
+  )
 
-  return {
+  const targetRealId = ensureNonEmpty(resolvePaneId(paneMap, targetVirtualId), () =>
+    raiseExecutionError("UNKNOWN_PANE", {
+      message: `Unknown target pane: ${targetVirtualId}`,
+      path: step.id,
+    }),
+  )
+
+  const panesBefore = await listPaneIds(executor, step)
+  const splitCommand = replaceTarget(step.command, targetRealId)
+  await executeCommand(executor, splitCommand, {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
-    message: error instanceof Error ? error.message : "Unknown tmux execution error",
+    message: `Failed to execute split step ${step.id}`,
     path: step.id,
-    details: {
-      command: step.command,
-    },
+    details: { command: splitCommand },
+  })
+
+  const panesAfter = await listPaneIds(executor, step)
+  const newPaneId = ensureNonEmpty(findNewPaneId(panesBefore, panesAfter), () =>
+    raiseExecutionError("UNKNOWN_PANE", {
+      message: "Unable to determine newly created pane",
+      path: step.id,
+    }),
+  )
+
+  const createdVirtualId = step.createdPaneId
+  if (typeof createdVirtualId === "string" && createdVirtualId.length > 0) {
+    registerPane(paneMap, createdVirtualId, newPaneId)
   }
 }
 
-interface ErrorContext {
-  readonly code: string
-  readonly message: string
-  readonly path: string
+const executeFocusStep = async ({
+  step,
+  executor,
+  paneMap,
+}: {
+  readonly step: CommandStep
+  readonly executor: CommandExecutor
+  readonly paneMap: Map<string, string>
+}): Promise<void> => {
+  const targetVirtualId = ensureNonEmpty(step.targetPaneId, () =>
+    raiseExecutionError("MISSING_TARGET", {
+      message: "Focus step missing target pane metadata",
+      path: step.id,
+    }),
+  )
+
+  const targetRealId = ensureNonEmpty(resolvePaneId(paneMap, targetVirtualId), () =>
+    raiseExecutionError("UNKNOWN_PANE", {
+      message: `Unknown focus pane: ${targetVirtualId}`,
+      path: step.id,
+    }),
+  )
+
+  const command = replaceTarget(step.command, targetRealId)
+  await executeCommand(executor, command, {
+    code: ErrorCodes.TMUX_COMMAND_FAILED,
+    message: `Failed to execute focus step ${step.id}`,
+    path: step.id,
+    details: { command },
+  })
 }
 
-const safeExecute = async (
-  executor: ICommandExecutor,
-  command: string[],
-  context: CommandStep | ErrorContext,
-): Promise<{ ok: true; value: string } | { ok: false; error: StructuredError }> => {
-  try {
-    const result = await executor.execute([...command])
-    return { ok: true, value: result }
-  } catch (error) {
-    if (!("kind" in context)) {
-      return {
-        ok: false,
-        error: {
-          code: context.code,
-          message: context.message,
-          path: context.path,
-        },
+const executeTerminalCommands = async ({
+  terminals,
+  executor,
+  paneMap,
+}: {
+  readonly terminals: ReadonlyArray<EmittedTerminal>
+  readonly executor: CommandExecutor
+  readonly paneMap: Map<string, string>
+}): Promise<void> => {
+  for (const terminal of terminals) {
+    const realPaneId = ensureNonEmpty(resolvePaneId(paneMap, terminal.virtualPaneId), () =>
+      raiseExecutionError("UNKNOWN_PANE", {
+        message: `Unknown terminal pane: ${terminal.virtualPaneId}`,
+        path: terminal.virtualPaneId,
+      }),
+    )
+
+    if (typeof terminal.cwd === "string" && terminal.cwd.length > 0) {
+      const escapedCwd = terminal.cwd.split(DOUBLE_QUOTE).join(ESCAPED_DOUBLE_QUOTE)
+      await executeCommand(executor, ["send-keys", "-t", realPaneId, `cd "${escapedCwd}"`, "Enter"], {
+        code: ErrorCodes.TMUX_COMMAND_FAILED,
+        message: `Failed to change directory for pane ${terminal.virtualPaneId}`,
+        path: terminal.virtualPaneId,
+        details: { cwd: terminal.cwd },
+      })
+    }
+
+    if (terminal.env !== undefined) {
+      for (const [key, value] of Object.entries(terminal.env)) {
+        const escaped = String(value).split(DOUBLE_QUOTE).join(ESCAPED_DOUBLE_QUOTE)
+        await executeCommand(executor, ["send-keys", "-t", realPaneId, `export ${key}="${escaped}"`, "Enter"], {
+          code: ErrorCodes.TMUX_COMMAND_FAILED,
+          message: `Failed to set environment variable ${key}`,
+          path: terminal.virtualPaneId,
+        })
       }
     }
-    return {
-      ok: false,
-      error: toStructuredError(error, context as CommandStep),
+
+    if (typeof terminal.command === "string" && terminal.command.length > 0) {
+      await executeCommand(executor, ["send-keys", "-t", realPaneId, terminal.command, "Enter"], {
+        code: ErrorCodes.TMUX_COMMAND_FAILED,
+        message: `Failed to execute command for pane ${terminal.virtualPaneId}`,
+        path: terminal.virtualPaneId,
+        details: { command: terminal.command },
+      })
     }
   }
 }
 
-const listPaneIds = async (
-  executor: ICommandExecutor,
-  step: CommandStep,
-): Promise<{ ok: true; value: string[] } | { ok: false; error: StructuredError }> => {
-  const result = await safeExecute(executor, ["list-panes", "-F", "#{pane_id}"], step)
-  if (!result.ok) {
-    return result
-  }
+const executeCommand = async (
+  executor: CommandExecutor,
+  command: string[],
+  context: {
+    readonly code: string
+    readonly message: string
+    readonly path: string
+    readonly details?: Record<string, unknown>
+  },
+): Promise<string> => {
+  try {
+    return await executor.execute([...command])
+  } catch (error) {
+    if (error instanceof Error && "code" in error && "message" in error) {
+      const candidate = error as { code?: string; message?: string; details?: Record<string, unknown> }
+      throw createFunctionalError("execution", {
+        code: typeof candidate.code === "string" ? candidate.code : context.code,
+        message: candidate.message ?? context.message,
+        path: context.path,
+        details: candidate.details ?? context.details,
+      })
+    }
 
-  const ids = result.value
+    throw createFunctionalError("execution", {
+      code: context.code,
+      message: context.message,
+      path: context.path,
+      details: context.details,
+    })
+  }
+}
+
+const listPaneIds = async (executor: CommandExecutor, step: CommandStep): Promise<string[]> => {
+  const output = await executeCommand(executor, ["list-panes", "-F", "#{pane_id}"], {
+    code: ErrorCodes.TMUX_COMMAND_FAILED,
+    message: "Failed to list tmux panes",
+    path: step.id,
+  })
+
+  return output
     .split("\n")
     .map((pane) => pane.trim())
     .filter((pane) => pane.length > 0)
-
-  return { ok: true, value: ids }
 }
 
 const findNewPaneId = (before: string[], after: string[]): string | undefined => {
   const beforeSet = new Set(before)
-  for (const id of after) {
-    if (!beforeSet.has(id)) {
-      return id
-    }
-  }
-  return undefined
+  return after.find((id) => !beforeSet.has(id))
 }
 
 const replaceTarget = (command: ReadonlyArray<string>, realTarget: string): string[] => {
@@ -231,7 +256,6 @@ const replaceTarget = (command: ReadonlyArray<string>, realTarget: string): stri
     return next
   }
 
-  // fallback: replace last argument if there is no -t flag
   if (next.length > 0) {
     next[next.length - 1] = realTarget
   }
@@ -240,10 +264,7 @@ const replaceTarget = (command: ReadonlyArray<string>, realTarget: string): stri
 
 const normalizePaneId = (raw: string): string => {
   const trimmed = raw.trim()
-  if (trimmed.length === 0) {
-    return "%0"
-  }
-  return trimmed
+  return trimmed.length === 0 ? "%0" : trimmed
 }
 
 const registerPane = (paneMap: Map<string, string>, virtualId: string, realId: string): void => {
@@ -266,30 +287,37 @@ const resolvePaneId = (paneMap: Map<string, string>, virtualId: string): string 
     }
   }
 
-  let bestKey: string | undefined
-  let bestValue: string | undefined
   for (const [key, value] of paneMap.entries()) {
     if (key.startsWith(`${virtualId}.`)) {
-      if (bestKey === undefined || key.length < bestKey.length) {
-        bestKey = key
-        bestValue = value
+      if (typeof value === "string" && value.length > 0) {
+        paneMap.set(virtualId, value)
+        return value
       }
     }
-  }
-
-  if (typeof bestValue === "string" && bestValue.length > 0) {
-    paneMap.set(virtualId, bestValue)
-    return bestValue
   }
 
   return undefined
 }
 
-const errorResult = ({ code, message, path }: ErrorContext): ExecutePlanResult => ({
-  ok: false,
+const ensureNonEmpty = <T extends string>(value: T | undefined, buildError: () => never): T => {
+  if (value === undefined || value.length === 0) {
+    return buildError()
+  }
+  return value
+}
+
+const raiseExecutionError = (
+  code: string,
   error: {
-    code,
-    message,
-    path,
+    readonly message: string
+    readonly path: string
+    readonly details?: Record<string, unknown>
   },
-})
+): never => {
+  throw createFunctionalError("execution", {
+    code,
+    message: error.message,
+    path: error.path,
+    details: error.details,
+  })
+}

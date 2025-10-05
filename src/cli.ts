@@ -2,9 +2,10 @@ import { Command } from "commander"
 import chalk from "chalk"
 import { stringify as toYAML } from "yaml"
 import { createRequire } from "module"
-import { PresetManager } from "./layout/preset.ts"
+import { createPresetManager } from "./layout/preset.ts"
 import type { Preset, PresetInfo } from "./models/types"
-import type { IPresetManager, ICommandExecutor } from "./interfaces"
+import type { CommandExecutor } from "./types/command-executor.ts"
+import type { PresetManager } from "./types/preset-manager.ts"
 import { createRealExecutor, createDryRunExecutor } from "./executor/index.ts"
 import { executePlan } from "./executor/plan-runner.ts"
 import { createLogger, LogLevel, type Logger } from "./utils/logger.ts"
@@ -19,8 +20,11 @@ import type {
   DiagnosticsSeverity,
   CompilePresetInput,
   PlanEmission,
-  StructuredError,
+  FunctionalCoreError,
+  CompilePresetSuccess,
+  CreateLayoutPlanSuccess,
 } from "./core/index.ts"
+import { isFunctionalCoreError } from "./core/index.ts"
 
 const KNOWN_ISSUES: ReadonlyArray<string> = [
   "LayoutEngineがtmux依存とI/Oを同一クラスで扱っている",
@@ -40,7 +44,7 @@ const formatSeverityTag = (severity: DiagnosticsSeverity): string => {
   }
 }
 
-export interface FunctionalCoreBridge {
+export type FunctionalCoreBridge = {
   readonly compilePreset: (input: CompilePresetInput) => ReturnType<typeof defaultCompilePreset>
   readonly createLayoutPlan: (
     input: Parameters<typeof defaultCreateLayoutPlan>[0],
@@ -48,21 +52,21 @@ export interface FunctionalCoreBridge {
   readonly emitPlan: (input: Parameters<typeof defaultEmitPlan>[0]) => ReturnType<typeof defaultEmitPlan>
 }
 
-export interface CLIOptions {
-  readonly presetManager?: IPresetManager
-  readonly createCommandExecutor?: (options: { verbose: boolean; dryRun: boolean }) => ICommandExecutor
+export type CLIOptions = {
+  readonly presetManager?: PresetManager
+  readonly createCommandExecutor?: (options: { verbose: boolean; dryRun: boolean }) => CommandExecutor
   readonly functionalCore?: FunctionalCoreBridge
 }
 
-export interface CLI {
+export type CLI = {
   run(args?: string[]): Promise<void>
 }
 
 export const createCli = (options: CLIOptions = {}): CLI => {
-  const presetManager = options.presetManager ?? new PresetManager()
+  const presetManager = options.presetManager ?? createPresetManager()
   const createCommandExecutor =
     options.createCommandExecutor ??
-    ((opts: { verbose: boolean; dryRun: boolean }): ICommandExecutor => {
+    ((opts: { verbose: boolean; dryRun: boolean }): CommandExecutor => {
       if (opts.dryRun) {
         return createDryRunExecutor({ verbose: opts.verbose })
       }
@@ -144,17 +148,13 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     return typeof presetName === "string" && presetName.length > 0 ? `preset://${presetName}` : "preset://default"
   }
 
-  const handleFunctionalError = (error: StructuredError): never => {
-    const segments: string[] = []
-    if (typeof error.code === "string" && error.code.length > 0) {
-      segments.push(`[${error.code}]`)
-    }
+  const handleFunctionalError = (error: FunctionalCoreError): never => {
+    const header = [`[${error.kind}]`, `[${error.code}]`]
     if (typeof error.path === "string" && error.path.length > 0) {
-      segments.push(`[${error.path}]`)
+      header.push(`[${error.path}]`)
     }
 
-    const header = segments.join(" ")
-    const lines = [`${header} ${error.message}`.trim()]
+    const lines = [`${header.join(" ")} ${error.message}`.trim()]
 
     if (typeof error.source === "string" && error.source.length > 0) {
       lines.push(`source: ${error.source}`)
@@ -163,7 +163,9 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     const commandDetail = error.details?.command
     if (Array.isArray(commandDetail)) {
       const tmuxCommand = commandDetail.filter((segment): segment is string => typeof segment === "string")
-      lines.push(`command: tmux ${tmuxCommand.join(" ")}`)
+      if (tmuxCommand.length > 0) {
+        lines.push(`command: tmux ${tmuxCommand.join(" ")}`)
+      }
     } else if (typeof commandDetail === "string" && commandDetail.length > 0) {
       lines.push(`command: ${commandDetail}`)
     }
@@ -187,6 +189,13 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     }
 
     process.exit(1)
+  }
+
+  const handlePipelineFailure = (error: unknown): never => {
+    if (isFunctionalCoreError(error)) {
+      return handleFunctionalError(error)
+    }
+    return handleError(error)
   }
 
   const listPresets = async (): Promise<never> => {
@@ -263,45 +272,34 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         console.log("[DRY RUN] No actual commands will be executed")
       }
 
-      const compiled = functionalCore.compilePreset({
-        document: buildPresetDocument(preset, presetName),
-        source: buildPresetSource(presetName),
-      })
+      let compileResult: CompilePresetSuccess
+      let planResult: CreateLayoutPlanSuccess
+      let emission: PlanEmission
 
-      if (!compiled.ok) {
-        return handleFunctionalError(compiled.error)
+      try {
+        compileResult = functionalCore.compilePreset({
+          document: buildPresetDocument(preset, presetName),
+          source: buildPresetSource(presetName),
+        })
+        planResult = functionalCore.createLayoutPlan({ preset: compileResult.preset })
+        emission = functionalCore.emitPlan({ plan: planResult.plan })
+      } catch (error) {
+        return handlePipelineFailure(error)
       }
-
-      const planResult = functionalCore.createLayoutPlan({
-        preset: compiled.value.preset,
-      })
-
-      if (!planResult.ok) {
-        return handleFunctionalError(planResult.error)
-      }
-
-      const emissionResult = functionalCore.emitPlan({
-        plan: planResult.value.plan,
-      })
-
-      if (!emissionResult.ok) {
-        return handleFunctionalError(emissionResult.error)
-      }
-
-      const emission = emissionResult.value
 
       if (options.dryRun === true) {
         renderDryRun(emission)
       } else {
-        const executionResult = await executePlan({
-          emission,
-          executor,
-          windowName: preset.name ?? presetName ?? "vde-layout",
-        })
-        if (!executionResult.ok) {
-          return handleFunctionalError(executionResult.error)
+        try {
+          const executionResult = await executePlan({
+            emission,
+            executor,
+            windowName: preset.name ?? presetName ?? "vde-layout",
+          })
+          logger.info(`Executed ${executionResult.executedSteps} tmux steps`)
+        } catch (error) {
+          return handlePipelineFailure(error)
         }
-        logger.info(`Executed ${executionResult.value.executedSteps} tmux steps`)
       }
 
       logger.success(`✓ Applied preset "${preset.name}"`)
