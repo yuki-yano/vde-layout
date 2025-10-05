@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { runDiagnostics } from "../diagnostics"
+import { runDiagnostics } from "../diagnostics.ts"
 
 describe("runDiagnostics", () => {
   it("フォーカス重複とlayout欠如を指摘する", () => {
@@ -40,9 +40,7 @@ layout:
 
     const report = runDiagnostics({
       presetDocument: preset,
-      knownIssues: [
-        "LayoutEngineがtmux依存とI/Oを同一クラスで扱っている",
-      ],
+      knownIssues: ["LayoutEngineがtmux依存とI/Oを同一クラスで扱っている"],
     })
 
     expect(report.findings).toEqual(

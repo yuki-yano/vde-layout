@@ -2,17 +2,28 @@
   "name": "vde-layout",
   "version": "0.0.1",
   "description": "Terminal multiplexer layout management tool for VDE (Vibe Coding Development Environment)",
+  "type": "module",
   "main": "dist/index.js",
+  "module": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "types": "dist/index.d.ts",
   "bin": {
     "vde-layout": "./bin/vde-layout"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsdown",
     "clean": "rm -rf dist",
-    "compile": "tsc",
-    "dev": "tsc --watch",
-    "test": "vitest run",
+    "compile": "tsdown",
+    "dev": "tsdown --watch",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "test": "bun run build && vitest run",
+    "ci": "bun run format:check && bun run typecheck && bun run lint && bun run test",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src",
@@ -62,6 +73,7 @@
     "eslint-config-prettier": "^9.1.0",
     "globals": "^16.3.0",
     "prettier": "^3.2.4",
+    "tsdown": "^0.15.6",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.38.0",
     "vitest": "^1.2.1"

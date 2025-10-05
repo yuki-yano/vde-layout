@@ -7,7 +7,7 @@ import {
   EnvironmentError,
   formatError,
   isVDELayoutError,
-} from "../errors"
+} from "../errors.ts"
 
 describe("Error class hierarchy", () => {
   describe("VDELayoutError", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
-import { createCli, type CLI, type FunctionalCoreBridge } from "../cli"
-import { MockPresetManager } from "./mocks/preset-manager-mock"
-import type { ICommandExecutor } from "../interfaces/command-executor"
+import { createCli, type CLI, type FunctionalCoreBridge } from "../cli.ts"
+import { MockPresetManager } from "./mocks/preset-manager-mock.ts"
+import type { ICommandExecutor } from "../interfaces/command-executor.ts"
 import type {
   CompilePresetInput,
   CompilePresetSuccess,
@@ -10,22 +10,47 @@ import type {
   FunctionalPreset,
   PlanNode,
   LayoutPlan,
-} from "@/core"
+} from "../core/index.ts"
 
 class RecordingExecutor implements ICommandExecutor {
   readonly commands: string[][] = []
+  private paneIds: string[] = ["%0"]
+  private paneCounter = 0
+
   constructor(private readonly dryRun: boolean) {}
 
   async execute(command: string | string[]): Promise<string> {
-    const args = typeof command === "string" ? command.split(" ").slice(1) : command
+    const args =
+      typeof command === "string"
+        ? command
+            .split(" ")
+            .filter((segment) => segment.length > 0)
+            .slice(1)
+        : command
     this.commands.push([...args])
+
+    const [cmd] = args
+    if (cmd === "display-message" && args.includes("#{pane_id}")) {
+      return this.paneIds[0] ?? "%0"
+    }
+
+    if (cmd === "list-panes" && args.includes("#{pane_id}")) {
+      return this.paneIds.join("\n")
+    }
+
+    if (cmd === "split-window") {
+      this.paneCounter += 1
+      const newId = `%${this.paneCounter}`
+      this.paneIds = [...this.paneIds, newId]
+    }
+
     return ""
   }
 
   async executeMany(commandsList: string[][]): Promise<void> {
-    commandsList.forEach((command) => {
-      this.commands.push([...command])
-    })
+    for (const command of commandsList) {
+      await this.execute(command)
+    }
   }
 
   isDryRun(): boolean {
@@ -101,17 +126,21 @@ describe("CLI", () => {
         kind: "split",
         command: ["split-window", "-h", "-t", "root.0", "-p", "50"],
         summary: "split root.0 (-h)",
+        targetPaneId: "root.0",
+        createdPaneId: "root.1",
       },
       {
         id: "root.0:focus",
         kind: "focus",
         command: ["select-pane", "-t", "root.0"],
         summary: "select pane root.0",
+        targetPaneId: "root.0",
       },
     ],
     summary: {
       stepsCount: 2,
       focusPaneId: "root.0",
+      initialPaneId: "root.0",
     },
     hash: "abc123",
   }
@@ -250,7 +279,9 @@ describe("CLI", () => {
       await cli.run(["dev"])
 
       expectFunctionalPipelineCalled()
-      expect(recordingExecutor.commands).toHaveLength(sampleEmission.steps.length)
+      const expectedCommandCount =
+        1 + sampleEmission.steps.length + sampleEmission.steps.filter((step) => step.kind === "split").length * 2
+      expect(recordingExecutor.commands).toHaveLength(expectedCommandCount)
       expect(consoleOutput.join("\n")).toContain('Applied preset "Development"')
       expect(exitCode).toBe(0)
     })
@@ -259,7 +290,9 @@ describe("CLI", () => {
       await cli.run([])
 
       expectFunctionalPipelineCalled()
-      expect(recordingExecutor.commands).toHaveLength(sampleEmission.steps.length)
+      const expectedCommandCount =
+        1 + sampleEmission.steps.length + sampleEmission.steps.filter((step) => step.kind === "split").length * 2
+      expect(recordingExecutor.commands).toHaveLength(expectedCommandCount)
       expect(exitCode).toBe(0)
     })
 
@@ -285,7 +318,9 @@ describe("CLI", () => {
       await cli.run(["dev", "--verbose"])
 
       expectFunctionalPipelineCalled()
-      expect(recordingExecutor.commands).toHaveLength(sampleEmission.steps.length)
+      const expectedCommandCount =
+        1 + sampleEmission.steps.length + sampleEmission.steps.filter((step) => step.kind === "split").length * 2
+      expect(recordingExecutor.commands).toHaveLength(expectedCommandCount)
       expect(exitCode).toBe(0)
     })
 
@@ -342,12 +377,24 @@ describe("CLI", () => {
 
     it("should report structured errors when plan execution fails", async () => {
       const failingExecutorFactory = vi.fn(() => {
-        let callCount = 0
+        let paneIds = ["%0"]
         return {
           async execute(command: string | string[]): Promise<string> {
-            const args = typeof command === "string" ? command.split(" ").slice(1) : command
-            callCount += 1
-            if (callCount === 2) {
+            const args =
+              typeof command === "string"
+                ? command
+                    .split(" ")
+                    .filter((segment) => segment.length > 0)
+                    .slice(1)
+                : command
+            const [cmd] = args
+            if (cmd === "display-message" && args.includes("#{pane_id}")) {
+              return paneIds[0] ?? "%0"
+            }
+            if (cmd === "list-panes" && args.includes("#{pane_id}")) {
+              return paneIds.join("\n")
+            }
+            if (cmd === "split-window") {
               const error = new Error("tmux failed") as Error & { code?: string; details?: Record<string, unknown> }
               error.code = "TMUX_COMMAND_FAILED"
               error.details = { stderr: "boom" }
@@ -367,9 +414,10 @@ describe("CLI", () => {
 
       const failingCli = createCli({
         presetManager: mockPresetManager,
-        createCommandExecutor: failingExecutorFactory as unknown as (
-          options: { verbose: boolean; dryRun: boolean }
-        ) => ICommandExecutor,
+        createCommandExecutor: failingExecutorFactory as unknown as (options: {
+          verbose: boolean
+          dryRun: boolean
+        }) => ICommandExecutor,
         functionalCore,
       })
 
@@ -377,8 +425,8 @@ describe("CLI", () => {
 
       const errorLog = errorOutput.join("\n")
       expect(errorLog).toContain("TMUX_COMMAND_FAILED")
-      expect(errorLog).toContain("root.0:focus")
-      expect(errorLog).toContain("select-pane -t root.0")
+      expect(errorLog).toContain("root:split:1")
+      expect(errorLog).toContain("split-window -h -t root.0")
       expect(exitCode).toBe(1)
     })
   })

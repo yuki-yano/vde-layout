@@ -1,8 +1,8 @@
-import { ConfigLoader, type ConfigLoaderOptions } from "../config/loader"
-import { validateYAML } from "../config/validator"
-import { ConfigError, ErrorCodes } from "../utils/errors"
-import type { Config, Preset, PresetInfo } from "../models/types"
-import type { IPresetManager } from "../interfaces"
+import { ConfigLoader, type ConfigLoaderOptions } from "../config/loader.ts"
+import { validateYAML } from "../config/validator.ts"
+import { ConfigError, ErrorCodes } from "../utils/errors.ts"
+import type { Config, Preset, PresetInfo } from "../models/types.ts"
+import type { IPresetManager } from "../interfaces/index.ts"
 
 /**
  * Preset Manager

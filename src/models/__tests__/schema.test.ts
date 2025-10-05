@@ -7,8 +7,8 @@ import {
   validateConfig,
   validatePreset,
   validatePane,
-} from "../schema"
-import type { Pane, Layout, Preset, Config } from "../types"
+} from "../schema.ts"
+import type { Pane, Layout, Preset, Config } from "../types.ts"
 
 describe("Zod schema validation", () => {
   describe("PaneSchema", () => {

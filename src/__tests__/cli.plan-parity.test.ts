@@ -1,21 +1,46 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { createCli, type CLI, type FunctionalCoreBridge } from "../cli"
-import type { IPresetManager } from "../interfaces"
-import type { Preset, PresetInfo } from "../models/types"
-import type { ICommandExecutor } from "../interfaces/command-executor"
+import { createCli, type CLI, type FunctionalCoreBridge } from "../cli.ts"
+import type { IPresetManager } from "../interfaces/index.ts"
+import type { Preset, PresetInfo } from "../models/types.ts"
+import type { ICommandExecutor } from "../interfaces/command-executor.ts"
 import {
   compilePreset as defaultCompilePreset,
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
-} from "@/core"
+} from "../core/index.ts"
 
 class RecordingExecutor implements ICommandExecutor {
   readonly commands: string[][] = []
+  private paneIds: string[] = ["%0"]
+  private paneCounter = 0
+
   constructor(private readonly dryRun: boolean) {}
 
   async execute(command: string | string[]): Promise<string> {
-    const args = typeof command === "string" ? command.split(" ").slice(1) : command
+    const args =
+      typeof command === "string"
+        ? command
+            .split(" ")
+            .filter((segment) => segment.length > 0)
+            .slice(1)
+        : command
     this.commands.push([...args])
+
+    const [cmd] = args
+    if (cmd === "display-message" && args.includes("#{pane_id}")) {
+      return this.paneIds[0] ?? "%0"
+    }
+
+    if (cmd === "list-panes" && args.includes("#{pane_id}")) {
+      return this.paneIds.join("\n")
+    }
+
+    if (cmd === "split-window") {
+      this.paneCounter += 1
+      const newId = `%${this.paneCounter}`
+      this.paneIds = [...this.paneIds, newId]
+    }
+
     return ""
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { validateYAML } from "../validator"
-import { ValidationError } from "../../utils/errors"
+import { validateYAML } from "../validator.ts"
+import { ValidationError } from "../../utils/errors.ts"
 
 describe("validateYAML", () => {
   describe("valid configurations", () => {

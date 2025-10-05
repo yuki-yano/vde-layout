@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { PresetManager } from "../preset"
-import { ConfigError } from "../../utils/errors"
+import { PresetManager } from "../preset.ts"
+import { ConfigError } from "../../utils/errors.ts"
 import * as fs from "fs/promises"
 import * as path from "path"
 import * as os from "os"

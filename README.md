@@ -26,9 +26,10 @@ This separation allows the Functional Core to remain pure and fully testable whi
 
 ## Development Notes
 
-- Import Functional Core modules via the `@/core` alias (`tsconfig.json` exposes `@/core/*`). The legacy `src/functional-core` path is a thin re-export kept for compatibility.
-- Boundary adapters (`src/cli`, `src/executor`, `src/tmux`) are implemented as factory functions; avoid introducing new classes in these layers.
-- Run `npm run typecheck` and `npm test` before sending changes. Vitest is configured with the same path aliases as the TypeScript compiler.
+- Runtime modules are authored in ESM with explicit `.ts` extensions. `src/functional-core/index.ts` re-exports the canonical modules under `src/core/` for compatibility.
+- Boundary adapters (`src/cli`, `src/executor`, `src/tmux`) remain factory-based; avoid新たなクラス導入は避けてください。
+- `npm run build` uses tsdown to emit ESM bundles into `dist/`. `npm test` automatically rebuilds before executing the Vitest suite.
+- Run `npm run typecheck` to validate the TypeScript sources without emitting artifacts.
 
 ## Installation
 

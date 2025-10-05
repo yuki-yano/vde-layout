@@ -1,4 +1,4 @@
-import type { ITmuxCommandGenerator } from "../interfaces"
+import type { ITmuxCommandGenerator } from "../interfaces/index.ts"
 
 /**
  * tmux command generator

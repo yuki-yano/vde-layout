@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest"
-import { ConfigLoader } from "../loader"
-import { ConfigError } from "../../utils/errors"
+import { ConfigLoader } from "../loader.ts"
+import { ConfigError } from "../../utils/errors.ts"
 
 describe("ConfigLoader", () => {
   let loader: ConfigLoader

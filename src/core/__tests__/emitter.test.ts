@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { compilePreset, createLayoutPlan, emitPlan } from "../index"
+import { compilePreset, createLayoutPlan, emitPlan } from "../index.ts"
 
 describe("emitPlan", () => {
   it("プランからtmuxコマンドステップを生成する", () => {
@@ -40,6 +40,7 @@ layout:
     })
     expect(emission.summary.stepsCount).toBe(2)
     expect(emission.summary.focusPaneId).toBe("root.0")
+    expect(emission.summary.initialPaneId).toBe("root.0")
     expect(emission.hash).toMatch(/^[a-f0-9]{64}$/)
   })
 
@@ -101,6 +102,7 @@ name: single
       command: ["select-pane", "-t", "root"],
     })
     expect(emission.value.summary.stepsCount).toBe(1)
+    expect(emission.value.summary.initialPaneId).toBe("root")
     expect(emission.value.hash).toMatch(/^[a-f0-9]{64}$/)
   })
 

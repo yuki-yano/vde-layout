@@ -1,8 +1,8 @@
 import * as YAML from "yaml"
 import { z } from "zod"
-import { ConfigSchema } from "../models/schema"
-import type { Config } from "../models/types"
-import { ValidationError, ErrorCodes } from "../utils/errors"
+import { ConfigSchema } from "../models/schema.ts"
+import type { Config } from "../models/types.ts"
+import { ValidationError, ErrorCodes } from "../utils/errors.ts"
 
 /**
  * Parse YAML text into an object

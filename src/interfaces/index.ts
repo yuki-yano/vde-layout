@@ -1,4 +1,4 @@
-import type { Preset, PresetInfo } from "../models/types"
+import type { Preset, PresetInfo } from "../models/types.ts"
 
 /**
  * Interface for preset management
@@ -42,4 +42,4 @@ export interface ITmuxCommandGenerator {
   setEnvironment(paneId: string, env: Record<string, string>): string[][]
 }
 
-export type { ICommandExecutor } from "./command-executor"
+export type { ICommandExecutor } from "./command-executor.ts"

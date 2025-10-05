@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
-import { TmuxExecutor } from "../executor"
-import { EnvironmentError } from "../../utils/errors"
-import { createMockExecutor, type MockExecutor } from "../../executor/mock-executor"
+import { TmuxExecutor } from "../executor.ts"
+import { EnvironmentError } from "../../utils/errors.ts"
+import { createMockExecutor, type MockExecutor } from "../../executor/mock-executor.ts"
 
 describe("TmuxExecutor", () => {
   let executor: TmuxExecutor

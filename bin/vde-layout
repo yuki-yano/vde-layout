@@ -1,2 +1,10 @@
 #!/usr/bin/env node
-require('../dist/index.js');
+try {
+  await import('../dist/index.js');
+} catch (error) {
+  if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_MODULE_NOT_FOUND') {
+    await import('../src/index.ts');
+  } else {
+    throw error;
+  }
+}

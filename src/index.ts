@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createCli } from "./cli"
+import { createCli } from "./cli.ts"
 
 /**
  * Main entry point

@@ -1,26 +1,26 @@
 import { Command } from "commander"
 import chalk from "chalk"
 import { stringify as toYAML } from "yaml"
-import { PresetManager } from "./layout/preset"
-import { version } from "../package.json"
+import { createRequire } from "module"
+import { PresetManager } from "./layout/preset.ts"
 import type { Preset, PresetInfo } from "./models/types"
 import type { IPresetManager, ICommandExecutor } from "./interfaces"
-import { createRealExecutor, createDryRunExecutor } from "./executor"
-import { executePlan } from "./executor/plan-runner"
-import { createLogger, LogLevel, type Logger } from "./utils/logger"
+import { createRealExecutor, createDryRunExecutor } from "./executor/index.ts"
+import { executePlan } from "./executor/plan-runner.ts"
+import { createLogger, LogLevel, type Logger } from "./utils/logger.ts"
 import {
   runDiagnostics,
   compilePreset as defaultCompilePreset,
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
-} from "@/core"
+} from "./core/index.ts"
 import type {
   DiagnosticsReport,
   DiagnosticsSeverity,
   CompilePresetInput,
   PlanEmission,
   StructuredError,
-} from "@/core"
+} from "./core/index.ts"
 
 const KNOWN_ISSUES: ReadonlyArray<string> = [
   "LayoutEngineがtmux依存とI/Oを同一クラスで扱っている",
@@ -42,9 +42,9 @@ const formatSeverityTag = (severity: DiagnosticsSeverity): string => {
 
 export interface FunctionalCoreBridge {
   readonly compilePreset: (input: CompilePresetInput) => ReturnType<typeof defaultCompilePreset>
-  readonly createLayoutPlan: (input: Parameters<typeof defaultCreateLayoutPlan>[0]) => ReturnType<
-    typeof defaultCreateLayoutPlan
-  >
+  readonly createLayoutPlan: (
+    input: Parameters<typeof defaultCreateLayoutPlan>[0],
+  ) => ReturnType<typeof defaultCreateLayoutPlan>
   readonly emitPlan: (input: Parameters<typeof defaultEmitPlan>[0]) => ReturnType<typeof defaultEmitPlan>
 }
 
@@ -71,9 +71,15 @@ export const createCli = (options: CLIOptions = {}): CLI => {
 
   const functionalCore: FunctionalCoreBridge =
     options.functionalCore ??
-    ({ compilePreset: defaultCompilePreset, createLayoutPlan: defaultCreateLayoutPlan, emitPlan: defaultEmitPlan } as const)
+    ({
+      compilePreset: defaultCompilePreset,
+      createLayoutPlan: defaultCreateLayoutPlan,
+      emitPlan: defaultEmitPlan,
+    } as const)
 
   const program = new Command()
+  const require = createRequire(import.meta.url)
+  const { version } = require("../package.json") as { version: string }
   let logger: Logger = createLogger()
 
   const renderDiagnosticsReport = (report: DiagnosticsReport): void => {
@@ -123,11 +129,11 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       layout: preset.layout,
     }
 
-    if (!preset.command) {
+    if (typeof preset.command !== "string" || preset.command.length === 0) {
       delete document.command
     }
 
-    if (!preset.layout) {
+    if (preset.layout === undefined || preset.layout === null) {
       delete document.layout
     }
 
@@ -135,36 +141,38 @@ export const createCli = (options: CLIOptions = {}): CLI => {
   }
 
   const buildPresetSource = (presetName?: string): string => {
-    return presetName ? `preset://${presetName}` : "preset://default"
+    return typeof presetName === "string" && presetName.length > 0 ? `preset://${presetName}` : "preset://default"
   }
 
   const handleFunctionalError = (error: StructuredError): never => {
     const segments: string[] = []
-    if (error.code) {
+    if (typeof error.code === "string" && error.code.length > 0) {
       segments.push(`[${error.code}]`)
     }
-    if (error.path) {
+    if (typeof error.path === "string" && error.path.length > 0) {
       segments.push(`[${error.path}]`)
     }
 
     const header = segments.join(" ")
-    const lines = [
-      `${header} ${error.message}`.trim(),
-    ]
+    const lines = [`${header} ${error.message}`.trim()]
 
-    if (error.source) {
+    if (typeof error.source === "string" && error.source.length > 0) {
       lines.push(`source: ${error.source}`)
     }
 
-    if (error.details?.command) {
-      const command = Array.isArray(error.details.command)
-        ? `tmux ${(error.details.command as string[]).join(" ")}`
-        : String(error.details.command)
-      lines.push(`command: ${command}`)
+    const commandDetail = error.details?.command
+    if (Array.isArray(commandDetail)) {
+      const tmuxCommand = commandDetail.filter((segment): segment is string => typeof segment === "string")
+      lines.push(`command: tmux ${tmuxCommand.join(" ")}`)
+    } else if (typeof commandDetail === "string" && commandDetail.length > 0) {
+      lines.push(`command: ${commandDetail}`)
     }
 
-    if (error.details?.stderr) {
-      lines.push(`stderr: ${String(error.details.stderr)}`)
+    const stderrDetail = error.details?.stderr
+    if (typeof stderrDetail === "string" && stderrDetail.length > 0) {
+      lines.push(`stderr: ${stderrDetail}`)
+    } else if (stderrDetail !== undefined) {
+      lines.push(`stderr: ${String(stderrDetail)}`)
     }
 
     logger.error(lines.join("\n"))
@@ -211,7 +219,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     try {
       await presetManager.loadConfig()
       const preset =
-        presetName !== undefined && presetName.length > 0
+        typeof presetName === "string" && presetName.length > 0
           ? presetManager.getPreset(presetName)
           : presetManager.getDefaultPreset()
 
@@ -236,12 +244,13 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       await presetManager.loadConfig()
 
       const preset =
-        presetName !== undefined && presetName.length > 0
+        typeof presetName === "string" && presetName.length > 0
           ? presetManager.getPreset(presetName)
           : presetManager.getDefaultPreset()
 
-      const insideTmux = Boolean(process.env.TMUX && process.env.TMUX.length > 0)
-      if (!insideTmux && !options.dryRun) {
+      const tmuxEnv = process.env.TMUX
+      const insideTmux = typeof tmuxEnv === "string" && tmuxEnv.length > 0
+      if (!insideTmux && options.dryRun !== true) {
         throw new Error("Must be run inside a tmux session")
       }
 
@@ -250,7 +259,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         dryRun: options.dryRun,
       })
 
-      if (options.dryRun) {
+      if (options.dryRun === true) {
         console.log("[DRY RUN] No actual commands will be executed")
       }
 
@@ -281,7 +290,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
 
       const emission = emissionResult.value
 
-      if (options.dryRun) {
+      if (options.dryRun === true) {
         renderDryRun(emission)
       } else {
         const executionResult = await executePlan({ emission, executor })
@@ -338,9 +347,15 @@ export const createCli = (options: CLIOptions = {}): CLI => {
   setupProgram()
 
   const run = async (args: string[] = process.argv.slice(2)): Promise<void> => {
+    const requestedVersion = args.includes("--version") || args.includes("-V")
+    const requestedHelp = args.includes("--help") || args.includes("-h")
     try {
       await program.parseAsync(args, { from: "user" })
       const opts = program.opts<{ verbose?: boolean; config?: string }>()
+
+      if (requestedVersion || requestedHelp) {
+        return
+      }
 
       if (opts.verbose === true) {
         logger = createLogger({ level: LogLevel.INFO })
@@ -348,7 +363,11 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         logger = createLogger()
       }
 
-      if (opts.config && typeof opts.config === "string" && typeof presetManager.setConfigPath === "function") {
+      if (
+        typeof opts.config === "string" &&
+        opts.config.length > 0 &&
+        typeof presetManager.setConfigPath === "function"
+      ) {
         presetManager.setConfigPath(opts.config)
       }
     } catch (error) {

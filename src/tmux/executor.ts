@@ -1,8 +1,8 @@
 import { execa } from "execa"
-import { EnvironmentError, ErrorCodes } from "../utils/errors"
-import type { ITmuxExecutor } from "../interfaces"
-import type { ICommandExecutor } from "../interfaces/command-executor"
-import { createRealExecutor, createDryRunExecutor, createMockExecutor } from "../executor"
+import { EnvironmentError, ErrorCodes } from "../utils/errors.ts"
+import type { ITmuxExecutor } from "../interfaces/index.ts"
+import type { ICommandExecutor } from "../interfaces/command-executor.ts"
+import { createRealExecutor, createDryRunExecutor, createMockExecutor } from "../executor/index.ts"
 
 export interface TmuxExecutorOptions {
   verbose?: boolean

@@ -50,9 +50,7 @@ export interface CompilePresetSuccess {
   readonly preset: FunctionalPreset
 }
 
-export const compilePreset = (
-  input: CompilePresetInput,
-): Result<CompilePresetSuccess, StructuredError> => {
+export const compilePreset = (input: CompilePresetInput): Result<CompilePresetSuccess, StructuredError> => {
   const { document, source } = input
 
   let parsed: unknown
@@ -257,7 +255,7 @@ const collectOptions = (
   }, {})
 }
 
-const isRecord = (value: unknown): value is Record<string, any> => {
+const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null
 }
 

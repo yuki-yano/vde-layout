@@ -1,15 +1,15 @@
-export { runDiagnostics } from "./diagnostics"
-export { compilePreset } from "./compile"
-export { createLayoutPlan } from "./planner"
-export { emitPlan } from "./emitter"
-export { compileFunctionalCorePipeline } from "./pipeline"
+export { runDiagnostics } from "./diagnostics.ts"
+export { compilePreset } from "./compile.ts"
+export { createLayoutPlan } from "./planner.ts"
+export { emitPlan } from "./emitter.ts"
+export { compileFunctionalCorePipeline } from "./pipeline.ts"
 
 export type {
   DiagnosticsBacklogItem,
   DiagnosticsFinding,
   DiagnosticsReport,
   DiagnosticsSeverity,
-} from "./diagnostics"
+} from "./diagnostics.ts"
 
 export type {
   CompilePresetInput,
@@ -20,7 +20,7 @@ export type {
   FunctionalTerminalPane,
   Result,
   StructuredError,
-} from "./compile"
+} from "./compile.ts"
 
 export type {
   CreateLayoutPlanInput,
@@ -29,16 +29,12 @@ export type {
   PlanNode,
   PlanSplit,
   PlanTerminal,
-} from "./planner"
+} from "./planner.ts"
 
-export type {
-  CommandStep,
-  PlanEmission,
-  PlanEmissionSummary,
-} from "./emitter"
+export type { CommandStep, PlanEmission, PlanEmissionSummary } from "./emitter.ts"
 
 export type {
   CompileFunctionalCorePipelineSuccess,
   CompileFunctionalCorePipelineInput,
   FunctionalCorePipelineDependencies,
-} from "./pipeline"
+} from "./pipeline.ts"

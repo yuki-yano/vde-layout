@@ -5,7 +5,7 @@ import type {
   FunctionalTerminalPane,
   Result,
   StructuredError,
-} from "./compile"
+} from "./compile.ts"
 
 export interface CreateLayoutPlanInput {
   readonly preset: FunctionalPreset
@@ -41,9 +41,7 @@ export interface CreateLayoutPlanSuccess {
   readonly plan: LayoutPlan
 }
 
-export const createLayoutPlan = (
-  input: CreateLayoutPlanInput,
-): Result<CreateLayoutPlanSuccess, StructuredError> => {
+export const createLayoutPlan = (input: CreateLayoutPlanInput): Result<CreateLayoutPlanSuccess, StructuredError> => {
   const { preset } = input
 
   if (!preset.layout) {

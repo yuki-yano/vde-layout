@@ -1,5 +1,5 @@
 import { afterEach, vi, type MockInstance } from "vitest"
-import type { Config, Preset, Layout, Pane } from "../../models/types"
+import type { Config, Preset, Layout, Pane } from "../../models/types.ts"
 
 // Mock environment variable cleanup
 afterEach(() => {

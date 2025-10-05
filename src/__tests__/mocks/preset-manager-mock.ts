@@ -1,5 +1,5 @@
-import type { IPresetManager } from "../../interfaces"
-import type { Preset, PresetInfo } from "../../models/types"
+import type { IPresetManager } from "../../interfaces/index.ts"
+import type { Preset, PresetInfo } from "../../models/types.ts"
 
 export class MockPresetManager implements IPresetManager {
   private presets: Record<string, Preset> = {

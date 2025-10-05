@@ -48,23 +48,25 @@ const createAccumulator = (): FindingAccumulator => {
     findings,
     nextSteps,
     backlog,
-    add: ({ path, severity, description, nextStep }) => {
+    add: ({ path, severity, description, nextStep }): void => {
       findings.push({ path, severity, description })
-      if (nextStep) {
+      if (typeof nextStep === "string" && nextStep.length > 0) {
         nextSteps.add(nextStep)
       }
 
       const existing = backlog.get(path)
       const existingActions = new Set(existing?.actions ?? [])
       existingActions.add(description)
-      if (nextStep) {
+      if (typeof nextStep === "string" && nextStep.length > 0) {
         existingActions.add(nextStep)
       }
 
-      const mergedSeverity = existing ? maxSeverity(existing.severity, severity) : severity
+      const mergedSeverity = existing !== undefined ? maxSeverity(existing.severity, severity) : severity
 
       const summary =
-        existing && severityRank[existing.severity] >= severityRank[severity] ? existing.summary : description
+        existing !== undefined && severityRank[existing.severity] >= severityRank[severity]
+          ? existing.summary
+          : description
 
       backlog.set(path, {
         id: path,
@@ -97,7 +99,7 @@ export function runDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
     }
   }
 
-  if (!parsedPreset || typeof parsedPreset !== "object") {
+  if (parsedPreset === null || typeof parsedPreset !== "object") {
     accumulator.add({
       path: "preset",
       severity: "high",
@@ -133,7 +135,7 @@ export function runDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
 
 const checkFocusDuplications = (preset: Record<string, unknown>, accumulator: FindingAccumulator): void => {
   const layout = preset.layout as unknown
-  if (!layout) {
+  if (layout === undefined || layout === null) {
     return
   }
 
@@ -149,8 +151,8 @@ const checkFocusDuplications = (preset: Record<string, unknown>, accumulator: Fi
 }
 
 const collectLowPrioritySignals = (preset: Record<string, unknown>, accumulator: FindingAccumulator): void => {
-  const layout = preset.layout as Record<string, unknown> | undefined
-  if (!layout) {
+  const layout = preset.layout as Record<string, unknown> | undefined | null
+  if (layout === undefined || layout === null) {
     accumulator.add({
       path: "preset.layout",
       severity: "low",
@@ -175,7 +177,7 @@ const countFocusFlags = (node: unknown): number => {
     return node.reduce((sum, child) => sum + countFocusFlags(child), 0)
   }
 
-  if (!node || typeof node !== "object") {
+  if (node === null || typeof node !== "object") {
     return 0
   }
 

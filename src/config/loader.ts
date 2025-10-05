@@ -2,8 +2,8 @@ import fs from "fs-extra"
 import path from "path"
 import os from "os"
 import * as yaml from "yaml"
-import type { Config } from "../models/types"
-import { ConfigError, ErrorCodes } from "../utils/errors"
+import type { Config } from "../models/types.ts"
+import { ConfigError, ErrorCodes } from "../utils/errors.ts"
 
 export interface ConfigLoaderOptions {
   configPaths?: string[]

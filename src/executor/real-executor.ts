@@ -1,7 +1,7 @@
 import { execa } from "execa"
-import { TmuxError, ErrorCodes } from "../utils/errors"
-import type { ICommandExecutor } from "../interfaces/command-executor"
-import { createLogger, LogLevel } from "../utils/logger"
+import { TmuxError, ErrorCodes } from "../utils/errors.ts"
+import type { ICommandExecutor } from "../interfaces/command-executor.ts"
+import { createLogger, LogLevel } from "../utils/logger.ts"
 
 export interface RealExecutorOptions {
   readonly verbose?: boolean

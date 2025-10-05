@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest"
-import { compileFunctionalCorePipeline } from "../index"
-import type { CompilePresetInput } from "../compile"
-import { compilePreset } from "../compile"
-import { createLayoutPlan } from "../planner"
-import { emitPlan } from "../emitter"
+import { compileFunctionalCorePipeline } from "../index.ts"
+import type { CompilePresetInput } from "../compile.ts"
+import { compilePreset } from "../compile.ts"
+import { createLayoutPlan } from "../planner.ts"
+import { emitPlan } from "../emitter.ts"
 
 type CompileSuccess = ReturnType<typeof compilePreset> extends { ok: true; value: infer S } ? S : never
 type PlanSuccess = ReturnType<typeof createLayoutPlan> extends { ok: true; value: infer P } ? P : never
@@ -54,10 +54,7 @@ describe("compileFunctionalCorePipeline", () => {
   })
 
   it("依存を差し替えて各ステージ呼び出しを検証する", () => {
-    const compileSpy = vi.fn<
-      [CompilePresetInput],
-      ReturnType<typeof compilePreset>
-    >(({ document, source }) => {
+    const compileSpy = vi.fn<[CompilePresetInput], ReturnType<typeof compilePreset>>(({ document, source }) => {
       expect(document).toBe(validDocument)
       expect(source).toBe("tests/pipeline.yml")
       return {
@@ -81,10 +78,7 @@ describe("compileFunctionalCorePipeline", () => {
       }
     })
 
-    const planSpy = vi.fn<
-      [{ preset: CompileSuccess["preset"] }],
-      ReturnType<typeof createLayoutPlan>
-    >(({ preset }) => {
+    const planSpy = vi.fn<[{ preset: CompileSuccess["preset"] }], ReturnType<typeof createLayoutPlan>>(({ preset }) => {
       expect(preset.name).toBe("mock")
       return {
         ok: true,
@@ -106,10 +100,7 @@ describe("compileFunctionalCorePipeline", () => {
       }
     })
 
-    const emissionSpy = vi.fn<
-      [{ plan: PlanSuccess["plan"] }],
-      ReturnType<typeof emitPlan>
-    >(() => {
+    const emissionSpy = vi.fn<[{ plan: PlanSuccess["plan"] }], ReturnType<typeof emitPlan>>(() => {
       return {
         ok: true,
         value: {
@@ -144,10 +135,7 @@ describe("compileFunctionalCorePipeline", () => {
   })
 
   it("プラン生成エラーを伝播する", () => {
-    const planSpy = vi.fn<
-      [{ preset: CompileSuccess["preset"] }],
-      ReturnType<typeof createLayoutPlan>
-    >(() => ({
+    const planSpy = vi.fn<[{ preset: CompileSuccess["preset"] }], ReturnType<typeof createLayoutPlan>>(() => ({
       ok: false,
       error: {
         code: "FOCUS_CONFLICT",
@@ -178,10 +166,7 @@ describe("compileFunctionalCorePipeline", () => {
   })
 
   it("Plan Emitterエラーを伝播する", () => {
-    const emissionSpy = vi.fn<
-      [{ plan: PlanSuccess["plan"] }],
-      ReturnType<typeof emitPlan>
-    >(() => ({
+    const emissionSpy = vi.fn<[{ plan: PlanSuccess["plan"] }], ReturnType<typeof emitPlan>>(() => ({
       ok: false,
       error: {
         code: "LAYOUT_INVALID_NODE",
@@ -210,5 +195,4 @@ describe("compileFunctionalCorePipeline", () => {
     expect(result.error.code).toBe("LAYOUT_INVALID_NODE")
     expect(result.error.path).toBe("preset.layout.panes[0]")
   })
-
 })

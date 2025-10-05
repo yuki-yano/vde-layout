@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { compilePreset } from "../compile"
+import { compilePreset } from "../compile.ts"
 
 describe("compilePreset", () => {
   it("プリセットYAMLを純粋データモデルへ変換する", () => {

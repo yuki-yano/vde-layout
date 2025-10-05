@@ -1,9 +1,9 @@
-import type { CompilePresetInput, FunctionalPreset, Result, StructuredError } from "./compile"
-import { compilePreset } from "./compile"
-import type { LayoutPlan } from "./planner"
-import { createLayoutPlan } from "./planner"
-import type { PlanEmission } from "./emitter"
-import { emitPlan } from "./emitter"
+import type { CompilePresetInput, FunctionalPreset, Result, StructuredError } from "./compile.ts"
+import { compilePreset } from "./compile.ts"
+import type { LayoutPlan } from "./planner.ts"
+import { createLayoutPlan } from "./planner.ts"
+import type { PlanEmission } from "./emitter.ts"
+import { emitPlan } from "./emitter.ts"
 
 export interface CompileFunctionalCorePipelineSuccess {
   readonly preset: FunctionalPreset
@@ -17,7 +17,7 @@ export interface FunctionalCorePipelineDependencies {
   readonly emitPlan: typeof emitPlan
 }
 
-export interface CompileFunctionalCorePipelineInput extends CompilePresetInput {}
+export type CompileFunctionalCorePipelineInput = CompilePresetInput
 
 export const compileFunctionalCorePipeline = (
   input: CompileFunctionalCorePipelineInput,

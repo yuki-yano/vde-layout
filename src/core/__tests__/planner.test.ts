@@ -1,6 +1,6 @@
-import type { FunctionalPreset } from "../compile"
+import type { FunctionalPreset } from "../compile.ts"
 import { describe, expect, it } from "vitest"
-import { compilePreset, createLayoutPlan } from "../index"
+import { compilePreset, createLayoutPlan } from "../index.ts"
 
 describe("createLayoutPlan", () => {
   it("比率を正規化し決定的なペインIDとフォーカスを付与する", () => {

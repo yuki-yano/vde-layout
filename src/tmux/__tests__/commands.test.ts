@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest"
-import { TmuxCommandGenerator } from "../commands"
+import { TmuxCommandGenerator } from "../commands.ts"
 
 describe("TmuxCommandGenerator", () => {
   let generator: TmuxCommandGenerator

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { normalizeRatio, isValidRatio } from "../ratio"
+import { normalizeRatio, isValidRatio } from "../ratio.ts"
 
 describe("normalizeRatio", () => {
   it("should normalize [1, 1] to [50, 50]", () => {

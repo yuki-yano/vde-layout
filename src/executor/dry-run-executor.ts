@@ -1,5 +1,5 @@
-import type { ICommandExecutor } from "../interfaces/command-executor"
-import { createLogger, LogLevel } from "../utils/logger"
+import type { ICommandExecutor } from "../interfaces/command-executor.ts"
+import { createLogger, LogLevel } from "../utils/logger.ts"
 
 export interface DryRunExecutorOptions {
   readonly verbose?: boolean

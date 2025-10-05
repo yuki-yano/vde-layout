@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
-import { createCli } from "../cli"
-import type { IPresetManager } from "../interfaces"
-import type { Preset, PresetInfo } from "../models/types"
+import { createCli } from "../cli.ts"
+import type { IPresetManager } from "../interfaces/index.ts"
+import type { Preset, PresetInfo } from "../models/types.ts"
 
 class StubPresetManager implements IPresetManager {
   private readonly preset: Preset

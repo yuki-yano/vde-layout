@@ -1,10 +1,8 @@
-import type { ICommandExecutor } from "../interfaces/command-executor"
-import type { ITmuxExecutor } from "../interfaces"
-import { EnvironmentError, ErrorCodes } from "../utils/errors"
+import type { ICommandExecutor } from "../interfaces/command-executor.ts"
+import type { ITmuxExecutor } from "../interfaces/index.ts"
+import { EnvironmentError, ErrorCodes } from "../utils/errors.ts"
 
-export interface MockExecutor
-  extends ICommandExecutor,
-    ITmuxExecutor {
+export interface MockExecutor extends ICommandExecutor, ITmuxExecutor {
   getExecutedCommands(): string[][]
   clearExecutedCommands(): void
   setMockPaneIds(paneIds: string[]): void

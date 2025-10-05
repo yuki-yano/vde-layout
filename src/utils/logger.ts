@@ -47,7 +47,7 @@ export const createLogger = (options: LoggerOptions = {}): Logger => {
     return {
       level: nextLevel,
       prefix: resolvedPrefix,
-      error(message: string, error?: Error) {
+      error(message: string, error?: Error): void {
         if (nextLevel >= LogLevel.ERROR) {
           console.error(chalk.red(formatMessage(resolvedPrefix, `Error: ${message}`)))
           if (error && process.env.VDE_DEBUG === "true") {
@@ -55,25 +55,25 @@ export const createLogger = (options: LoggerOptions = {}): Logger => {
           }
         }
       },
-      warn(message: string) {
+      warn(message: string): void {
         if (nextLevel >= LogLevel.WARN) {
           console.warn(chalk.yellow(formatMessage(resolvedPrefix, message)))
         }
       },
-      info(message: string) {
+      info(message: string): void {
         if (nextLevel >= LogLevel.INFO) {
           console.log(formatMessage(resolvedPrefix, message))
         }
       },
-      debug(message: string) {
+      debug(message: string): void {
         if (nextLevel >= LogLevel.DEBUG) {
           console.log(chalk.gray(formatMessage(resolvedPrefix, `[DEBUG] ${message}`)))
         }
       },
-      success(message: string) {
+      success(message: string): void {
         console.log(chalk.green(formatMessage(resolvedPrefix, message)))
       },
-      createChild(suffix: string) {
+      createChild(suffix: string): Logger {
         const childPrefix = resolvedPrefix ? `${resolvedPrefix} ${suffix}` : suffix
         return build(childPrefix, nextLevel)
       },
