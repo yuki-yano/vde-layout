@@ -40,6 +40,42 @@ export default [
     },
   },
   {
+    files: ["src/cli.ts", "src/executor/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "ClassDeclaration",
+          message: "Use factory functions instead of class declarations in boundary adapters.",
+        },
+        {
+          selector: "ClassExpression",
+          message: "Use factory functions instead of class declarations in boundary adapters.",
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/core/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/cli", "@/cli/*", "@/executor", "@/executor/*", "@/tmux", "@/tmux/*", "@/layout", "@/layout/*"],
+              message: "Functional Core must not depend on boundary adapters.",
+            },
+            {
+              group: ["../cli", "../cli/*", "../executor", "../executor/*", "../tmux", "../tmux/*", "../layout", "../layout/*"],
+              message: "Functional Core must not import boundary adapters via relative paths.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     ignores: [
       "**/*.js", 
       "**/*.mjs", 

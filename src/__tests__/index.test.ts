@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
-import { CLI } from "../cli"
+import * as cliModule from "../cli"
 
 // Separate main function to make it testable
 export async function main(): Promise<void> {
-  const cli = new CLI()
+  const cli = cliModule.createCli()
   try {
     await cli.run(process.argv.slice(2))
   } catch (error) {
@@ -39,7 +39,7 @@ describe("index.ts", () => {
 
   it("should create CLI instance and run it with sliced argv", async () => {
     const mockRun = vi.fn().mockResolvedValue(undefined)
-    vi.spyOn(CLI.prototype, "run").mockImplementation(mockRun)
+    vi.spyOn(cliModule, "createCli").mockReturnValue({ run: mockRun })
 
     process.argv = ["node", "vde-layout", "--help"]
     await main()
@@ -55,7 +55,9 @@ describe("index.ts", () => {
     })
 
     const testError = new Error("Test error message")
-    vi.spyOn(CLI.prototype, "run").mockRejectedValue(testError)
+    vi.spyOn(cliModule, "createCli").mockReturnValue({
+      run: vi.fn().mockRejectedValue(testError),
+    })
 
     await expect(main()).rejects.toThrow("Process exited")
 
@@ -72,7 +74,9 @@ describe("index.ts", () => {
     process.env.VDE_DEBUG = "true"
     const testError = new Error("Debug error")
     testError.stack = "Error: Debug error\n    at test.js:1:1"
-    vi.spyOn(CLI.prototype, "run").mockRejectedValue(testError)
+    vi.spyOn(cliModule, "createCli").mockReturnValue({
+      run: vi.fn().mockRejectedValue(testError),
+    })
 
     await expect(main()).rejects.toThrow("Process exited")
 
@@ -87,7 +91,9 @@ describe("index.ts", () => {
       throw new Error("Process exited")
     })
 
-    vi.spyOn(CLI.prototype, "run").mockRejectedValue("String error")
+    vi.spyOn(cliModule, "createCli").mockReturnValue({
+      run: vi.fn().mockRejectedValue("String error"),
+    })
 
     await expect(main()).rejects.toThrow("Process exited")
 

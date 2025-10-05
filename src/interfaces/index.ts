@@ -42,11 +42,4 @@ export interface ITmuxCommandGenerator {
   setEnvironment(paneId: string, env: Record<string, string>): string[][]
 }
 
-/**
- * Interface for layout engine
- */
-export interface ILayoutEngine {
-  createLayout(preset: Preset): Promise<void>
-}
-
 export type { ICommandExecutor } from "./command-executor"

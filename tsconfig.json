@@ -11,6 +11,12 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"],
+      "@/core": ["core/index"],
+      "@/core/*": ["core/*"]
+    },
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

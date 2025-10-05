@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
 import { TmuxExecutor } from "../executor"
 import { EnvironmentError } from "../../utils/errors"
-import { MockExecutor } from "../../executor/mock-executor"
+import { createMockExecutor, type MockExecutor } from "../../executor/mock-executor"
 
 describe("TmuxExecutor", () => {
   let executor: TmuxExecutor
@@ -9,7 +9,7 @@ describe("TmuxExecutor", () => {
   let originalTMUX: string | undefined
 
   beforeEach(() => {
-    mockExecutor = new MockExecutor()
+    mockExecutor = createMockExecutor()
     executor = new TmuxExecutor({ executor: mockExecutor })
     originalTMUX = process.env.TMUX
   })

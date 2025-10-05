@@ -1,5 +1,5 @@
 import type { ICommandExecutor } from "../interfaces/command-executor"
-import type { PlanEmission, CommandStep, StructuredError } from "../functional-core"
+import type { PlanEmission, CommandStep, StructuredError } from "@/core"
 import { ErrorCodes } from "../utils/errors"
 
 export interface ExecutePlanInput {

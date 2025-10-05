@@ -14,6 +14,22 @@ vde-layout is a tool that allows you to define tmux pane layouts in YAML configu
 - Flexible pane settings (commands, working directories, environment variables, etc.)
 - Freely combine horizontal and vertical splits
 
+## Architecture
+
+vde-layout follows a functional-core/imperative-shell approach:
+
+- Functional Core compiles presets into immutable layout plans and deterministic tmux command sequences.
+- CLI adapters reuse the same plan for dry-run and real execution, ensuring matching plan hashes.
+- Plan Runner validates tmux prerequisites, applies each plan step, and reports structured diagnostics when a step fails.
+
+This separation allows the Functional Core to remain pure and fully testable while the boundary layer coordinates I/O with tmux.
+
+## Development Notes
+
+- Import Functional Core modules via the `@/core` alias (`tsconfig.json` exposes `@/core/*`). The legacy `src/functional-core` path is a thin re-export kept for compatibility.
+- Boundary adapters (`src/cli`, `src/executor`, `src/tmux`) are implemented as factory functions; avoid introducing new classes in these layers.
+- Run `npm run typecheck` and `npm test` before sending changes. Vitest is configured with the same path aliases as the TypeScript compiler.
+
 ## Installation
 
 ```bash

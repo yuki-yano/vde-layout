@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
-import { CLI } from "../cli"
-import type { CLIOptions } from "../cli"
+import { createCli, type CLI, type FunctionalCoreBridge } from "../cli"
 import { MockPresetManager } from "./mocks/preset-manager-mock"
 import type { ICommandExecutor } from "../interfaces/command-executor"
 import type {
@@ -11,7 +10,7 @@ import type {
   FunctionalPreset,
   PlanNode,
   LayoutPlan,
-} from "../functional-core"
+} from "@/core"
 
 class RecordingExecutor implements ICommandExecutor {
   readonly commands: string[][] = []
@@ -117,9 +116,10 @@ describe("CLI", () => {
     hash: "abc123",
   }
 
-  let compilePresetMock: (input: CompilePresetInput) => ReturnType<typeof CLI["prototype"]["functionalCore"]["compilePreset"]>
-  let createLayoutPlanMock: () => ReturnType<typeof CLI["prototype"]["functionalCore"]["createLayoutPlan"]>
-  let emitPlanMock: () => ReturnType<typeof CLI["prototype"]["functionalCore"]["emitPlan"]>
+  let compilePresetMock: ReturnType<typeof vi.fn>
+  let createLayoutPlanMock: ReturnType<typeof vi.fn>
+  let emitPlanMock: ReturnType<typeof vi.fn>
+  let functionalCore: FunctionalCoreBridge
 
   beforeEach(() => {
     mockPresetManager = new MockPresetManager()
@@ -135,14 +135,16 @@ describe("CLI", () => {
       return recordingExecutor
     })
 
-    cli = new CLI({
+    functionalCore = {
+      compilePreset: compilePresetMock as unknown as FunctionalCoreBridge["compilePreset"],
+      createLayoutPlan: createLayoutPlanMock as unknown as FunctionalCoreBridge["createLayoutPlan"],
+      emitPlan: emitPlanMock as unknown as FunctionalCoreBridge["emitPlan"],
+    }
+
+    cli = createCli({
       presetManager: mockPresetManager,
       createCommandExecutor,
-      functionalCore: {
-        compilePreset: compilePresetMock,
-        createLayoutPlan: createLayoutPlanMock,
-        emitPlan: emitPlanMock,
-      },
+      functionalCore,
     })
 
     originalExit = process.exit
@@ -317,14 +319,10 @@ describe("CLI", () => {
 
     it("should allow specifying configuration file via --config", async () => {
       const customPresetManager = new MockPresetManager()
-      const cliWithConfig = new CLI({
+      const cliWithConfig = createCli({
         presetManager: customPresetManager,
         createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => new RecordingExecutor(dryRun),
-        functionalCore: {
-          compilePreset: compilePresetMock,
-          createLayoutPlan: createLayoutPlanMock,
-          emitPlan: emitPlanMock,
-        },
+        functionalCore,
       })
 
       await cliWithConfig.run(["dev", "--config", "/tmp/custom.yml", "--dry-run"])
@@ -367,14 +365,12 @@ describe("CLI", () => {
         }
       })
 
-      const failingCli = new CLI({
+      const failingCli = createCli({
         presetManager: mockPresetManager,
-        createCommandExecutor: failingExecutorFactory as unknown as CLIOptions["createCommandExecutor"],
-        functionalCore: {
-          compilePreset: compilePresetMock,
-          createLayoutPlan: createLayoutPlanMock,
-          emitPlan: emitPlanMock,
-        },
+        createCommandExecutor: failingExecutorFactory as unknown as (
+          options: { verbose: boolean; dryRun: boolean }
+        ) => ICommandExecutor,
+        functionalCore,
       })
 
       await expect(failingCli.run(["dev"])).rejects.toThrow("Process exited")

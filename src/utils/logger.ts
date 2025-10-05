@@ -8,99 +8,79 @@ export enum LogLevel {
 }
 
 export interface LoggerOptions {
-  level?: LogLevel
-  prefix?: string
+  readonly level?: LogLevel
+  readonly prefix?: string
 }
 
-/**
- * Logger class for consistent logging throughout the application
- */
-export class Logger {
-  private level: LogLevel
-  private prefix: string
-
-  constructor(options: LoggerOptions = {}) {
-    this.level = options.level ?? this.getDefaultLogLevel()
-    this.prefix = options.prefix ?? ""
-  }
-
-  /**
-   * Get default log level based on environment
-   */
-  private getDefaultLogLevel(): LogLevel {
-    if (process.env.VDE_DEBUG === "true") {
-      return LogLevel.DEBUG
-    }
-    if (process.env.VDE_VERBOSE === "true") {
-      return LogLevel.INFO
-    }
-    return LogLevel.WARN
-  }
-
-  /**
-   * Format message with prefix
-   */
-  private formatMessage(message: string): string {
-    return this.prefix ? `${this.prefix} ${message}` : message
-  }
-
-  /**
-   * Log error message
-   */
-  error(message: string, error?: Error): void {
-    if (this.level >= LogLevel.ERROR) {
-      console.error(chalk.red(this.formatMessage(`Error: ${message}`)))
-      if (error && process.env.VDE_DEBUG === "true") {
-        console.error(chalk.gray(error.stack))
-      }
-    }
-  }
-
-  /**
-   * Log warning message
-   */
-  warn(message: string): void {
-    if (this.level >= LogLevel.WARN) {
-      console.warn(chalk.yellow(this.formatMessage(message)))
-    }
-  }
-
-  /**
-   * Log info message
-   */
-  info(message: string): void {
-    if (this.level >= LogLevel.INFO) {
-      console.log(this.formatMessage(message))
-    }
-  }
-
-  /**
-   * Log debug message
-   */
-  debug(message: string): void {
-    if (this.level >= LogLevel.DEBUG) {
-      console.log(chalk.gray(this.formatMessage(`[DEBUG] ${message}`)))
-    }
-  }
-
-  /**
-   * Log success message
-   */
-  success(message: string): void {
-    // Success messages are always shown
-    console.log(chalk.green(this.formatMessage(message)))
-  }
-
-  /**
-   * Create a child logger with additional prefix
-   */
-  createChild(prefix: string): Logger {
-    const childPrefix = this.prefix ? `${this.prefix} ${prefix}` : prefix
-    return new Logger({ level: this.level, prefix: childPrefix })
-  }
+export interface Logger {
+  readonly level: LogLevel
+  readonly prefix: string
+  error: (message: string, error?: Error) => void
+  warn: (message: string) => void
+  info: (message: string) => void
+  debug: (message: string) => void
+  success: (message: string) => void
+  createChild: (suffix: string) => Logger
 }
 
-/**
- * Default logger instance
- */
-export const logger = new Logger()
+const resolveDefaultLogLevel = (): LogLevel => {
+  if (process.env.VDE_DEBUG === "true") {
+    return LogLevel.DEBUG
+  }
+  if (process.env.VDE_VERBOSE === "true") {
+    return LogLevel.INFO
+  }
+  return LogLevel.WARN
+}
+
+const formatMessage = (prefix: string, message: string): string => {
+  return prefix ? `${prefix} ${message}` : message
+}
+
+export const createLogger = (options: LoggerOptions = {}): Logger => {
+  const level = options.level ?? resolveDefaultLogLevel()
+  const prefix = options.prefix ?? ""
+
+  const build = (nextPrefix: string, nextLevel: LogLevel): Logger => {
+    const resolvedPrefix = nextPrefix
+
+    return {
+      level: nextLevel,
+      prefix: resolvedPrefix,
+      error(message: string, error?: Error) {
+        if (nextLevel >= LogLevel.ERROR) {
+          console.error(chalk.red(formatMessage(resolvedPrefix, `Error: ${message}`)))
+          if (error && process.env.VDE_DEBUG === "true") {
+            console.error(chalk.gray(error.stack))
+          }
+        }
+      },
+      warn(message: string) {
+        if (nextLevel >= LogLevel.WARN) {
+          console.warn(chalk.yellow(formatMessage(resolvedPrefix, message)))
+        }
+      },
+      info(message: string) {
+        if (nextLevel >= LogLevel.INFO) {
+          console.log(formatMessage(resolvedPrefix, message))
+        }
+      },
+      debug(message: string) {
+        if (nextLevel >= LogLevel.DEBUG) {
+          console.log(chalk.gray(formatMessage(resolvedPrefix, `[DEBUG] ${message}`)))
+        }
+      },
+      success(message: string) {
+        console.log(chalk.green(formatMessage(resolvedPrefix, message)))
+      },
+      createChild(suffix: string) {
+        const childPrefix = resolvedPrefix ? `${resolvedPrefix} ${suffix}` : suffix
+        return build(childPrefix, nextLevel)
+      },
+    }
+  }
+
+  return build(prefix, level)
+}
+
+export const logger = createLogger()

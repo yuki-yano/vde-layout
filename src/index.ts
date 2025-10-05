@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-import { CLI } from "./cli"
+import { createCli } from "./cli"
 
 /**
  * Main entry point
  * Launches the CLI application
  */
 async function main(): Promise<void> {
-  const cli = new CLI()
+  const cli = createCli()
   try {
     // Pass arguments excluding the first two elements (node, script path) from process.argv
     await cli.run(process.argv.slice(2))

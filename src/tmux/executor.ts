@@ -2,7 +2,7 @@ import { execa } from "execa"
 import { EnvironmentError, ErrorCodes } from "../utils/errors"
 import type { ITmuxExecutor } from "../interfaces"
 import type { ICommandExecutor } from "../interfaces/command-executor"
-import { RealExecutor, DryRunExecutor, MockExecutor } from "../executor"
+import { createRealExecutor, createDryRunExecutor, createMockExecutor } from "../executor"
 
 export interface TmuxExecutorOptions {
   verbose?: boolean
@@ -21,12 +21,12 @@ export class TmuxExecutor implements ITmuxExecutor {
     if (options.executor) {
       this.executor = options.executor
     } else if (options.dryRun === true) {
-      this.executor = new DryRunExecutor({ verbose: options.verbose })
+      this.executor = createDryRunExecutor({ verbose: options.verbose })
     } else if (this.isTestEnvironment()) {
       // Automatically use MockExecutor in test environment when not dry-run
-      this.executor = new MockExecutor()
+      this.executor = createMockExecutor()
     } else {
-      this.executor = new RealExecutor({ verbose: options.verbose })
+      this.executor = createRealExecutor({ verbose: options.verbose })
     }
   }
 

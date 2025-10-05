@@ -3,25 +3,24 @@ import chalk from "chalk"
 import { stringify as toYAML } from "yaml"
 import { PresetManager } from "./layout/preset"
 import { version } from "../package.json"
-import type { Preset } from "./models/types"
-import type { PresetInfo } from "./models/types"
+import type { Preset, PresetInfo } from "./models/types"
 import type { IPresetManager, ICommandExecutor } from "./interfaces"
-import { RealExecutor, DryRunExecutor } from "./executor"
+import { createRealExecutor, createDryRunExecutor } from "./executor"
 import { executePlan } from "./executor/plan-runner"
-import { Logger, LogLevel } from "./utils/logger"
+import { createLogger, LogLevel, type Logger } from "./utils/logger"
 import {
   runDiagnostics,
   compilePreset as defaultCompilePreset,
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
-} from "./functional-core"
+} from "@/core"
 import type {
   DiagnosticsReport,
   DiagnosticsSeverity,
   CompilePresetInput,
   PlanEmission,
   StructuredError,
-} from "./functional-core"
+} from "@/core"
 
 const KNOWN_ISSUES: ReadonlyArray<string> = [
   "LayoutEngineがtmux依存とI/Oを同一クラスで扱っている",
@@ -41,169 +40,43 @@ const formatSeverityTag = (severity: DiagnosticsSeverity): string => {
   }
 }
 
-interface FunctionalCoreBridge {
-  compilePreset: (input: CompilePresetInput) => ReturnType<typeof defaultCompilePreset>
-  createLayoutPlan: (input: Parameters<typeof defaultCreateLayoutPlan>[0]) => ReturnType<typeof defaultCreateLayoutPlan>
-  emitPlan: (input: Parameters<typeof defaultEmitPlan>[0]) => ReturnType<typeof defaultEmitPlan>
+export interface FunctionalCoreBridge {
+  readonly compilePreset: (input: CompilePresetInput) => ReturnType<typeof defaultCompilePreset>
+  readonly createLayoutPlan: (input: Parameters<typeof defaultCreateLayoutPlan>[0]) => ReturnType<
+    typeof defaultCreateLayoutPlan
+  >
+  readonly emitPlan: (input: Parameters<typeof defaultEmitPlan>[0]) => ReturnType<typeof defaultEmitPlan>
 }
 
 export interface CLIOptions {
-  presetManager?: IPresetManager
-  createCommandExecutor?: (options: { verbose: boolean; dryRun: boolean }) => ICommandExecutor
-  functionalCore?: FunctionalCoreBridge
+  readonly presetManager?: IPresetManager
+  readonly createCommandExecutor?: (options: { verbose: boolean; dryRun: boolean }) => ICommandExecutor
+  readonly functionalCore?: FunctionalCoreBridge
 }
 
-/**
- * CLI Interface
- * Parses command-line arguments and executes appropriate actions
- */
-export class CLI {
-  private program: Command
-  private presetManager: IPresetManager
-  private createCommandExecutor: (options: { verbose: boolean; dryRun: boolean }) => ICommandExecutor
-  private logger: Logger
-  private functionalCore: FunctionalCoreBridge
+export interface CLI {
+  run(args?: string[]): Promise<void>
+}
 
-  constructor(options: CLIOptions = {}) {
-    this.program = new Command()
-    this.presetManager = options.presetManager || new PresetManager()
-    this.createCommandExecutor =
-      options.createCommandExecutor ||
-      ((opts): ICommandExecutor => {
-        if (opts.dryRun) {
-          return new DryRunExecutor({ verbose: opts.verbose })
-        }
-        return new RealExecutor({ verbose: opts.verbose })
-      })
-    this.logger = new Logger()
-    this.functionalCore =
-      options.functionalCore ||
-      ({ compilePreset: defaultCompilePreset, createLayoutPlan: defaultCreateLayoutPlan, emitPlan: defaultEmitPlan } as const)
-    this.setupCommands()
-  }
-
-  /**
-   * Setup commands
-   */
-  private setupCommands(): void {
-    this.program
-      .name("vde-layout")
-      .description("VDE (Vibrant Development Environment) Layout Manager - tmux pane layout management tool")
-      .version(version, "-V, --version", "Show version")
-      .helpOption("-h, --help", "Show help")
-
-    // Global options
-    this.program
-      .option("-v, --verbose", "Show detailed logs", false)
-      .option("--dry-run", "Display commands without executing", false)
-      .option("--config <path>", "Path to configuration file")
-
-    // list command
-    this.program
-      .command("list")
-      .description("List available presets")
-      .action(async () => {
-        await this.listPresets()
-      })
-
-    this.program
-      .command("diagnose")
-      .description("Functional Coreリライトに向けた診断レポートを表示する")
-      .argument("[preset]", 'Preset name (defaults to "default" preset when omitted)')
-      .action(async (presetName?: string) => {
-        await this.diagnosePreset(presetName)
-      })
-
-    // Default action (execute preset)
-    this.program
-      .argument("[preset]", 'Preset name (defaults to "default" preset when omitted)')
-      .action(async (presetName?: string) => {
-        const options = this.program.opts()
-        await this.executePreset(presetName, {
-          verbose: options.verbose as boolean,
-          dryRun: options.dryRun as boolean,
-        })
-      })
-  }
-
-  /**
-   * Execute CLI
-   * @param args - Command-line arguments
-   */
-  async run(args: string[] = process.argv.slice(2)): Promise<void> {
-    try {
-      // Parse args first to get verbose option
-      await this.program.parseAsync(args, { from: "user" })
-
-      // Update logger level based on verbose option
-      const opts = this.program.opts()
-      if (opts.verbose === true) {
-        this.logger = new Logger({ level: LogLevel.INFO })
+export const createCli = (options: CLIOptions = {}): CLI => {
+  const presetManager = options.presetManager ?? new PresetManager()
+  const createCommandExecutor =
+    options.createCommandExecutor ??
+    ((opts: { verbose: boolean; dryRun: boolean }): ICommandExecutor => {
+      if (opts.dryRun) {
+        return createDryRunExecutor({ verbose: opts.verbose })
       }
+      return createRealExecutor({ verbose: opts.verbose })
+    })
 
-      if (opts.config && typeof opts.config === "string" && this.presetManager.setConfigPath) {
-        this.presetManager.setConfigPath(opts.config)
-      }
-    } catch (error) {
-      // Ignore errors thrown by Commander.js for help and version display
-      if (error instanceof Error && error.message.includes("Process exited")) {
-        throw error
-      }
-      this.handleError(error)
-    }
-  }
+  const functionalCore: FunctionalCoreBridge =
+    options.functionalCore ??
+    ({ compilePreset: defaultCompilePreset, createLayoutPlan: defaultCreateLayoutPlan, emitPlan: defaultEmitPlan } as const)
 
-  /**
-   * Display preset list
-   */
-  private async listPresets(): Promise<void> {
-    try {
-      await this.presetManager.loadConfig()
-      const presets = this.presetManager.listPresets()
+  const program = new Command()
+  let logger: Logger = createLogger()
 
-      if (presets.length === 0) {
-        this.logger.warn("No presets defined")
-        process.exit(0)
-      }
-
-      console.log(chalk.bold("Available presets:\n"))
-
-      const maxKeyLength = Math.max(...presets.map((p) => p.key.length))
-
-      presets.forEach((preset: PresetInfo) => {
-        const paddedKey = preset.key.padEnd(maxKeyLength + 2)
-        const description = preset.description ?? ""
-        console.log(`  ${chalk.cyan(paddedKey)} ${description}`)
-      })
-
-      process.exit(0)
-    } catch (error) {
-      this.handleError(error)
-    }
-  }
-
-  private async diagnosePreset(presetName: string | undefined): Promise<void> {
-    try {
-      await this.presetManager.loadConfig()
-      const preset =
-        presetName !== undefined && presetName.length > 0
-          ? this.presetManager.getPreset(presetName)
-          : this.presetManager.getDefaultPreset()
-
-      const presetDocument = toYAML(preset ?? {})
-      const report = runDiagnostics({
-        presetDocument,
-        knownIssues: KNOWN_ISSUES,
-      })
-
-      this.renderDiagnosticsReport(report)
-      process.exit(0)
-    } catch (error) {
-      this.handleError(error)
-    }
-  }
-
-  private renderDiagnosticsReport(report: DiagnosticsReport): void {
+  const renderDiagnosticsReport = (report: DiagnosticsReport): void => {
     console.log(chalk.bold("\nFunctional Core Diagnostics\n"))
 
     if (report.backlog.length > 0) {
@@ -235,7 +108,7 @@ export class CLI {
     }
   }
 
-  private renderDryRun(emission: PlanEmission): void {
+  const renderDryRun = (emission: PlanEmission): void => {
     console.log(chalk.bold("\nPlanned tmux steps (dry-run)"))
     emission.steps.forEach((step, index) => {
       const commandString = step.command.join(" ")
@@ -243,7 +116,7 @@ export class CLI {
     })
   }
 
-  private buildPresetDocument(preset: Preset, presetName?: string): string {
+  const buildPresetDocument = (preset: Preset, presetName?: string): string => {
     const document: Record<string, unknown> = {
       name: preset.name ?? presetName ?? "vde-layout",
       command: preset.command,
@@ -261,11 +134,11 @@ export class CLI {
     return toYAML(document)
   }
 
-  private buildPresetSource(presetName?: string): string {
+  const buildPresetSource = (presetName?: string): string => {
     return presetName ? `preset://${presetName}` : "preset://default"
   }
 
-  private handleFunctionalError(error: StructuredError): never {
+  const handleFunctionalError = (error: StructuredError): never => {
     const segments: string[] = []
     if (error.code) {
       segments.push(`[${error.code}]`)
@@ -273,6 +146,7 @@ export class CLI {
     if (error.path) {
       segments.push(`[${error.path}]`)
     }
+
     const header = segments.join(" ")
     const lines = [
       `${header} ${error.message}`.trim(),
@@ -293,101 +167,197 @@ export class CLI {
       lines.push(`stderr: ${String(error.details.stderr)}`)
     }
 
-    this.logger.error(lines.join("\n"))
+    logger.error(lines.join("\n"))
     process.exit(1)
   }
 
-  /**
-   * Execute preset
-   * @param presetName - Preset name
-   * @param options - Execution options
-   */
-  private async executePreset(
-    presetName: string | undefined,
-    options: { verbose: boolean; dryRun: boolean },
-  ): Promise<void> {
-    try {
-      await this.presetManager.loadConfig()
+  const handleError = (error: unknown): never => {
+    if (error instanceof Error) {
+      logger.error(error.message, error)
+    } else {
+      logger.error("An unexpected error occurred")
+    }
 
-      // Get preset
+    process.exit(1)
+  }
+
+  const listPresets = async (): Promise<never> => {
+    try {
+      await presetManager.loadConfig()
+      const presets = presetManager.listPresets()
+
+      if (presets.length === 0) {
+        logger.warn("No presets defined")
+        process.exit(0)
+      }
+
+      console.log(chalk.bold("Available presets:\n"))
+
+      const maxKeyLength = Math.max(...presets.map((p) => p.key.length))
+
+      presets.forEach((preset: PresetInfo) => {
+        const paddedKey = preset.key.padEnd(maxKeyLength + 2)
+        const description = preset.description ?? ""
+        console.log(`  ${chalk.cyan(paddedKey)} ${description}`)
+      })
+
+      process.exit(0)
+    } catch (error) {
+      return handleError(error)
+    }
+  }
+
+  const diagnosePreset = async (presetName: string | undefined): Promise<never> => {
+    try {
+      await presetManager.loadConfig()
       const preset =
         presetName !== undefined && presetName.length > 0
-          ? this.presetManager.getPreset(presetName)
-          : this.presetManager.getDefaultPreset()
+          ? presetManager.getPreset(presetName)
+          : presetManager.getDefaultPreset()
+
+      const presetDocument = toYAML(preset ?? {})
+      const report = runDiagnostics({
+        presetDocument,
+        knownIssues: KNOWN_ISSUES,
+      })
+
+      renderDiagnosticsReport(report)
+      process.exit(0)
+    } catch (error) {
+      return handleError(error)
+    }
+  }
+
+  const executePreset = async (
+    presetName: string | undefined,
+    options: { verbose: boolean; dryRun: boolean },
+  ): Promise<never> => {
+    try {
+      await presetManager.loadConfig()
+
+      const preset =
+        presetName !== undefined && presetName.length > 0
+          ? presetManager.getPreset(presetName)
+          : presetManager.getDefaultPreset()
 
       const insideTmux = Boolean(process.env.TMUX && process.env.TMUX.length > 0)
       if (!insideTmux && !options.dryRun) {
         throw new Error("Must be run inside a tmux session")
       }
 
-      const effectiveDryRun = options.dryRun
-
-      // Create command executor
-      const executor = this.createCommandExecutor({
+      const executor = createCommandExecutor({
         verbose: options.verbose,
-        dryRun: effectiveDryRun,
+        dryRun: options.dryRun,
       })
 
-      if (effectiveDryRun) {
-        const dryRunMessage = "[DRY RUN] No actual commands will be executed"
-        console.log(dryRunMessage)
+      if (options.dryRun) {
+        console.log("[DRY RUN] No actual commands will be executed")
       }
 
-      const compiled = this.functionalCore.compilePreset({
-        document: this.buildPresetDocument(preset, presetName),
-        source: this.buildPresetSource(presetName),
+      const compiled = functionalCore.compilePreset({
+        document: buildPresetDocument(preset, presetName),
+        source: buildPresetSource(presetName),
       })
 
       if (!compiled.ok) {
-        this.handleFunctionalError(compiled.error)
+        return handleFunctionalError(compiled.error)
       }
 
-      const planResult = this.functionalCore.createLayoutPlan({
+      const planResult = functionalCore.createLayoutPlan({
         preset: compiled.value.preset,
       })
 
       if (!planResult.ok) {
-        this.handleFunctionalError(planResult.error)
+        return handleFunctionalError(planResult.error)
       }
 
-      const emissionResult = this.functionalCore.emitPlan({
+      const emissionResult = functionalCore.emitPlan({
         plan: planResult.value.plan,
       })
 
       if (!emissionResult.ok) {
-        this.handleFunctionalError(emissionResult.error)
+        return handleFunctionalError(emissionResult.error)
       }
 
       const emission = emissionResult.value
 
-      if (effectiveDryRun) {
-        this.renderDryRun(emission)
+      if (options.dryRun) {
+        renderDryRun(emission)
       } else {
         const executionResult = await executePlan({ emission, executor })
         if (!executionResult.ok) {
-          this.handleFunctionalError(executionResult.error)
+          return handleFunctionalError(executionResult.error)
         }
-        this.logger.info(`Executed ${executionResult.value.executedSteps} tmux steps`)
+        logger.info(`Executed ${executionResult.value.executedSteps} tmux steps`)
       }
 
-      this.logger.success(`✓ Applied preset "${preset.name}"`)
+      logger.success(`✓ Applied preset "${preset.name}"`)
       process.exit(0)
     } catch (error) {
-      this.handleError(error)
+      return handleError(error)
     }
   }
 
-  /**
-   * Error handling
-   * @param error - Error object
-   */
-  private handleError(error: unknown): void {
-    if (error instanceof Error) {
-      this.logger.error(error.message, error)
-    } else {
-      this.logger.error("An unexpected error occurred")
-    }
+  const setupProgram = (): void => {
+    program
+      .name("vde-layout")
+      .description("VDE (Vibrant Development Environment) Layout Manager - tmux pane layout management tool")
+      .version(version, "-V, --version", "Show version")
+      .helpOption("-h, --help", "Show help")
 
-    process.exit(1)
+    program.option("-v, --verbose", "Show detailed logs", false)
+    program.option("--dry-run", "Display commands without executing", false)
+    program.option("--config <path>", "Path to configuration file")
+
+    program
+      .command("list")
+      .description("List available presets")
+      .action(async () => {
+        await listPresets()
+      })
+
+    program
+      .command("diagnose")
+      .description("Functional Coreリライトに向けた診断レポートを表示する")
+      .argument("[preset]", 'Preset name (defaults to "default" preset when omitted)')
+      .action(async (presetName?: string) => {
+        await diagnosePreset(presetName)
+      })
+
+    program
+      .argument("[preset]", 'Preset name (defaults to "default" preset when omitted)')
+      .action(async (presetName?: string) => {
+        const opts = program.opts<{ verbose?: boolean; dryRun?: boolean }>()
+        await executePreset(presetName, {
+          verbose: opts.verbose === true,
+          dryRun: opts.dryRun === true,
+        })
+      })
   }
+
+  setupProgram()
+
+  const run = async (args: string[] = process.argv.slice(2)): Promise<void> => {
+    try {
+      await program.parseAsync(args, { from: "user" })
+      const opts = program.opts<{ verbose?: boolean; config?: string }>()
+
+      if (opts.verbose === true) {
+        logger = createLogger({ level: LogLevel.INFO })
+      } else {
+        logger = createLogger()
+      }
+
+      if (opts.config && typeof opts.config === "string" && typeof presetManager.setConfigPath === "function") {
+        presetManager.setConfigPath(opts.config)
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Process exited")) {
+        throw error
+      }
+      handleError(error)
+    }
+  }
+
+  return { run }
 }

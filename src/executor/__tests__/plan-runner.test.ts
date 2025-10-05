@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { executePlan } from "../plan-runner"
-import type { PlanEmission } from "../../functional-core"
-import { MockExecutor } from "../mock-executor"
+import type { PlanEmission } from "@/core"
+import { createMockExecutor } from "../mock-executor"
 
 const emission: PlanEmission = {
   steps: [
@@ -27,7 +27,7 @@ const emission: PlanEmission = {
 
 describe("executePlan", () => {
   it("executes all steps with the provided executor", async () => {
-    const executor = new MockExecutor()
+    const executor = createMockExecutor()
     const result = await executePlan({ emission, executor })
 
     expect(result.ok).toBe(true)

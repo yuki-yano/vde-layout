@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { CLI } from "../cli"
+import { createCli } from "../cli"
 import type { IPresetManager } from "../interfaces"
 import type { Preset, PresetInfo } from "../models/types"
 
@@ -37,7 +37,7 @@ describe("CLI diagnose command", () => {
     }
 
     const presetManager = new StubPresetManager(preset)
-    const cli = new CLI({ presetManager })
+    const cli = createCli({ presetManager })
 
     const loggedLines: string[] = []
     const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
