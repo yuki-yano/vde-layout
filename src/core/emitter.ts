@@ -81,8 +81,12 @@ const appendSplitSteps = (node: SplitNode, steps: CommandStep[]): void => {
   const directionFlag = node.orientation === "horizontal" ? "-h" : "-v"
 
   for (let index = 1; index < node.panes.length; index += 1) {
-    const previousRatioSum = node.ratio.slice(0, index).reduce((sum, value) => sum + value, 0)
-    const percentage = Math.max(1, Math.round((1 - previousRatioSum) * 100))
+    const remainingIncludingTarget = node.ratio.slice(index - 1).reduce((sum, value) => sum + value, 0)
+    const remainingAfterTarget = node.ratio.slice(index).reduce((sum, value) => sum + value, 0)
+
+    const desiredPercentage =
+      remainingIncludingTarget === 0 ? 0 : (remainingAfterTarget / remainingIncludingTarget) * 100
+    const percentage = Math.max(1, Math.round(desiredPercentage))
     const targetPaneId = node.panes[index - 1]?.id ?? node.id
     const createdPaneId = node.panes[index]?.id
 

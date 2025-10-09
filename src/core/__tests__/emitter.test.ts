@@ -92,7 +92,7 @@ layout:
       }),
       expect.objectContaining({
         id: "root:split:2",
-        command: ["split-window", "-h", "-t", "root.1", "-p", "33"],
+        command: ["split-window", "-h", "-t", "root.1", "-p", "50"],
       }),
       expect.objectContaining({
         id: "root.1:split:1",
