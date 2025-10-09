@@ -10,7 +10,7 @@ import { createValidationError, ErrorCodes, isVDELayoutError } from "../utils/er
  * @returns Parsed object
  * @throws {ValidationError} When YAML parsing fails
  */
-function parseYAML(yamlText: string): unknown {
+const parseYAML = (yamlText: string): unknown => {
   // Input validation
   if (!yamlText || typeof yamlText !== "string") {
     throw createValidationError("YAML text not provided", ErrorCodes.CONFIG_PARSE_ERROR, {
@@ -33,7 +33,7 @@ function parseYAML(yamlText: string): unknown {
  * @param parsed - Parsed YAML object
  * @throws {ValidationError} When structure is invalid
  */
-function validateConfigStructure(parsed: unknown): void {
+const validateConfigStructure = (parsed: unknown): void => {
   // Check for empty YAML
   if (parsed === null || parsed === undefined || typeof parsed !== "object") {
     throw createValidationError("YAML is empty or invalid format", ErrorCodes.CONFIG_PARSE_ERROR, {
@@ -63,7 +63,7 @@ function validateConfigStructure(parsed: unknown): void {
  * @param error - Zod validation error
  * @returns Formatted error issues
  */
-function formatZodErrors(error: z.ZodError): Array<{ path: string; message: string; code: string }> {
+const formatZodErrors = (error: z.ZodError): Array<{ path: string; message: string; code: string }> => {
   return error.issues.map((issue) => {
     const path = issue.path.join(".")
     let message = issue.message
@@ -137,7 +137,7 @@ function formatZodErrors(error: z.ZodError): Array<{ path: string; message: stri
  * @returns Validated Config object
  * @throws {ValidationError} When YAML is invalid
  */
-export function validateYAML(yamlText: string): Config {
+export const validateYAML = (yamlText: string): Config => {
   // Parse YAML
   const parsed = parseYAML(yamlText)
 

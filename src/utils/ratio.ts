@@ -12,7 +12,7 @@
  * normalizeRatio([2, 3]) => [40, 60]
  * normalizeRatio([50, 50]) => [50, 50]
  */
-export function normalizeRatio(ratio: number[]): number[] {
+export const normalizeRatio = (ratio: number[]): number[] => {
   if (ratio.length === 0) {
     return []
   }
@@ -75,6 +75,4 @@ export function normalizeRatio(ratio: number[]): number[] {
  * @param ratio - Ratio array to check
  * @returns true if valid
  */
-export function isValidRatio(ratio: number[]): boolean {
-  return ratio.length > 0 && ratio.every((val) => val > 0)
-}
+export const isValidRatio = (ratio: number[]): boolean => ratio.length > 0 && ratio.every((val) => val > 0)

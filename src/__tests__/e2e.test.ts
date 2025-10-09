@@ -20,14 +20,14 @@ describe("E2E Tests", () => {
     rmSync(testBaseDir, { recursive: true, force: true })
   })
 
-  function runCommand(
+  const runCommand = (
     args: string,
     env: Record<string, string> = {},
   ): {
     stdout: string
     stderr: string
     code: number
-  } {
+  } => {
     try {
       const stdout = execSync(`${binPath} ${args}`, {
         env: {

@@ -5,7 +5,7 @@ import { createCli } from "./cli.ts"
  * Main entry point
  * Launches the CLI application
  */
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const cli = createCli()
   try {
     // Pass arguments excluding the first two elements (node, script path) from process.argv

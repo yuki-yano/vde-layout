@@ -62,7 +62,7 @@ type ValidationResult<T> = {
 }
 
 // Helper function to format Zod errors consistently
-function formatValidationError(error: z.ZodError): string {
+const formatValidationError = (error: z.ZodError): string => {
   const messages = error.errors.map((e) => {
     const path = e.path.join(".")
     const message = e.message
@@ -79,7 +79,7 @@ function formatValidationError(error: z.ZodError): string {
 }
 
 // Config validation
-export function validateConfig(data: unknown): ValidationResult<z.infer<typeof ConfigSchema>> {
+export const validateConfig = (data: unknown): ValidationResult<z.infer<typeof ConfigSchema>> => {
   try {
     const parsed = ConfigSchema.parse(data)
     return { success: true, data: parsed }
@@ -92,7 +92,7 @@ export function validateConfig(data: unknown): ValidationResult<z.infer<typeof C
 }
 
 // Preset validation
-export function validatePreset(data: unknown): ValidationResult<z.infer<typeof PresetSchema>> {
+export const validatePreset = (data: unknown): ValidationResult<z.infer<typeof PresetSchema>> => {
   try {
     const parsed = PresetSchema.parse(data)
     return { success: true, data: parsed }
@@ -105,7 +105,7 @@ export function validatePreset(data: unknown): ValidationResult<z.infer<typeof P
 }
 
 // Pane validation
-export function validatePane(data: unknown): ValidationResult<z.infer<typeof PaneSchema>> {
+export const validatePane = (data: unknown): ValidationResult<z.infer<typeof PaneSchema>> => {
   try {
     const parsed = PaneSchema.parse(data)
     return { success: true, data: parsed }

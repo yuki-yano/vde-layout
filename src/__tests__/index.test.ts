@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import * as cliModule from "../cli.ts"
 
 // Separate main function to make it testable
-export async function main(): Promise<void> {
+export const main = async (): Promise<void> => {
   const cli = cliModule.createCli()
   try {
     await cli.run(process.argv.slice(2))

@@ -78,7 +78,7 @@ const createAccumulator = (): FindingAccumulator => {
   }
 }
 
-export function runDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
+export const runDiagnostics = (input: DiagnosticsInput): DiagnosticsReport => {
   const accumulator = createAccumulator()
   const knownIssues = input.knownIssues ?? []
   let parsedPreset: unknown
