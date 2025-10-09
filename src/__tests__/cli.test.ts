@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
+import packageJson from "../../package.json"
 import { createCli, type CLI, type FunctionalCoreBridge } from "../cli.ts"
 import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock.ts"
 import type { CommandExecutor } from "../types/command-executor.ts"
@@ -75,6 +76,7 @@ const createRecordingExecutor = (
 }
 
 describe("CLI", () => {
+  const packageVersion = packageJson.version
   let cli: CLI
   let mockPresetManager: MockPresetManager
   let recordingExecutor: ReturnType<typeof createRecordingExecutor>
@@ -252,12 +254,17 @@ describe("CLI", () => {
   describe("basic commands", () => {
     it("should display version", async () => {
       await cli.run(["--version"])
-      expect(processExitCalled || consoleOutput.some((line) => line.includes("0.0.1"))).toBe(true)
+      expect(processExitCalled || consoleOutput.some((line) => line.includes(packageVersion))).toBe(true)
     })
 
     it("should display version with -V", async () => {
       await cli.run(["-V"])
-      expect(processExitCalled || consoleOutput.some((line) => line.includes("0.0.1"))).toBe(true)
+      expect(processExitCalled || consoleOutput.some((line) => line.includes(packageVersion))).toBe(true)
+    })
+
+    it("should display version with -v", async () => {
+      await cli.run(["-v"])
+      expect(processExitCalled || consoleOutput.some((line) => line.includes(packageVersion))).toBe(true)
     })
 
     it("should show help with --help", async () => {
@@ -374,7 +381,7 @@ describe("CLI", () => {
     })
 
     it("should accept both verbose and dry-run options", async () => {
-      await cli.run(["dev", "-v", "--dry-run"])
+      await cli.run(["dev", "--verbose", "--dry-run"])
 
       expectFunctionalPipelineCalled()
       expect(recordingExecutor.commands).toHaveLength(0)

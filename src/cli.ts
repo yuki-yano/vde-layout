@@ -313,10 +313,11 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     program
       .name("vde-layout")
       .description("VDE (Vibrant Development Environment) Layout Manager - tmux pane layout management tool")
-      .version(version, "-V, --version", "Show version")
+      .version(version, "-v, --version", "Show version")
       .helpOption("-h, --help", "Show help")
 
-    program.option("-v, --verbose", "Show detailed logs", false)
+    program.option("--verbose", "Show detailed logs", false)
+    program.option("-V", "Show version (deprecated; use -v)")
     program.option("--dry-run", "Display commands without executing", false)
     program.option("--config <path>", "Path to configuration file")
 
@@ -349,11 +350,16 @@ export const createCli = (options: CLIOptions = {}): CLI => {
   setupProgram()
 
   const run = async (args: string[] = process.argv.slice(2)): Promise<void> => {
-    const requestedVersion = args.includes("--version") || args.includes("-V")
+    if (args.includes("-V")) {
+      console.log(version)
+      return
+    }
+
+    const requestedVersion = args.some((arg) => arg === "--version" || arg === "-v")
     const requestedHelp = args.includes("--help") || args.includes("-h")
     try {
       await program.parseAsync(args, { from: "user" })
-      const opts = program.opts<{ verbose?: boolean; config?: string }>()
+      const opts = program.opts<{ verbose?: boolean; config?: string; V?: boolean }>()
 
       if (requestedVersion || requestedHelp) {
         return

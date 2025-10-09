@@ -33,6 +33,8 @@ describe("E2E Tests", () => {
         env: {
           ...process.env,
           ...env,
+          TMUX: env.TMUX ?? "",
+          TMUX_PANE: env.TMUX_PANE ?? "",
           XDG_CONFIG_HOME: join(testBaseDir, ".config"),
           // Disable other configuration paths
           VDE_CONFIG_PATH: undefined,
@@ -190,7 +192,7 @@ presets:
     })
 
     it("can use verbose and dry-run together", () => {
-      const result = runCommand("-v --dry-run dev", {
+      const result = runCommand("--verbose --dry-run dev", {
         TMUX: "fake-tmux-session",
       })
       expect(result.code).toBe(0)
@@ -199,9 +201,13 @@ presets:
     })
 
     it("short options work correctly", () => {
-      const result = runCommand("-V")
-      expect(result.code).toBe(0)
-      expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/)
+      const versionResult = runCommand("-v")
+      expect(versionResult.code).toBe(0)
+      expect(versionResult.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/)
+
+      const deprecatedVersionResult = runCommand("-V")
+      expect(deprecatedVersionResult.code).toBe(0)
+      expect(deprecatedVersionResult.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/)
 
       const helpResult = runCommand("-h")
       expect(helpResult.code).toBe(0)
