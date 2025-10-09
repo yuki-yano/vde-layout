@@ -3,9 +3,28 @@ import eslintConfigPrettier from "eslint-config-prettier"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 
+const baseStyleRestrictions = [
+  {
+    selector: "FunctionDeclaration",
+    message: "function declarations are forbidden; declare arrow functions assigned to const instead.",
+  },
+  {
+    selector: "ClassDeclaration",
+    message: "class declarations are forbidden; use factory functions or plain objects.",
+  },
+  {
+    selector: "ClassExpression",
+    message: "class expressions are forbidden; use factory functions or plain objects.",
+  },
+  {
+    selector: "TSInterfaceDeclaration",
+    message: "interface declarations are forbidden; use type aliases.",
+  },
+]
+
 export default [
   {
-    files: ["src/**/*.ts"],
+    files: ["src/**/*.ts", "scripts/**/*.ts"],
   },
   {
     languageOptions: {
@@ -38,6 +57,14 @@ export default [
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/consistent-type-definitions": ["error", "type"],
       "eqeqeq": ["error", "smart"],
+      "func-style": [
+        "error",
+        "expression",
+        {
+          allowArrowFunctions: true,
+        },
+      ],
+      "no-restricted-syntax": ["error", ...baseStyleRestrictions],
     },
   },
   {
@@ -45,6 +72,7 @@ export default [
     rules: {
       "no-restricted-syntax": [
         "error",
+        ...baseStyleRestrictions,
         {
           selector: "ClassDeclaration",
           message: "Use factory functions instead of class declarations in boundary adapters.",
@@ -85,7 +113,9 @@ export default [
       "node_modules", 
       "coverage",
       "src/**/__tests__/**/*",
-      "src/**/*.test.ts"
+      "src/**/*.test.ts",
+      "scripts/**/__tests__/**/*",
+      "scripts/**/*.test.ts"
     ],
   },
 ]

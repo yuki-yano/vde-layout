@@ -1,6 +1,6 @@
 {
   "name": "vde-layout",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Terminal multiplexer layout management tool for VDE (Vibe Coding Development Environment)",
   "type": "module",
   "main": "dist/index.js",
@@ -19,7 +19,6 @@
   "scripts": {
     "build": "tsdown",
     "clean": "rm -rf dist",
-    "compile": "tsdown",
     "dev": "tsdown --watch",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "test": "bun run build && vitest run",

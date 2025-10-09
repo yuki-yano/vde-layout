@@ -9,4 +9,5 @@ export default defineConfig({
   treeshake: true,
   dts: false,
   nodeProtocol: true,
+  external: ['typescript'],
 })
