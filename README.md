@@ -1,211 +1,146 @@
 # vde-layout
 
-A CLI tool for easily reproducing tmux pane layouts
+vde-layout is a CLI that reproduces tmux pane layouts from YAML presets. Define the panes you need once, then bring them back with a single command.
 
-## Overview
-
-vde-layout is a tool that allows you to define tmux pane layouts in YAML configuration files and reproduce them with a single command. You can manage multiple layouts as presets for different purposes such as development environments, monitoring, and test execution.
-
-## Features
-
-- Define layouts in YAML format
-- Reproduce layouts with a single command
-- Manage presets for different use cases
-- Flexible pane settings (commands, working directories, environment variables, etc.)
-- Freely combine horizontal and vertical splits
-
-## Architecture
-
-vde-layout follows a functional-core/imperative-shell approach:
-
-- Functional Core compiles presets into immutable layout plans and deterministic tmux command sequences.
-- CLI adapters reuse the same plan for dry-run and real execution, ensuring matching plan hashes.
-- Plan Runner validates tmux prerequisites, applies each plan step, and reports structured diagnostics when a step fails.
-
-This separation allows the Functional Core to remain pure and fully testable while the boundary layer coordinates I/O with tmux.
-
-## Development Notes
-
-- Runtime modules are authored in ESM with explicit `.ts` extensions, and `src/core/` exposes the canonical functional services directly.
-- Boundary adapters (`src/cli`, `src/executor`, `src/tmux`) remain factory-based; avoid新たなクラス導入は避けてください。
-- `npm run build` uses tsdown to emit ESM bundles into `dist/`. `npm test` automatically rebuilds before executing the Vitest suite.
-- Run `npm run typecheck` to validate the TypeScript sources without emitting artifacts.
+## Key Capabilities
+- Keep reusable presets for development, monitoring, reviews, and more.
+- Build nested horizontal/vertical splits with ratio-based sizing.
+- Launch commands in each pane with custom working directories, environment variables, delays, and titles.
+- Preview every tmux step in dry-run mode before you apply a preset.
+- Switch between configuration files by flag or environment variables.
 
 ## Installation
-
 ```bash
 npm install -g vde-layout
-```
-
-or
-
-```bash
+# or
 pnpm add -g vde-layout
-```
-
-or
-
-```bash
+# or
 bun add -g vde-layout
 ```
 
-## Usage
+## Quick Start
+1. Create a YAML file at `~/.config/vde/layout.yml` (or any supported location; see “Configuration Search Order”).
+2. Paste a preset definition:
+   ```yaml
+   presets:
+     web-dev:
+       name: Web Development
+       description: Editor, server, and logs
+       layout:
+         type: horizontal
+         ratio: [3, 2]
+         panes:
+           - name: editor
+             command: nvim
+             focus: true
+           - type: vertical
+             ratio: [7, 3]
+             panes:
+               - name: server
+                 command: npm run dev
+                 cwd: ~/projects/app
+                 env:
+                   NODE_ENV: development
+               - name: logs
+                 command: tail -f logs/app.log
+                 title: Logs
+                 delay: 500
+     monitor:
+       name: Monitor
+       command: htop
+   ```
+3. Start tmux and run:
+   ```bash
+   vde-layout web-dev
+   ```
 
-### Creating a Configuration File
+## CLI Commands
+- `vde-layout [preset]` – Apply the named preset. When omitted, vde-layout uses the `default` preset; if none exists it lists available presets and exits.
+- `vde-layout list` – Show available presets with descriptions.
+- `vde-layout dev --dry-run` – Display the tmux steps without executing them.
+- `vde-layout dev --verbose` – Print informational logs, including resolved presets and plan details.
+- `vde-layout --config /path/to/layout.yml` – Load presets from a specific file.
+- `vde-layout --help` – Show usage.
+- `vde-layout --version` / `vde-layout -v` – Print package version (`-V` is kept for compatibility).
 
-Create a configuration file at `~/.config/vde/layout.yml`:
+> **Note:** Applying a preset (without `--dry-run`) must be done inside an active tmux session.
 
+## Configuration Search Order
+When no `--config` flag is provided, vde-layout searches for configuration files in the following order:
+1. `$VDE_CONFIG_PATH/layout.yml` (if `VDE_CONFIG_PATH` is set).
+2. `$XDG_CONFIG_HOME/vde/layout.yml` or `~/.config/vde/layout.yml` when `XDG_CONFIG_HOME` is unset.
+3. `<project-root>/.vde/layout.yml` (discovered by walking up from the current directory).
+
+All existing files are merged, with project-specific definitions taking precedence over shared ones.
+
+## Preset Structure
+Each preset is an object under the `presets` key:
 ```yaml
 presets:
-  # Development environment layout
-  dev:
-    name: Development Environment
-    description: 3-pane configuration with editor, server, and log monitoring
-    layout:
-      type: horizontal
-      ratio: [3, 2]  # 60:40 ratio (automatically normalized)
-      panes:
-        - name: editor
-          command: nvim
-          focus: true
-        - type: vertical
-          ratio: [7, 3]  # 70:30 ratio
-          panes:
-            - name: server
-              command: npm run dev
-            - name: logs
-              command: tail -f logs/app.log
-
-  # Simple 2-pane layout
-  simple:
-    name: Simple Layout
-    description: 2-pane configuration with editor and terminal
-    layout:
-      type: vertical
-      ratio: [7, 3]  # 70:30 ratio
-      panes:
-        - name: editor
-          command: vim
-        - name: terminal
-          # Omitting command launches the default shell
-
-  # Single pane preset (without layout)
-  monitor:
-    name: System Monitor
-    description: System monitoring tool
-    command: htop
+  preset-key:
+    name: "Display Name"        # required
+    description: "Summary"      # optional
+    layout:                     # optional; omit for single command presets
+      # see Layout Structure
+    command: "htop"             # optional; used when layout is omitted
 ```
 
-### Commands
-
-#### List Presets
-
-```bash
-vde-layout list
-```
-
-#### Execute a Preset
-
-```bash
-# Execute a specific preset
-vde-layout dev
-
-# Execute the default preset
-vde-layout
-```
-
-#### Options
-
-```bash
-# dry-run mode (doesn't actually execute)
-vde-layout dev --dry-run
-
-# Show verbose logs
-vde-layout dev --verbose
-
-# Show help
-vde-layout --help
-```
-
-## Configuration File Structure
-
-### Presets
-
-Each preset is defined as an object with the following fields:
-
-```yaml
-presets:
-  preset-name:
-    name: "Preset Name"         # Required
-    description: "Description"  # Optional
-    layout:                     # Optional (single pane when omitted)
-      # Layout definition
-    command: "Command"          # Optional (only when layout is absent)
-```
-
-### Layout Definition
-
-Layouts define horizontal or vertical splits:
-
+### Layout Structure
 ```yaml
 layout:
-  type: horizontal              # horizontal or vertical
-  ratio: [3, 2]                # Split ratio (automatically normalized)
-  panes:                       # Array of panes
-    - name: "Pane Name"        # Required (for pane identification)
-      command: "Command"       # Optional (default shell when omitted)
-      cwd: "~/project"         # Working directory (optional)
-      env:                     # Environment variables (optional)
-        NODE_ENV: development
-      focus: true              # Focus setting (optional)
-    # Or nested layout
-    - type: vertical
+  type: horizontal | vertical   # required
+  ratio: [3, 2, ...]            # required; positive numbers, auto-normalized
+  panes:                        # required
+    - name: "left"              # required for terminal panes
+      command: "npm run start"  # optional
+      cwd: "~/project"          # optional
+      env:                      # optional
+        API_BASE_URL: http://localhost:3000
+      focus: true               # optional; only one pane should be true
+      delay: 500                # optional; wait (ms) before running command
+      title: "Server"           # optional; tmux pane title
+    - type: vertical            # nested split
       ratio: [1, 1]
       panes:
-        - name: "Child Pane 1"
-        - name: "Child Pane 2"
+        - name: "tests"
+        - name: "shell"
 ```
 
-### Automatic Ratio Normalization
+### Ratio Normalization
+Ratios can be any set of positive integers. vde-layout normalizes them to percentages:
+- `[1, 1]` → `[50, 50]`
+- `[2, 3]` → `[40, 60]`
+- `[1, 2, 1]` → `[25, 50, 25]`
 
-You can specify any positive numbers for ratio, which are automatically normalized to 100%:
-
-- `[1, 1]` → `[50, 50]` (50% each)
-- `[2, 3]` → `[40, 60]` (40%, 60%)
-- `[1, 2, 1]` → `[25, 50, 25]` (25%, 50%, 25%)
-
-### Single Pane Presets
-
-When layout is omitted, it operates as a single pane:
-
+### Single Command Presets
+If you omit `layout`, the preset runs a single command in one pane (or opens the default shell when `command` is omitted):
 ```yaml
 presets:
-  simple-command:
-    name: "Single Command"
-    command: "htop"            # Execute a single command
-
-  default-shell:
-    name: "Default Shell"
-    # Omitting command also launches the default shell
+  shell:
+    name: Default Shell
+  build:
+    name: Build Script
+    command: npm run build
 ```
 
-### Environment Variables
+## Runtime Behavior
+- Dry-run mode prints every tmux command and preserves the execution order you would see in a real run.
+- Applying a preset creates (or reuses) a tmux window, splits panes according to the plan, sets environment variables, changes directories, and runs commands sequentially.
+- If an error occurs (for example, a tmux command fails or the configuration is invalid), vde-layout returns a structured error with the failing step and guidance.
 
-The configuration file location can be changed using environment variables:
-
-- `XDG_CONFIG_HOME`: Follows the XDG Base Directory specification
-- `VDE_CONFIG_PATH`: Directly specify the configuration file directory
+## Environment Variables
+- `VDE_CONFIG_PATH` – Override the base directory for configuration files.
+- `XDG_CONFIG_HOME` – XDG base directory root; defaults to `~/.config` when unset.
+- `VDE_DEBUG=true` – Enable debug-level logs (includes stack traces).
+- `VDE_VERBOSE=true` – Enable info-level logs without full debug output.
+- `TMUX` – Automatically set by tmux. vde-layout checks this to ensure execution happens inside a session.
 
 ## Requirements
-
 - Node.js 22 or higher
 - tmux 2.0 or higher
-- Must be executed within a tmux session
-
-## License
-
-MIT
 
 ## Contributing
+Please submit bug reports and feature requests through [GitHub Issues](https://github.com/yuki-yano/vde-layout/issues).
 
-Please submit bug reports and feature requests to [GitHub Issues](https://github.com/yuki-yano/vde-layout/issues).
+## License
+MIT
