@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+export const WindowModeSchema = z.enum(["new-window", "current-window"])
+
 // Terminal pane schema
 const TerminalPaneSchema = z
   .object({
@@ -47,10 +49,16 @@ export const PresetSchema = z.object({
   description: z.string().optional(),
   layout: LayoutSchema.optional(),
   command: z.string().optional(),
+  windowMode: WindowModeSchema.optional(),
 })
 
 // Config schema definition
 export const ConfigSchema = z.object({
+  defaults: z
+    .object({
+      windowMode: WindowModeSchema.optional(),
+    })
+    .optional(),
   presets: z.record(PresetSchema),
 })
 

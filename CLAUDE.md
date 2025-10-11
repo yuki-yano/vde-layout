@@ -14,6 +14,7 @@ This project implements Kiro-style Spec-Driven Development for Claude Code using
 - **preset-loader**: Preset loading and layout reproduction functionality
 - **functional-core-rewrite**: vde-layoutを関数型アーキテクチャで全面改修する
 - **project-size-refactor**: プロジェクトの構成とアセットを整理して全体サイズを大幅に縮小する
+- **preset-window-mode**: プリセットごとにtmuxウィンドウ利用モードを切り替えられるようにする
 - Current spec: Check `.kiro/specs/` for active specifications
 - Use `/kiro:spec-status [feature-name]` to check progress
 

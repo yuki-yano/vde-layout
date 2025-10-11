@@ -3,7 +3,9 @@ import chalk from "chalk"
 import { stringify as toYAML } from "yaml"
 import { createRequire } from "module"
 import { createPresetManager } from "./layout/preset.ts"
-import type { Preset, PresetInfo } from "./models/types"
+import { resolveWindowMode } from "./cli/window-mode.ts"
+import { createPaneKillPrompter } from "./cli/user-prompt.ts"
+import type { Preset, PresetInfo, WindowMode } from "./models/types"
 import type { CommandExecutor } from "./types/command-executor.ts"
 import type { PresetManager } from "./types/preset-manager.ts"
 import { createRealExecutor, createDryRunExecutor } from "./executor/index.ts"
@@ -148,6 +150,25 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     return typeof presetName === "string" && presetName.length > 0 ? `preset://${presetName}` : "preset://default"
   }
 
+  const determineCliWindowMode = (options: {
+    currentWindow?: boolean
+    newWindow?: boolean
+  }): WindowMode | undefined => {
+    if (options.currentWindow === true && options.newWindow === true) {
+      throw new Error("Cannot use --current-window and --new-window at the same time")
+    }
+
+    if (options.currentWindow === true) {
+      return "current-window"
+    }
+
+    if (options.newWindow === true) {
+      return "new-window"
+    }
+
+    return undefined
+  }
+
   const handleFunctionalError = (error: FunctionalCoreError): never => {
     const header = [`[${error.kind}]`, `[${error.code}]`]
     if (typeof error.path === "string" && error.path.length > 0) {
@@ -247,7 +268,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
 
   const executePreset = async (
     presetName: string | undefined,
-    options: { verbose: boolean; dryRun: boolean },
+    options: { verbose: boolean; dryRun: boolean; currentWindow: boolean; newWindow: boolean },
   ): Promise<never> => {
     try {
       await presetManager.loadConfig()
@@ -256,6 +277,20 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         typeof presetName === "string" && presetName.length > 0
           ? presetManager.getPreset(presetName)
           : presetManager.getDefaultPreset()
+
+      const cliWindowMode = determineCliWindowMode({
+        currentWindow: options.currentWindow,
+        newWindow: options.newWindow,
+      })
+      const defaults = presetManager.getDefaults()
+      const windowModeResolution = resolveWindowMode({
+        cli: cliWindowMode,
+        preset: preset.windowMode,
+        defaults: defaults?.windowMode,
+      })
+      const windowMode = windowModeResolution.mode
+      logger.info(`Window mode: ${windowMode} (source: ${windowModeResolution.source})`)
+      const confirmPaneClosure = createPaneKillPrompter(logger)
 
       const tmuxEnv = process.env.TMUX
       const insideTmux = typeof tmuxEnv === "string" && tmuxEnv.length > 0
@@ -295,6 +330,8 @@ export const createCli = (options: CLIOptions = {}): CLI => {
             emission,
             executor,
             windowName: preset.name ?? presetName ?? "vde-layout",
+            windowMode,
+            onConfirmKill: confirmPaneClosure,
           })
           logger.info(`Executed ${executionResult.executedSteps} tmux steps`)
         } catch (error) {
@@ -320,6 +357,8 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     program.option("-V", "Show version (deprecated; use -v)")
     program.option("--dry-run", "Display commands without executing", false)
     program.option("--config <path>", "Path to configuration file")
+    program.option("--current-window", "Use the current tmux window for layout (kills other panes)", false)
+    program.option("--new-window", "Always create a new tmux window for layout", false)
 
     program
       .command("list")
@@ -339,10 +378,17 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     program
       .argument("[preset]", 'Preset name (defaults to "default" preset when omitted)')
       .action(async (presetName?: string) => {
-        const opts = program.opts<{ verbose?: boolean; dryRun?: boolean }>()
+        const opts = program.opts<{
+          verbose?: boolean
+          dryRun?: boolean
+          currentWindow?: boolean
+          newWindow?: boolean
+        }>()
         await executePreset(presetName, {
           verbose: opts.verbose === true,
           dryRun: opts.dryRun === true,
+          currentWindow: opts.currentWindow === true,
+          newWindow: opts.newWindow === true,
         })
       })
   }
@@ -359,7 +405,13 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     const requestedHelp = args.includes("--help") || args.includes("-h")
     try {
       await program.parseAsync(args, { from: "user" })
-      const opts = program.opts<{ verbose?: boolean; config?: string; V?: boolean }>()
+      const opts = program.opts<{
+        verbose?: boolean
+        config?: string
+        V?: boolean
+        currentWindow?: boolean
+        newWindow?: boolean
+      }>()
 
       if (requestedVersion || requestedHelp) {
         return

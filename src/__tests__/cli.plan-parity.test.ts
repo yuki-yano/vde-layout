@@ -117,6 +117,7 @@ const createFixturePresetManager = (): PresetManager => {
       description: "Fixture preset for plan parity tests",
     },
   ]
+  const getDefaults = () => undefined
 
   return {
     loadConfig,
@@ -124,6 +125,7 @@ const createFixturePresetManager = (): PresetManager => {
     getPreset,
     getDefaultPreset,
     listPresets,
+    getDefaults,
   }
 }
 

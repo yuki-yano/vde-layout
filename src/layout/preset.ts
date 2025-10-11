@@ -9,6 +9,7 @@ type PresetState = {
   getPreset: (name: string) => Preset
   listPresets: () => PresetInfo[]
   getDefaultPreset: () => Preset
+  getDefaults: () => Config["defaults"] | undefined
 }
 
 const createState = (options: ConfigLoaderOptions = {}): PresetState => {
@@ -70,12 +71,18 @@ const createState = (options: ConfigLoaderOptions = {}): PresetState => {
     return config.presets[firstKey]!
   }
 
+  const getDefaults = (): Config["defaults"] | undefined => {
+    const config = ensureConfig()
+    return config.defaults
+  }
+
   return {
     setConfigPath,
     loadConfig,
     getPreset,
     listPresets,
     getDefaultPreset,
+    getDefaults,
   }
 }
 
@@ -87,5 +94,6 @@ export const createPresetManager = (options: ConfigLoaderOptions = {}): PresetMa
     getPreset: state.getPreset,
     listPresets: state.listPresets,
     getDefaultPreset: state.getDefaultPreset,
+    getDefaults: state.getDefaults,
   }
 }

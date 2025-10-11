@@ -1,15 +1,20 @@
 import type { CommandExecutor } from "../types/command-executor.ts"
 import type { PlanEmission, CommandStep, EmittedTerminal } from "../core/emitter.ts"
+import type { WindowMode } from "../models/types.ts"
 import { ErrorCodes } from "../utils/errors.ts"
 import { createFunctionalError } from "../core/errors.ts"
 
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'
 
+type ConfirmPaneClosure = (context: { panesToClose: ReadonlyArray<string>; dryRun: boolean }) => Promise<boolean>
+
 type ExecutePlanInput = {
   readonly emission: PlanEmission
   readonly executor: CommandExecutor
   readonly windowName?: string
+  readonly windowMode: WindowMode
+  readonly onConfirmKill?: ConfirmPaneClosure
 }
 
 type ExecutePlanSuccess = {
@@ -20,6 +25,8 @@ export const executePlan = async ({
   emission,
   executor,
   windowName,
+  windowMode,
+  onConfirmKill,
 }: ExecutePlanInput): Promise<ExecutePlanSuccess> => {
   const initialVirtualPaneId = emission.summary.initialPaneId
   if (typeof initialVirtualPaneId !== "string" || initialVirtualPaneId.length === 0) {
@@ -31,18 +38,58 @@ export const executePlan = async ({
 
   const paneMap = new Map<string, string>()
 
-  const newWindowCommand: string[] = ["new-window", "-P", "-F", "#{pane_id}"]
-  if (typeof windowName === "string" && windowName.trim().length > 0) {
-    newWindowCommand.push("-n", windowName.trim())
-  }
+  const isDryRun = executor.isDryRun()
 
-  const initialPaneId = normalizePaneId(
-    await executeCommand(executor, newWindowCommand, {
-      code: ErrorCodes.TMUX_COMMAND_FAILED,
-      message: "Failed to create tmux window",
-      path: initialVirtualPaneId,
-    }),
-  )
+  let initialPaneId: string
+
+  if (windowMode === "current-window") {
+    const currentPaneId = await resolveCurrentPaneId({
+      executor,
+      contextPath: initialVirtualPaneId,
+      isDryRun,
+    })
+
+    const panesInWindow = await listWindowPaneIds(executor, initialVirtualPaneId)
+    const panesToClose = panesInWindow.filter((paneId) => paneId !== currentPaneId)
+
+    if (panesToClose.length > 0) {
+      let confirmed = true
+      if (onConfirmKill !== undefined) {
+        confirmed = await onConfirmKill({ panesToClose, dryRun: isDryRun })
+      }
+
+      if (confirmed !== true) {
+        throw createFunctionalError("execution", {
+          code: ErrorCodes.USER_CANCELLED,
+          message: "Aborted layout application for current window",
+          path: initialVirtualPaneId,
+          details: { panes: panesToClose },
+        })
+      }
+
+      await executeCommand(executor, ["kill-pane", "-a", "-t", currentPaneId], {
+        code: ErrorCodes.TMUX_COMMAND_FAILED,
+        message: "Failed to close existing panes",
+        path: initialVirtualPaneId,
+        details: { command: ["kill-pane", "-a", "-t", currentPaneId] },
+      })
+    }
+
+    initialPaneId = normalizePaneId(currentPaneId)
+  } else {
+    const newWindowCommand: string[] = ["new-window", "-P", "-F", "#{pane_id}"]
+    if (typeof windowName === "string" && windowName.trim().length > 0) {
+      newWindowCommand.push("-n", windowName.trim())
+    }
+
+    initialPaneId = normalizePaneId(
+      await executeCommand(executor, newWindowCommand, {
+        code: ErrorCodes.TMUX_COMMAND_FAILED,
+        message: "Failed to create tmux window",
+        path: initialVirtualPaneId,
+      }),
+    )
+  }
 
   registerPane(paneMap, initialVirtualPaneId, initialPaneId)
 
@@ -230,17 +277,57 @@ const executeCommand = async (
   }
 }
 
-const listPaneIds = async (executor: CommandExecutor, step: CommandStep): Promise<string[]> => {
+const resolveCurrentPaneId = async ({
+  executor,
+  contextPath,
+  isDryRun,
+}: {
+  executor: CommandExecutor
+  contextPath: string
+  isDryRun: boolean
+}): Promise<string> => {
+  const envPaneId = process.env.TMUX_PANE
+  if (typeof envPaneId === "string" && envPaneId.trim().length > 0) {
+    return normalizePaneId(envPaneId)
+  }
+
+  if (isDryRun) {
+    return "%0"
+  }
+
+  const output = await executeCommand(executor, ["display-message", "-p", "#{pane_id}"], {
+    code: ErrorCodes.TMUX_COMMAND_FAILED,
+    message: "Failed to resolve current tmux pane",
+    path: contextPath,
+  })
+
+  const paneId = output.trim()
+  if (paneId.length === 0) {
+    throw createFunctionalError("execution", {
+      code: ErrorCodes.NOT_IN_TMUX_SESSION,
+      message: "Unable to determine current tmux pane",
+      path: contextPath,
+    })
+  }
+
+  return normalizePaneId(paneId)
+}
+
+const listWindowPaneIds = async (executor: CommandExecutor, contextPath: string): Promise<string[]> => {
   const output = await executeCommand(executor, ["list-panes", "-F", "#{pane_id}"], {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
     message: "Failed to list tmux panes",
-    path: step.id,
+    path: contextPath,
   })
 
   return output
     .split("\n")
     .map((pane) => pane.trim())
     .filter((pane) => pane.length > 0)
+}
+
+const listPaneIds = async (executor: CommandExecutor, step: CommandStep): Promise<string[]> => {
+  return listWindowPaneIds(executor, step.id)
 }
 
 const findNewPaneId = (before: string[], after: string[]): string | undefined => {

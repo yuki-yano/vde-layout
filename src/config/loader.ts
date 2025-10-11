@@ -75,7 +75,7 @@ export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoa
       mergedConfig = mergeConfigs(mergedConfig, config)
     }
 
-    return mergedConfig
+    return applyDefaults(mergedConfig)
   }
 
   return {
@@ -171,10 +171,54 @@ const safeReadFile = async (filePath: string): Promise<string> => {
 }
 
 const mergeConfigs = (base: Config, override: Config): Config => {
-  return {
-    presets: {
-      ...base.presets,
-      ...override.presets,
-    },
+  const mergedPresets: Config["presets"] = { ...base.presets }
+
+  for (const [presetKey, overridePreset] of Object.entries(override.presets)) {
+    const basePreset = base.presets[presetKey]
+    if (
+      basePreset !== undefined &&
+      basePreset.windowMode !== undefined &&
+      overridePreset.windowMode !== undefined &&
+      basePreset.windowMode !== overridePreset.windowMode
+    ) {
+      console.warn(
+        `[vde-layout] Preset "${presetKey}" windowMode conflict: "${basePreset.windowMode}" overridden by "${overridePreset.windowMode}"`,
+      )
+    }
+    mergedPresets[presetKey] = overridePreset
   }
+
+  const baseDefaults = base.defaults
+  const overrideDefaults = override.defaults
+
+  if (
+    baseDefaults?.windowMode !== undefined &&
+    overrideDefaults?.windowMode !== undefined &&
+    baseDefaults.windowMode !== overrideDefaults.windowMode
+  ) {
+    console.warn(
+      `[vde-layout] defaults.windowMode conflict: "${baseDefaults.windowMode}" overridden by "${overrideDefaults.windowMode}"`,
+    )
+  }
+
+  const mergedDefaults =
+    baseDefaults !== undefined || overrideDefaults !== undefined
+      ? {
+          ...(baseDefaults ?? {}),
+          ...(overrideDefaults ?? {}),
+        }
+      : undefined
+
+  return mergedDefaults === undefined
+    ? {
+        presets: mergedPresets,
+      }
+    : {
+        defaults: mergedDefaults,
+        presets: mergedPresets,
+      }
+}
+
+const applyDefaults = (config: Config): Config => {
+  return config
 }

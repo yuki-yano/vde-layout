@@ -1,4 +1,4 @@
-import type { Preset, PresetInfo } from "../../models/types.ts"
+import type { Config, Preset, PresetInfo } from "../../models/types.ts"
 import type { PresetManager } from "../../types/preset-manager.ts"
 
 export type MockPresetManager = PresetManager & {
@@ -7,6 +7,7 @@ export type MockPresetManager = PresetManager & {
   readonly wasLoadConfigCalled: () => boolean
   readonly resetLoadConfigCalled: () => void
   readonly getConfigPath: () => string | undefined
+  readonly setDefaults: (next: Config["defaults"] | undefined) => void
 }
 
 export const createMockPresetManager = (): MockPresetManager => {
@@ -32,6 +33,7 @@ export const createMockPresetManager = (): MockPresetManager => {
   let loadConfigCalled = false
   let shouldFailOnLoad = false
   let configPath: string | undefined
+  let defaults: Config["defaults"] | undefined
 
   const loadConfig = async () => {
     loadConfigCalled = true
@@ -68,6 +70,10 @@ export const createMockPresetManager = (): MockPresetManager => {
     presets = next
   }
 
+  const setDefaults = (next: Config["defaults"] | undefined) => {
+    defaults = next
+  }
+
   const setShouldFailOnLoad = (shouldFail: boolean) => {
     shouldFailOnLoad = shouldFail
   }
@@ -78,6 +84,7 @@ export const createMockPresetManager = (): MockPresetManager => {
   }
 
   const getConfigPath = () => configPath
+  const getDefaults = () => defaults
 
   return {
     loadConfig,
@@ -90,5 +97,7 @@ export const createMockPresetManager = (): MockPresetManager => {
     wasLoadConfigCalled,
     resetLoadConfigCalled,
     getConfigPath,
+    getDefaults,
+    setDefaults,
   }
 }

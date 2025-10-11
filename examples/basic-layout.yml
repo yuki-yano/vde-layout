@@ -1,5 +1,8 @@
 # VDE Layout Configuration Sample - New Format
 
+defaults:
+  windowMode: new-window  # use current-window here to reuse the pane by default
+
 presets:
   # 3-pane layout for development environment
   dev:
@@ -26,6 +29,7 @@ presets:
   monitor:
     name: monitor
     description: "System monitoring"
+    windowMode: current-window
     layout:
       type: horizontal
       ratio: [50, 50]

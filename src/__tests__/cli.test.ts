@@ -388,6 +388,13 @@ describe("CLI", () => {
       expect(exitCode).toBe(0)
     })
 
+    it("should reject when both window override options are provided", async () => {
+      await expect(cli.run(["dev", "--current-window", "--new-window"])).rejects.toThrow("Process exited")
+
+      expect(errorOutput.join("\n")).toContain("Cannot use --current-window and --new-window")
+      expect(exitCode).toBe(1)
+    })
+
     it("should allow specifying configuration file via --config", async () => {
       const customPresetManager = createMockPresetManager()
       const cliWithConfig = createCli({

@@ -50,6 +50,18 @@ export const createMockExecutor = (): MockExecutor => {
       return mockPaneIds.join("\n")
     }
 
+    if (args[0] === "kill-pane" && args.includes("-a")) {
+      const targetIndex = args.indexOf("-t")
+      const targetPane =
+        (targetIndex >= 0 && targetIndex + 1 < args.length ? args[targetIndex + 1] : mockPaneIds[0]) ?? "%0"
+      mockPaneIds = [targetPane]
+      const parsedCounter = Number(targetPane.replace("%", ""))
+      if (!Number.isNaN(parsedCounter)) {
+        mockPaneCounter = parsedCounter
+      }
+      return ""
+    }
+
     if (args.includes("split-window")) {
       mockPaneCounter += 1
       const newPaneId = `%${mockPaneCounter}`

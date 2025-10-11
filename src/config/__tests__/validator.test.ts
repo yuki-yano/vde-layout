@@ -145,6 +145,39 @@ presets:
     })
   })
 
+  it("should accept windowMode on defaults and presets", () => {
+    const yaml = `
+defaults:
+  windowMode: current-window
+presets:
+  dev:
+    name: dev
+    windowMode: new-window
+    layout:
+      type: horizontal
+      ratio: [50, 50]
+      panes:
+        - name: editor
+          command: vim
+        - name: monitor
+          command: htop
+  ops:
+    name: ops
+    layout:
+      type: horizontal
+      ratio: [60, 40]
+      panes:
+        - name: deploy
+          command: ./deploy.sh
+        - name: logs
+          command: tail -f logs.txt
+`
+    const result = validateYAML(yaml)
+    expect(result.defaults?.windowMode).toBe("current-window")
+    expect(result.presets.dev?.windowMode).toBe("new-window")
+    expect(result.presets.ops?.windowMode).toBeUndefined()
+  })
+
   describe("invalid configurations", () => {
     it("should throw ValidationError for invalid YAML syntax", () => {
       const yaml = `
@@ -166,6 +199,25 @@ config:
 `
       const error = captureValidationError(() => validateYAML(yaml))
       expect(error.message).toMatch(/presets field is required/)
+    })
+
+    it("should throw ValidationError for invalid windowMode", () => {
+      const yaml = `
+presets:
+  dev:
+    name: dev
+    windowMode: side-window
+    layout:
+      type: horizontal
+      ratio: [50, 50]
+      panes:
+        - name: editor
+          command: vim
+        - name: monitor
+          command: htop
+`
+      const error = captureValidationError(() => validateYAML(yaml))
+      expect(error.message).toMatch(/Invalid enum value/)
     })
 
     it("should throw ValidationError for invalid layout type", () => {

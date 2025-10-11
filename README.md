@@ -59,6 +59,8 @@ bun add -g vde-layout
 - `vde-layout list` – Show available presets with descriptions.
 - `vde-layout dev --dry-run` – Display the tmux steps without executing them.
 - `vde-layout dev --verbose` – Print informational logs, including resolved presets and plan details.
+- `vde-layout dev --current-window` – Reuse the current tmux window after confirming that other panes can be closed.
+- `vde-layout dev --new-window` – Force creation of a new tmux window even when presets or defaults request reuse.
 - `vde-layout --config /path/to/layout.yml` – Load presets from a specific file.
 - `vde-layout --help` – Show usage.
 - `vde-layout --version` / `vde-layout -v` – Print package version (`-V` is kept for compatibility).
@@ -80,6 +82,7 @@ presets:
   preset-key:
     name: "Display Name"        # required
     description: "Summary"      # optional
+    windowMode: new-window       # optional; "new-window" (default) or "current-window"
     layout:                     # optional; omit for single command presets
       # see Layout Structure
     command: "htop"             # optional; used when layout is omitted
@@ -122,6 +125,13 @@ presets:
     name: Build Script
     command: npm run build
 ```
+
+### Window Mode Selection
+- `defaults.windowMode` sets the default behavior for presets that omit `windowMode`. Allowed values are `new-window` (default) and `current-window`.
+- Each preset may override the default by specifying its own `windowMode`.
+- CLI flags (`--current-window` / `--new-window`) take highest precedence and override both presets and defaults.
+- When `current-window` mode is used during an actual run, vde-layout prompts for confirmation before closing panes other than the pane running the command. Dry-run mode prints the intended closures without prompting.
+
 
 ## Runtime Behavior
 - Dry-run mode prints every tmux command and preserves the execution order you would see in a real run.
