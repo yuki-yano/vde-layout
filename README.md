@@ -92,7 +92,7 @@ presets:
 ```yaml
 layout:
   type: horizontal | vertical   # required
-  ratio: [3, 2, ...]            # required; positive numbers, auto-normalized
+  ratio: [3, 2]            # required; positive numbers, auto-normalized
   panes:                        # required
     - name: "left"              # required for terminal panes
       command: "npm run start"  # optional
