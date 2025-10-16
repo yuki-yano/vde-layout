@@ -366,7 +366,7 @@ describe("CLI", () => {
       expectFunctionalPipelineCalled()
       expect(recordingExecutor.commands).toHaveLength(0)
       expect(consoleOutput.join("\n")).toContain("[DRY RUN]")
-      expect(consoleOutput.join("\n")).toContain("Planned tmux steps")
+      expect(consoleOutput.join("\n")).toContain("Planned terminal steps")
       expect(exitCode).toBe(0)
     })
 

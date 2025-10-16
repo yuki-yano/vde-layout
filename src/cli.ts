@@ -9,7 +9,9 @@ import type { Preset, PresetInfo, WindowMode } from "./models/types"
 import type { CommandExecutor } from "./types/command-executor.ts"
 import type { PresetManager } from "./types/preset-manager.ts"
 import { createRealExecutor, createDryRunExecutor } from "./executor/index.ts"
-import { executePlan } from "./executor/plan-runner.ts"
+import { createTerminalBackend } from "./executor/backend-factory.ts"
+import { resolveTerminalBackendKind } from "./executor/backend-resolver.ts"
+import type { DryRunStep, TerminalBackendKind } from "./executor/terminal-backend.ts"
 import { createLogger, LogLevel, type Logger } from "./utils/logger.ts"
 import {
   runDiagnostics,
@@ -120,11 +122,10 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     }
   }
 
-  const renderDryRun = (emission: PlanEmission): void => {
-    console.log(chalk.bold("\nPlanned tmux steps (dry-run)"))
-    emission.steps.forEach((step, index) => {
-      const commandString = step.command.join(" ")
-      console.log(` ${index + 1}. ${step.summary}: tmux ${commandString}`)
+  const renderDryRun = (steps: ReadonlyArray<DryRunStep>): void => {
+    console.log(chalk.bold("\nPlanned terminal steps (dry-run)"))
+    steps.forEach((step, index) => {
+      console.log(` ${index + 1}. [${step.backend}] ${step.summary}: ${step.command}`)
     })
   }
 
@@ -268,7 +269,13 @@ export const createCli = (options: CLIOptions = {}): CLI => {
 
   const executePreset = async (
     presetName: string | undefined,
-    options: { verbose: boolean; dryRun: boolean; currentWindow: boolean; newWindow: boolean },
+    options: {
+      verbose: boolean
+      dryRun: boolean
+      currentWindow: boolean
+      newWindow: boolean
+      backend?: string
+    },
   ): Promise<never> => {
     try {
       await presetManager.loadConfig()
@@ -292,16 +299,26 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       logger.info(`Window mode: ${windowMode} (source: ${windowModeResolution.source})`)
       const confirmPaneClosure = createPaneKillPrompter(logger)
 
-      const tmuxEnv = process.env.TMUX
-      const insideTmux = typeof tmuxEnv === "string" && tmuxEnv.length > 0
-      if (!insideTmux && options.dryRun !== true) {
-        throw new Error("Must be run inside a tmux session")
-      }
-
       const executor = createCommandExecutor({
         verbose: options.verbose,
         dryRun: options.dryRun,
       })
+
+      const backendKind = resolveTerminalBackendKind({
+        cliFlag: options.backend as TerminalBackendKind | undefined,
+        env: process.env,
+      })
+      logger.info(`Terminal backend: ${backendKind}`)
+
+      const backend = createTerminalBackend(backendKind, {
+        executor,
+        logger,
+        dryRun: options.dryRun,
+        verbose: options.verbose,
+        prompt: confirmPaneClosure,
+      })
+
+      await backend.verifyEnvironment()
 
       if (options.dryRun === true) {
         console.log("[DRY RUN] No actual commands will be executed")
@@ -323,17 +340,16 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       }
 
       if (options.dryRun === true) {
-        renderDryRun(emission)
+        const dryRunSteps = backend.getDryRunSteps(emission)
+        renderDryRun(dryRunSteps)
       } else {
         try {
-          const executionResult = await executePlan({
+          const executionResult = await backend.applyPlan({
             emission,
-            executor,
-            windowName: preset.name ?? presetName ?? "vde-layout",
             windowMode,
-            onConfirmKill: confirmPaneClosure,
+            windowName: preset.name ?? presetName ?? "vde-layout",
           })
-          logger.info(`Executed ${executionResult.executedSteps} tmux steps`)
+          logger.info(`Executed ${executionResult.executedSteps} ${backendKind} steps`)
         } catch (error) {
           return handlePipelineFailure(error)
         }
@@ -356,6 +372,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     program.option("--verbose", "Show detailed logs", false)
     program.option("-V", "Show version (deprecated; use -v)")
     program.option("--dry-run", "Display commands without executing", false)
+    program.option("--backend <backend>", "Select terminal backend (tmux or wezterm)")
     program.option("--config <path>", "Path to configuration file")
     program.option("--current-window", "Use the current tmux window for layout (kills other panes)", false)
     program.option("--new-window", "Always create a new tmux window for layout", false)
@@ -383,12 +400,14 @@ export const createCli = (options: CLIOptions = {}): CLI => {
           dryRun?: boolean
           currentWindow?: boolean
           newWindow?: boolean
+          backend?: string
         }>()
         await executePreset(presetName, {
           verbose: opts.verbose === true,
           dryRun: opts.dryRun === true,
           currentWindow: opts.currentWindow === true,
           newWindow: opts.newWindow === true,
+          backend: opts.backend,
         })
       })
   }

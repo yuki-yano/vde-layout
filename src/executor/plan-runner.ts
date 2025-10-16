@@ -7,7 +7,7 @@ import { createFunctionalError } from "../core/errors.ts"
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'
 
-type ConfirmPaneClosure = (context: { panesToClose: ReadonlyArray<string>; dryRun: boolean }) => Promise<boolean>
+export type ConfirmPaneClosure = (context: { panesToClose: ReadonlyArray<string>; dryRun: boolean }) => Promise<boolean>
 
 type ExecutePlanInput = {
   readonly emission: PlanEmission

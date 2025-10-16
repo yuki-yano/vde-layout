@@ -1,0 +1,351 @@
+import { execa } from "execa"
+import { createEnvironmentError, ErrorCodes } from "../utils/errors.ts"
+import { createFunctionalError } from "../core/errors.ts"
+
+const WEZTERM_BINARY = "wezterm"
+const MINIMUM_VERSION = "20220624-141144-bd1b7c5d"
+const VERSION_REGEX = /(\d{8})-(\d{6})-([0-9a-fA-F]+)/i
+
+type ExecaLikeError = Error & {
+  readonly exitCode?: number
+  readonly code?: string
+  readonly stderr?: string
+  readonly stdout?: string
+}
+
+export type WeztermListPane = {
+  readonly paneId: string
+  readonly isActive: boolean
+}
+
+export type WeztermListTab = {
+  readonly tabId: string
+  readonly isActive: boolean
+  readonly panes: ReadonlyArray<WeztermListPane>
+}
+
+export type WeztermListWindow = {
+  readonly windowId: string
+  readonly isActive: boolean
+  readonly tabs: ReadonlyArray<WeztermListTab>
+}
+
+export type WeztermListResult = {
+  readonly windows: ReadonlyArray<WeztermListWindow>
+}
+
+export const verifyWeztermAvailability = async (): Promise<{ version: string }> => {
+  let stdout: string
+  try {
+    const result = await execa(WEZTERM_BINARY, ["--version"])
+    stdout = result.stdout
+  } catch (error) {
+    const execaError = error as ExecaLikeError
+    if (execaError.code === "ENOENT") {
+      throw createEnvironmentError("wezterm is not installed", ErrorCodes.BACKEND_NOT_FOUND, {
+        backend: "wezterm",
+        binary: WEZTERM_BINARY,
+      })
+    }
+    throw createEnvironmentError("Failed to execute wezterm --version", ErrorCodes.WEZTERM_NOT_FOUND, {
+      backend: "wezterm",
+      binary: WEZTERM_BINARY,
+      stderr: execaError.stderr,
+    })
+  }
+
+  const detectedVersion = extractVersion(stdout)
+  if (detectedVersion === undefined) {
+    throw createEnvironmentError("Unable to determine wezterm version", ErrorCodes.UNSUPPORTED_WEZTERM_VERSION, {
+      requiredVersion: MINIMUM_VERSION,
+      detectedVersion: stdout.trim(),
+    })
+  }
+
+  if (!isVersionSupported(detectedVersion, MINIMUM_VERSION)) {
+    throw createEnvironmentError("Unsupported wezterm version", ErrorCodes.UNSUPPORTED_WEZTERM_VERSION, {
+      requiredVersion: MINIMUM_VERSION,
+      detectedVersion,
+    })
+  }
+
+  return { version: detectedVersion }
+}
+
+type RunWeztermErrorContext = {
+  readonly message: string
+  readonly path?: string
+  readonly details?: Readonly<Record<string, unknown>>
+}
+
+export const runWeztermCli = async (args: string[], errorContext: RunWeztermErrorContext): Promise<string> => {
+  try {
+    const result = await execa(WEZTERM_BINARY, ["cli", ...args])
+    return result.stdout
+  } catch (error) {
+    const execaError = error as ExecaLikeError
+    throw createFunctionalError("execution", {
+      code: ErrorCodes.TERMINAL_COMMAND_FAILED,
+      message: errorContext.message,
+      path: errorContext.path,
+      details: {
+        command: [WEZTERM_BINARY, "cli", ...args],
+        stderr: execaError.stderr,
+        exitCode: execaError.exitCode,
+        backend: "wezterm",
+        ...(errorContext.details ?? {}),
+      },
+    })
+  }
+}
+
+export const listWeztermWindows = async (): Promise<WeztermListResult> => {
+  const stdout = await runWeztermCli(["list", "--format", "json"], { message: "Failed to list wezterm panes" })
+  const result = parseListResult(stdout)
+  if (result === undefined) {
+    throw createFunctionalError("execution", {
+      code: ErrorCodes.TERMINAL_COMMAND_FAILED,
+      message: "Invalid wezterm list output",
+      details: { stdout },
+    })
+  }
+  return result
+}
+
+export const killWeztermPane = async (paneId: string): Promise<void> => {
+  await runWeztermCli(["kill-pane", "--pane-id", paneId], {
+    message: `Failed to kill wezterm pane ${paneId}`,
+    path: paneId,
+  })
+}
+
+const extractVersion = (raw: string): string | undefined => {
+  const match = raw.match(VERSION_REGEX)
+  if (!match) {
+    return undefined
+  }
+  const date = match[1]
+  const time = match[2]
+  const commit = match[3]
+  if (date === undefined || time === undefined || commit === undefined) {
+    return undefined
+  }
+  return `${date}-${time}-${commit.toLowerCase()}`
+}
+
+const isVersionSupported = (detected: string, minimum: string): boolean => {
+  const parse = (version: string): { build: number; commit: string } | undefined => {
+    const match = version.match(VERSION_REGEX)
+    if (!match) {
+      return undefined
+    }
+    const date = match[1]
+    const time = match[2]
+    const commit = match[3]
+    if (date === undefined || time === undefined || commit === undefined) {
+      return undefined
+    }
+    const build = Number(`${date}${time}`)
+    if (Number.isNaN(build)) {
+      return undefined
+    }
+    return { build, commit: commit.toLowerCase() }
+  }
+
+  const detectedInfo = parse(detected)
+  const minimumInfo = parse(minimum)
+  if (detectedInfo === undefined || minimumInfo === undefined) {
+    return false
+  }
+
+  if (detectedInfo.build > minimumInfo.build) {
+    return true
+  }
+  if (detectedInfo.build < minimumInfo.build) {
+    return false
+  }
+
+  return detectedInfo.commit >= minimumInfo.commit
+}
+
+const toIdString = (value: unknown): string | undefined => {
+  if (typeof value === "string") {
+    return value
+  }
+  if (typeof value === "number") {
+    return value.toString()
+  }
+  return undefined
+}
+
+const isNonEmptyString = (value: string | undefined): value is string => {
+  return typeof value === "string" && value.length > 0
+}
+
+type RawListPane = {
+  readonly pane_id?: number | string
+  readonly is_active?: unknown
+}
+
+type RawListTab = {
+  readonly tab_id?: number | string
+  readonly is_active?: unknown
+  readonly panes?: RawListPane[]
+}
+
+type RawListWindow = {
+  readonly window_id?: number | string
+  readonly is_active?: unknown
+  readonly tabs?: RawListTab[]
+}
+
+type RawListEntry = {
+  readonly window_id?: number | string
+  readonly tab_id?: number | string
+  readonly pane_id?: number | string
+  readonly is_active?: unknown
+}
+
+type RawListResult = {
+  readonly windows?: RawListWindow[]
+}
+
+const parseListResult = (stdout: string): WeztermListResult | undefined => {
+  try {
+    const parsed = JSON.parse(stdout) as RawListResult
+    if (Array.isArray(parsed)) {
+      const windowMap = new Map<
+        string,
+        {
+          windowId: string
+          isActive: boolean
+          tabs: Map<
+            string,
+            {
+              tabId: string
+              isActive: boolean
+              panes: WeztermListPane[]
+            }
+          >
+        }
+      >()
+
+      parsed.forEach((entry) => {
+        const listEntry = entry as RawListEntry
+        const windowIdRaw = toIdString(listEntry.window_id)
+        const paneIdRaw = toIdString(listEntry.pane_id)
+        const tabIdRaw = toIdString(listEntry.tab_id) ?? windowIdRaw
+        if (!isNonEmptyString(windowIdRaw) || !isNonEmptyString(tabIdRaw) || !isNonEmptyString(paneIdRaw)) {
+          return
+        }
+        const windowId = windowIdRaw
+        const tabId = tabIdRaw
+        const paneId = paneIdRaw
+
+        let windowRecord = windowMap.get(windowId)
+        if (!windowRecord) {
+          windowRecord = {
+            windowId,
+            isActive: false,
+            tabs: new Map(),
+          }
+          windowMap.set(windowId, windowRecord)
+        }
+
+        let tabRecord = windowRecord.tabs.get(tabId)
+        if (!tabRecord) {
+          tabRecord = {
+            tabId,
+            isActive: false,
+            panes: [],
+          }
+          windowRecord.tabs.set(tabId, tabRecord)
+        }
+
+        const pane: WeztermListPane = {
+          paneId,
+          isActive: listEntry.is_active === true,
+        }
+
+        windowRecord.isActive ||= listEntry.is_active === true
+        tabRecord.isActive ||= listEntry.is_active === true
+        tabRecord.panes.push(pane)
+      })
+
+      const windows = Array.from(windowMap.values()).map(
+        (windowRecord): WeztermListWindow => ({
+          windowId: windowRecord.windowId,
+          isActive: windowRecord.isActive,
+          tabs: Array.from(windowRecord.tabs.values()).map(
+            (tabRecord): WeztermListTab => ({
+              tabId: tabRecord.tabId,
+              isActive: tabRecord.isActive,
+              panes: tabRecord.panes.map(
+                (pane): WeztermListPane => ({
+                  paneId: pane.paneId,
+                  isActive: pane.isActive,
+                }),
+              ),
+            }),
+          ),
+        }),
+      )
+
+      return {
+        windows,
+      }
+    }
+
+    const windows = Array.isArray(parsed.windows) ? parsed.windows : []
+    const mappedWindows: WeztermListWindow[] = []
+
+    for (const window of windows) {
+      const windowIdRaw = toIdString(window.window_id)
+      if (!isNonEmptyString(windowIdRaw)) {
+        continue
+      }
+      const windowId = windowIdRaw
+
+      const mappedTabs: WeztermListTab[] = []
+      const tabs = Array.isArray(window.tabs) ? window.tabs : []
+      for (const tab of tabs) {
+        const tabIdRaw = toIdString(tab.tab_id)
+        if (!isNonEmptyString(tabIdRaw)) {
+          continue
+        }
+        const tabId = tabIdRaw
+
+        const paneRecords = Array.isArray(tab.panes) ? tab.panes : []
+        const mappedPanes: WeztermListPane[] = []
+        for (const pane of paneRecords) {
+          const paneIdRaw = toIdString(pane.pane_id)
+          if (!isNonEmptyString(paneIdRaw)) {
+            continue
+          }
+          const paneId = paneIdRaw
+
+          mappedPanes.push({
+            paneId,
+            isActive: pane.is_active === true,
+          })
+        }
+
+        mappedTabs.push({
+          tabId,
+          isActive: tab.is_active === true,
+          panes: mappedPanes,
+        })
+      }
+
+      mappedWindows.push({
+        windowId,
+        isActive: window.is_active === true,
+        tabs: mappedTabs,
+      })
+    }
+
+    return { windows: mappedWindows }
+  } catch {
+    return undefined
+  }
+}
