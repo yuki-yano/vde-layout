@@ -80,6 +80,7 @@ const createContext = (overrides: Partial<TerminalBackendContext> = {}): Termina
   dryRun: false,
   verbose: false,
   prompt: undefined,
+  cwd: "/workspace",
   ...overrides,
 })
 
@@ -128,10 +129,41 @@ describe("createWeztermBackend", () => {
 
     expect(runMock).toHaveBeenNthCalledWith(
       1,
-      ["spawn", "--window-id", "7"],
+      ["spawn", "--window-id", "7", "--cwd", "/workspace"],
       expect.objectContaining({ message: "Failed to spawn wezterm tab" }),
     )
     expect(result.focusPaneId).toBe("42")
+  })
+
+  it("prefers terminal cwd when spawning the initial tab", async () => {
+    queueListResponses(
+      makeList([{ windowId: "7", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "7", panes: [{ paneId: "10", active: true }, { paneId: "42" }] }]),
+    )
+    runMock.mockResolvedValueOnce("42 7\n")
+
+    const backend = createWeztermBackend(createContext({ cwd: "/fallback" }))
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      terminals: [
+        {
+          virtualPaneId: "root",
+          command: undefined,
+          cwd: "/project/app",
+          env: undefined,
+          focus: true,
+          name: "root",
+        },
+      ],
+    }
+
+    await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(runMock).toHaveBeenNthCalledWith(
+      1,
+      ["spawn", "--window-id", "7", "--cwd", "/project/app"],
+      expect.objectContaining({ message: "Failed to spawn wezterm tab" }),
+    )
   })
 
   it("falls back to new window when no windows exist", async () => {
@@ -144,7 +176,7 @@ describe("createWeztermBackend", () => {
 
     expect(runMock).toHaveBeenNthCalledWith(
       1,
-      ["spawn", "--new-window"],
+      ["spawn", "--new-window", "--cwd", "/workspace"],
       expect.objectContaining({ message: "Failed to spawn wezterm window" }),
     )
     expect(result.focusPaneId).toBe("21")
@@ -229,7 +261,7 @@ describe("createWeztermBackend", () => {
 
     expect(runMock).toHaveBeenNthCalledWith(
       1,
-      ["spawn", "--window-id", "w1"],
+      ["spawn", "--window-id", "w1", "--cwd", "/workspace"],
       expect.objectContaining({ message: "Failed to spawn wezterm tab" }),
     )
     expect(runMock).toHaveBeenNthCalledWith(
@@ -273,7 +305,7 @@ describe("createWeztermBackend", () => {
 
     expect(runMock).toHaveBeenNthCalledWith(
       1,
-      ["spawn", "--window-id", "win"],
+      ["spawn", "--window-id", "win", "--cwd", "/workspace/project"],
       expect.objectContaining({ message: "Failed to spawn wezterm tab" }),
     )
     expect(runMock).toHaveBeenNthCalledWith(

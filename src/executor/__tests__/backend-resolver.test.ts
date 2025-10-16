@@ -65,6 +65,7 @@ describe("createTerminalBackend", () => {
       logger: createMockLogger(),
       dryRun: false,
       verbose: false,
+      cwd: "/workspace",
     }
 
     const backend = createTerminalBackend("tmux", context)
@@ -85,6 +86,7 @@ describe("createTerminalBackend", () => {
       logger: createMockLogger(),
       dryRun: false,
       verbose: false,
+      cwd: "/workspace",
     }
 
     const backend = createTerminalBackend("wezterm", context)

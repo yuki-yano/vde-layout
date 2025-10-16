@@ -98,6 +98,7 @@ describe("createTmuxBackend", () => {
     dryRun: false,
     verbose: false,
     prompt: undefined,
+    cwd: "/workspace",
     ...overrides,
   })
 

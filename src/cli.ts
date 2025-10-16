@@ -316,6 +316,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         dryRun: options.dryRun,
         verbose: options.verbose,
         prompt: confirmPaneClosure,
+        cwd: process.cwd(),
       })
 
       await backend.verifyEnvironment()

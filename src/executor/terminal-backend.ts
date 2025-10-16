@@ -35,4 +35,5 @@ export type TerminalBackendContext = {
   readonly dryRun: boolean
   readonly verbose: boolean
   readonly prompt?: ConfirmPaneClosure
+  readonly cwd: string
 }

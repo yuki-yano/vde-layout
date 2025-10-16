@@ -300,6 +300,7 @@ const resolveInitialPane = async ({
   listWindows,
   runCommand,
   logCommand,
+  initialCwd,
 }: {
   readonly windowMode: ApplyPlanParameters["windowMode"]
   readonly prompt?: TerminalBackendContext["prompt"]
@@ -307,6 +308,7 @@ const resolveInitialPane = async ({
   readonly listWindows: () => Promise<WeztermListResult>
   readonly runCommand: ExecuteWeztermCommand
   readonly logCommand: (args: ReadonlyArray<string>) => void
+  readonly initialCwd?: string
 }): Promise<InitialPaneResolution> => {
   if (windowMode === "current-window") {
     const list = await listWindows()
@@ -317,7 +319,11 @@ const resolveInitialPane = async ({
   const activeWindow = findActiveWindow(existing)
 
   if (activeWindow) {
-    const spawnOutput = await runCommand(["spawn", "--window-id", activeWindow.windowId], {
+    const args = ["spawn", "--window-id", activeWindow.windowId] as string[]
+    if (typeof initialCwd === "string" && initialCwd.length > 0) {
+      args.push("--cwd", initialCwd)
+    }
+    const spawnOutput = await runCommand(args, {
       message: "Failed to spawn wezterm tab",
     })
     const paneId = extractSpawnPaneId(spawnOutput)
@@ -336,7 +342,11 @@ const resolveInitialPane = async ({
     return { paneId, windowId }
   }
 
-  const spawnOutput = await runCommand(["spawn", "--new-window"], {
+  const args = ["spawn", "--new-window"] as string[]
+  if (typeof initialCwd === "string" && initialCwd.length > 0) {
+    args.push("--cwd", initialCwd)
+  }
+  const spawnOutput = await runCommand(args, {
     message: "Failed to spawn wezterm window",
   })
   const paneId = extractSpawnPaneId(spawnOutput)
@@ -627,6 +637,9 @@ export const createWeztermBackend = (context: TerminalBackendContext): TerminalB
   const applyPlan = async ({ emission, windowMode }: ApplyPlanParameters): Promise<ApplyPlanResult> => {
     const initialVirtualPaneId = ensureVirtualPaneId(emission)
     const paneMap: PaneMap = new Map()
+    const initialTerminal = emission.terminals.find((terminal) => terminal.virtualPaneId === initialVirtualPaneId)
+    const initialCwd =
+      typeof initialTerminal?.cwd === "string" && initialTerminal.cwd.length > 0 ? initialTerminal.cwd : context.cwd
 
     const { paneId: initialPaneId, windowId } = await resolveInitialPane({
       windowMode,
@@ -635,6 +648,7 @@ export const createWeztermBackend = (context: TerminalBackendContext): TerminalB
       listWindows,
       runCommand,
       logCommand,
+      initialCwd,
     })
     registerPaneWithAncestors(paneMap, initialVirtualPaneId, initialPaneId)
     logPaneMapping(initialVirtualPaneId, initialPaneId)
