@@ -165,8 +165,19 @@ const resolveCurrentWindow = async (context: {
   readonly prompt?: TerminalBackendContext["prompt"]
   readonly dryRun: boolean
   readonly logCommand: (args: ReadonlyArray<string>) => void
+  readonly preferredPaneId?: string
 }): Promise<CurrentWindowResolution> => {
-  const activeWindow = context.list.windows.find((window) => window.isActive) ?? context.list.windows[0]
+  const hasPreferredPane = typeof context.preferredPaneId === "string" && context.preferredPaneId.length > 0
+  const preferredPaneId = hasPreferredPane ? (context.preferredPaneId as string) : undefined
+  const preferredWindowId =
+    preferredPaneId !== undefined ? findWindowContainingPane(context.list, preferredPaneId) : undefined
+
+  const activeWindow =
+    (preferredWindowId !== undefined
+      ? context.list.windows.find((window) => window.windowId === preferredWindowId)
+      : undefined) ??
+    context.list.windows.find((window) => window.isActive) ??
+    context.list.windows[0]
 
   if (!activeWindow) {
     throw createFunctionalError("execution", {
@@ -176,7 +187,12 @@ const resolveCurrentWindow = async (context: {
     })
   }
 
-  const activeTab = activeWindow.tabs.find((tab) => tab.isActive) ?? activeWindow.tabs[0]
+  const activeTab =
+    (preferredPaneId !== undefined
+      ? activeWindow.tabs.find((tab) => tab.panes.some((pane) => pane.paneId === preferredPaneId))
+      : undefined) ??
+    activeWindow.tabs.find((tab) => tab.isActive) ??
+    activeWindow.tabs[0]
 
   if (!activeTab) {
     throw createFunctionalError("execution", {
@@ -187,7 +203,10 @@ const resolveCurrentWindow = async (context: {
     })
   }
 
-  const activePane = activeTab.panes.find((pane) => pane.isActive) ?? activeTab.panes[0]
+  const activePane =
+    (preferredPaneId !== undefined ? activeTab.panes.find((pane) => pane.paneId === preferredPaneId) : undefined) ??
+    activeTab.panes.find((pane) => pane.isActive) ??
+    activeTab.panes[0]
 
   if (!activePane) {
     throw createFunctionalError("execution", {
@@ -327,6 +346,7 @@ const resolveInitialPane = async ({
   initialCwd,
   workspaceHint,
   initialList,
+  preferredPaneId,
 }: {
   readonly windowMode: ApplyPlanParameters["windowMode"]
   readonly prompt?: TerminalBackendContext["prompt"]
@@ -337,16 +357,25 @@ const resolveInitialPane = async ({
   readonly initialCwd?: string
   readonly workspaceHint?: string
   readonly initialList?: WeztermListResult
+  readonly preferredPaneId?: string
 }): Promise<InitialPaneResolution> => {
+  const hasPreferredPane = typeof preferredPaneId === "string" && preferredPaneId.length > 0
+  const preferredPaneIdValue = hasPreferredPane ? (preferredPaneId as string) : undefined
+
   if (windowMode === "current-window") {
     const snapshot = initialList ?? (await listWindows())
     const scoped = filterWindowsByWorkspace(snapshot, workspaceHint)
-    return resolveCurrentWindow({ list: scoped, prompt, dryRun, logCommand })
+    return resolveCurrentWindow({ list: scoped, prompt, dryRun, logCommand, preferredPaneId: preferredPaneIdValue })
   }
 
   const existingSnapshot = initialList ?? (await listWindows())
   const scopedExisting = filterWindowsByWorkspace(existingSnapshot, workspaceHint)
-  const activeWindow = findActiveWindow(scopedExisting)
+  const scopedPreferredWindowId =
+    preferredPaneIdValue !== undefined ? findWindowContainingPane(scopedExisting, preferredPaneIdValue) : undefined
+  const activeWindow =
+    (scopedPreferredWindowId !== undefined
+      ? scopedExisting.windows.find((window) => window.windowId === scopedPreferredWindowId)
+      : undefined) ?? findActiveWindow(scopedExisting)
 
   if (activeWindow) {
     const args = ["spawn", "--window-id", activeWindow.windowId] as string[]
@@ -696,6 +725,7 @@ export const createWeztermBackend = (context: TerminalBackendContext): TerminalB
       initialCwd,
       workspaceHint,
       initialList: cachedInitialList,
+      preferredPaneId: context.paneId,
     })
     registerPaneWithAncestors(paneMap, initialVirtualPaneId, initialPaneId)
     logPaneMapping(initialVirtualPaneId, initialPaneId)

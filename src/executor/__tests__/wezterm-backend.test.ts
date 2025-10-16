@@ -232,6 +232,32 @@ describe("createWeztermBackend", () => {
     expect(result.focusPaneId).toBe("A")
   })
 
+  it("uses paneId to resolve the current window when it is not active", async () => {
+    queueListResponses(
+      makeList([
+        {
+          windowId: "w-main",
+          panes: [{ paneId: "main", active: true }, { paneId: "main-extra" }],
+        },
+        {
+          windowId: "w-dev",
+          panes: [{ paneId: "pane-dev" }, { paneId: "dev-extra" }],
+        },
+      ]),
+    )
+    killMock.mockResolvedValue(undefined)
+    const prompt = vi.fn(async () => true)
+
+    const backend = createWeztermBackend(createContext({ paneId: "pane-dev", prompt }))
+    const emission = minimalEmission()
+    const result = await backend.applyPlan({ emission, windowMode: "current-window" })
+
+    expect(prompt).toHaveBeenCalledWith({ panesToClose: ["dev-extra"], dryRun: false })
+    expect(killMock).toHaveBeenCalledWith("dev-extra")
+    expect(killMock).not.toHaveBeenCalledWith("main-extra")
+    expect(result.focusPaneId).toBe("pane-dev")
+  })
+
   it("aborts when pane closure is rejected", async () => {
     queueListResponses(
       makeList([
