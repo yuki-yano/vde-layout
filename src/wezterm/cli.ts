@@ -72,7 +72,7 @@ export const verifyWeztermAvailability = async (): Promise<{ version: string }> 
   return { version: detectedVersion }
 }
 
-type RunWeztermErrorContext = {
+export type RunWeztermErrorContext = {
   readonly message: string
   readonly path?: string
   readonly details?: Readonly<Record<string, unknown>>
@@ -212,7 +212,8 @@ type RawListResult = {
 
 const parseListResult = (stdout: string): WeztermListResult | undefined => {
   try {
-    const parsed = JSON.parse(stdout) as RawListResult
+    const parsed: unknown = JSON.parse(stdout)
+
     if (Array.isArray(parsed)) {
       const windowMap = new Map<
         string,
@@ -230,13 +231,16 @@ const parseListResult = (stdout: string): WeztermListResult | undefined => {
         }
       >()
 
-      parsed.forEach((entry) => {
+      for (const entry of parsed) {
+        if (typeof entry !== "object" || entry === null) {
+          continue
+        }
         const listEntry = entry as RawListEntry
         const windowIdRaw = toIdString(listEntry.window_id)
         const paneIdRaw = toIdString(listEntry.pane_id)
         const tabIdRaw = toIdString(listEntry.tab_id) ?? windowIdRaw
         if (!isNonEmptyString(windowIdRaw) || !isNonEmptyString(tabIdRaw) || !isNonEmptyString(paneIdRaw)) {
-          return
+          continue
         }
         const windowId = windowIdRaw
         const tabId = tabIdRaw
@@ -270,7 +274,7 @@ const parseListResult = (stdout: string): WeztermListResult | undefined => {
         windowRecord.isActive ||= listEntry.is_active === true
         tabRecord.isActive ||= listEntry.is_active === true
         tabRecord.panes.push(pane)
-      })
+      }
 
       const windows = Array.from(windowMap.values()).map(
         (windowRecord): WeztermListWindow => ({
@@ -296,55 +300,72 @@ const parseListResult = (stdout: string): WeztermListResult | undefined => {
       }
     }
 
-    const windows = Array.isArray(parsed.windows) ? parsed.windows : []
-    const mappedWindows: WeztermListWindow[] = []
+    if (typeof parsed === "object" && parsed !== null) {
+      const candidate = parsed as Partial<RawListResult>
+      const windows = Array.isArray(candidate.windows) ? candidate.windows : []
+      const mappedWindows: WeztermListWindow[] = []
 
-    for (const window of windows) {
-      const windowIdRaw = toIdString(window.window_id)
-      if (!isNonEmptyString(windowIdRaw)) {
-        continue
-      }
-      const windowId = windowIdRaw
-
-      const mappedTabs: WeztermListTab[] = []
-      const tabs = Array.isArray(window.tabs) ? window.tabs : []
-      for (const tab of tabs) {
-        const tabIdRaw = toIdString(tab.tab_id)
-        if (!isNonEmptyString(tabIdRaw)) {
+      for (const window of windows) {
+        if (typeof window !== "object" || window === null) {
           continue
         }
-        const tabId = tabIdRaw
+        const rawWindow = window as RawListWindow
+        const windowIdRaw = toIdString(rawWindow.window_id)
+        if (!isNonEmptyString(windowIdRaw)) {
+          continue
+        }
+        const windowId = windowIdRaw
 
-        const paneRecords = Array.isArray(tab.panes) ? tab.panes : []
-        const mappedPanes: WeztermListPane[] = []
-        for (const pane of paneRecords) {
-          const paneIdRaw = toIdString(pane.pane_id)
-          if (!isNonEmptyString(paneIdRaw)) {
+        const mappedTabs: WeztermListTab[] = []
+        const tabs = Array.isArray(rawWindow.tabs) ? rawWindow.tabs : []
+        for (const tab of tabs) {
+          if (typeof tab !== "object" || tab === null) {
             continue
           }
-          const paneId = paneIdRaw
+          const rawTab = tab as RawListTab
+          const tabIdRaw = toIdString(rawTab.tab_id)
+          if (!isNonEmptyString(tabIdRaw)) {
+            continue
+          }
+          const tabId = tabIdRaw
 
-          mappedPanes.push({
-            paneId,
-            isActive: pane.is_active === true,
+          const paneRecords = Array.isArray(rawTab.panes) ? rawTab.panes : []
+          const mappedPanes: WeztermListPane[] = []
+          for (const pane of paneRecords) {
+            if (typeof pane !== "object" || pane === null) {
+              continue
+            }
+            const rawPane = pane as RawListPane
+            const paneIdRaw = toIdString(rawPane.pane_id)
+            if (!isNonEmptyString(paneIdRaw)) {
+              continue
+            }
+            const paneId = paneIdRaw
+
+            mappedPanes.push({
+              paneId,
+              isActive: rawPane.is_active === true,
+            })
+          }
+
+          mappedTabs.push({
+            tabId,
+            isActive: rawTab.is_active === true,
+            panes: mappedPanes,
           })
         }
 
-        mappedTabs.push({
-          tabId,
-          isActive: tab.is_active === true,
-          panes: mappedPanes,
+        mappedWindows.push({
+          windowId,
+          isActive: rawWindow.is_active === true,
+          tabs: mappedTabs,
         })
       }
 
-      mappedWindows.push({
-        windowId,
-        isActive: window.is_active === true,
-        tabs: mappedTabs,
-      })
+      return { windows: mappedWindows }
     }
 
-    return { windows: mappedWindows }
+    return undefined
   } catch {
     return undefined
   }

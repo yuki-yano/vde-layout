@@ -3,11 +3,10 @@ import type { PlanEmission, CommandStep, EmittedTerminal } from "../core/emitter
 import type { WindowMode } from "../models/types.ts"
 import { ErrorCodes } from "../utils/errors.ts"
 import { createFunctionalError } from "../core/errors.ts"
+import type { ConfirmPaneClosure } from "../types/confirm-pane.ts"
 
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'
-
-export type ConfirmPaneClosure = (context: { panesToClose: ReadonlyArray<string>; dryRun: boolean }) => Promise<boolean>
 
 type ExecutePlanInput = {
   readonly emission: PlanEmission

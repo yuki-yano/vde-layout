@@ -184,9 +184,9 @@ export const createCli = (options: CLIOptions = {}): CLI => {
 
     const commandDetail = error.details?.command
     if (Array.isArray(commandDetail)) {
-      const tmuxCommand = commandDetail.filter((segment): segment is string => typeof segment === "string")
-      if (tmuxCommand.length > 0) {
-        lines.push(`command: tmux ${tmuxCommand.join(" ")}`)
+      const parts = commandDetail.filter((segment): segment is string => typeof segment === "string")
+      if (parts.length > 0) {
+        lines.push(`command: ${parts.join(" ")}`)
       }
     } else if (typeof commandDetail === "string" && commandDetail.length > 0) {
       lines.push(`command: ${commandDetail}`)

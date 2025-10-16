@@ -35,7 +35,6 @@ const makeList = (
   windows: ReadonlyArray<{
     windowId: string
     panes: ReadonlyArray<{ paneId: string; active?: boolean }>
-    tabs?: number
   }>,
 ): WeztermListResult => {
   return {

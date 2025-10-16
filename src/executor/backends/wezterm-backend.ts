@@ -13,15 +13,16 @@ import {
   listWeztermWindows,
   runWeztermCli,
   verifyWeztermAvailability,
+  type RunWeztermErrorContext,
   type WeztermListResult,
 } from "../../wezterm/cli.ts"
 
 type PaneMap = Map<string, string>
 
-type ExecuteWeztermCommand = (
-  args: ReadonlyArray<string>,
-  errorContext: Parameters<typeof runWeztermCli>[1],
-) => Promise<string>
+type ExecuteWeztermCommand = (args: ReadonlyArray<string>, errorContext: RunWeztermErrorContext) => Promise<string>
+
+const PANE_REGISTRATION_RETRIES = 5
+const PANE_REGISTRATION_DELAY_MS = 100
 
 type InitialPaneResolution = {
   readonly paneId: string
@@ -261,7 +262,7 @@ const waitForPaneRegistration = async ({
   readonly listWindows: () => Promise<WeztermListResult>
   readonly windowHint?: string
 }): Promise<string> => {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < PANE_REGISTRATION_RETRIES; attempt += 1) {
     const snapshot = await listWindows()
 
     if (typeof windowHint === "string") {
@@ -280,8 +281,8 @@ const waitForPaneRegistration = async ({
       return located
     }
 
-    if (attempt < 4) {
-      await delay(100)
+    if (attempt < PANE_REGISTRATION_RETRIES - 1) {
+      await delay(PANE_REGISTRATION_DELAY_MS)
     }
   }
 
@@ -379,13 +380,12 @@ const extractSpawnPaneId = (output: string): string => {
   if (tokens.length === 0) {
     return ""
   }
-  // wezterm cli spawn --new-window outputs pane-id and window-id separated by space
-  const candidateIndex = tokens.length > 1 ? tokens.length - 2 : 0
-  const candidate = tokens[candidateIndex]
-  if (typeof candidate !== "string") {
+  // wezterm cli spawn outputs pane-id first, followed by optional window or tab metadata
+  const [paneId] = tokens
+  if (typeof paneId !== "string") {
     return ""
   }
-  return candidate.trim()
+  return paneId.trim()
 }
 
 const findNewPaneId = (before: Set<string>, after: Set<string>): string | undefined => {
