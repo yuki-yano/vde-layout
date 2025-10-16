@@ -247,6 +247,30 @@ const findWindowContainingPane = (list: WeztermListResult, paneId: string): stri
   return undefined
 }
 
+const findWorkspaceForPane = (list: WeztermListResult, paneId: string): string | undefined => {
+  for (const window of list.windows) {
+    for (const tab of window.tabs) {
+      for (const pane of tab.panes) {
+        if (pane.paneId === paneId) {
+          return window.workspace
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+const filterWindowsByWorkspace = (list: WeztermListResult, workspace?: string): WeztermListResult => {
+  if (workspace === undefined || workspace.length === 0) {
+    return list
+  }
+  const scoped = list.windows.filter((window) => window.workspace === workspace)
+  if (scoped.length === 0) {
+    return list
+  }
+  return { windows: scoped }
+}
+
 const delay = (ms: number): Promise<void> => {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
@@ -301,6 +325,8 @@ const resolveInitialPane = async ({
   runCommand,
   logCommand,
   initialCwd,
+  workspaceHint,
+  initialList,
 }: {
   readonly windowMode: ApplyPlanParameters["windowMode"]
   readonly prompt?: TerminalBackendContext["prompt"]
@@ -309,14 +335,18 @@ const resolveInitialPane = async ({
   readonly runCommand: ExecuteWeztermCommand
   readonly logCommand: (args: ReadonlyArray<string>) => void
   readonly initialCwd?: string
+  readonly workspaceHint?: string
+  readonly initialList?: WeztermListResult
 }): Promise<InitialPaneResolution> => {
   if (windowMode === "current-window") {
-    const list = await listWindows()
-    return resolveCurrentWindow({ list, prompt, dryRun, logCommand })
+    const snapshot = initialList ?? (await listWindows())
+    const scoped = filterWindowsByWorkspace(snapshot, workspaceHint)
+    return resolveCurrentWindow({ list: scoped, prompt, dryRun, logCommand })
   }
 
-  const existing = await listWindows()
-  const activeWindow = findActiveWindow(existing)
+  const existingSnapshot = initialList ?? (await listWindows())
+  const scopedExisting = filterWindowsByWorkspace(existingSnapshot, workspaceHint)
+  const activeWindow = findActiveWindow(scopedExisting)
 
   if (activeWindow) {
     const args = ["spawn", "--window-id", activeWindow.windowId] as string[]
@@ -345,6 +375,9 @@ const resolveInitialPane = async ({
   const args = ["spawn", "--new-window"] as string[]
   if (typeof initialCwd === "string" && initialCwd.length > 0) {
     args.push("--cwd", initialCwd)
+  }
+  if (typeof workspaceHint === "string" && workspaceHint.length > 0) {
+    args.push("--workspace", workspaceHint)
   }
   const spawnOutput = await runCommand(args, {
     message: "Failed to spawn wezterm window",
@@ -641,6 +674,18 @@ export const createWeztermBackend = (context: TerminalBackendContext): TerminalB
     const initialCwd =
       typeof initialTerminal?.cwd === "string" && initialTerminal.cwd.length > 0 ? initialTerminal.cwd : context.cwd
 
+    let cachedInitialList: WeztermListResult | undefined
+    let workspaceHint: string | undefined
+    if (typeof context.paneId === "string" && context.paneId.length > 0) {
+      try {
+        cachedInitialList = await listWindows()
+        workspaceHint = findWorkspaceForPane(cachedInitialList, context.paneId)
+      } catch {
+        cachedInitialList = undefined
+        workspaceHint = undefined
+      }
+    }
+
     const { paneId: initialPaneId, windowId } = await resolveInitialPane({
       windowMode,
       prompt: context.prompt,
@@ -649,6 +694,8 @@ export const createWeztermBackend = (context: TerminalBackendContext): TerminalB
       runCommand,
       logCommand,
       initialCwd,
+      workspaceHint,
+      initialList: cachedInitialList,
     })
     registerPaneWithAncestors(paneMap, initialVirtualPaneId, initialPaneId)
     logPaneMapping(initialVirtualPaneId, initialPaneId)

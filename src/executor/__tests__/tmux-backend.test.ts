@@ -99,6 +99,7 @@ describe("createTmuxBackend", () => {
     verbose: false,
     prompt: undefined,
     cwd: "/workspace",
+    paneId: undefined,
     ...overrides,
   })
 

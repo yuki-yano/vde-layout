@@ -61,6 +61,7 @@ describe("runWeztermCli", () => {
       {
         windowId: "5",
         isActive: true,
+        workspace: undefined,
         tabs: [
           {
             tabId: "7",
@@ -80,6 +81,7 @@ describe("runWeztermCli", () => {
       {
         windowId: "6",
         isActive: true,
+        workspace: undefined,
         tabs: [
           {
             tabId: "9",

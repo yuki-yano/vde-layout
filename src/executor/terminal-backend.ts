@@ -36,4 +36,5 @@ export type TerminalBackendContext = {
   readonly verbose: boolean
   readonly prompt?: ConfirmPaneClosure
   readonly cwd: string
+  readonly paneId?: string
 }

@@ -317,6 +317,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         verbose: options.verbose,
         prompt: confirmPaneClosure,
         cwd: process.cwd(),
+        paneId: process.env.WEZTERM_PANE,
       })
 
       await backend.verifyEnvironment()

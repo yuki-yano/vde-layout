@@ -27,6 +27,7 @@ export type WeztermListTab = {
 export type WeztermListWindow = {
   readonly windowId: string
   readonly isActive: boolean
+  readonly workspace?: string
   readonly tabs: ReadonlyArray<WeztermListTab>
 }
 
@@ -182,6 +183,13 @@ const isNonEmptyString = (value: string | undefined): value is string => {
   return typeof value === "string" && value.length > 0
 }
 
+const toWorkspaceString = (value: unknown): string | undefined => {
+  if (typeof value === "string" && value.length > 0) {
+    return value
+  }
+  return undefined
+}
+
 type RawListPane = {
   readonly pane_id?: number | string
   readonly is_active?: unknown
@@ -196,6 +204,7 @@ type RawListTab = {
 type RawListWindow = {
   readonly window_id?: number | string
   readonly is_active?: unknown
+  readonly workspace?: unknown
   readonly tabs?: RawListTab[]
 }
 
@@ -203,6 +212,7 @@ type RawListEntry = {
   readonly window_id?: number | string
   readonly tab_id?: number | string
   readonly pane_id?: number | string
+  readonly workspace?: unknown
   readonly is_active?: unknown
 }
 
@@ -220,6 +230,7 @@ const parseListResult = (stdout: string): WeztermListResult | undefined => {
         {
           windowId: string
           isActive: boolean
+          workspace?: string
           tabs: Map<
             string,
             {
@@ -245,15 +256,19 @@ const parseListResult = (stdout: string): WeztermListResult | undefined => {
         const windowId = windowIdRaw
         const tabId = tabIdRaw
         const paneId = paneIdRaw
+        const workspace = toWorkspaceString(listEntry.workspace)
 
         let windowRecord = windowMap.get(windowId)
         if (!windowRecord) {
           windowRecord = {
             windowId,
             isActive: false,
+            workspace,
             tabs: new Map(),
           }
           windowMap.set(windowId, windowRecord)
+        } else if (workspace !== undefined && windowRecord.workspace === undefined) {
+          windowRecord.workspace = workspace
         }
 
         let tabRecord = windowRecord.tabs.get(tabId)
@@ -280,6 +295,7 @@ const parseListResult = (stdout: string): WeztermListResult | undefined => {
         (windowRecord): WeztermListWindow => ({
           windowId: windowRecord.windowId,
           isActive: windowRecord.isActive,
+          workspace: windowRecord.workspace,
           tabs: Array.from(windowRecord.tabs.values()).map(
             (tabRecord): WeztermListTab => ({
               tabId: tabRecord.tabId,
@@ -315,6 +331,7 @@ const parseListResult = (stdout: string): WeztermListResult | undefined => {
           continue
         }
         const windowId = windowIdRaw
+        const workspace = toWorkspaceString(rawWindow.workspace)
 
         const mappedTabs: WeztermListTab[] = []
         const tabs = Array.isArray(rawWindow.tabs) ? rawWindow.tabs : []
@@ -358,6 +375,7 @@ const parseListResult = (stdout: string): WeztermListResult | undefined => {
         mappedWindows.push({
           windowId,
           isActive: rawWindow.is_active === true,
+          workspace,
           tabs: mappedTabs,
         })
       }

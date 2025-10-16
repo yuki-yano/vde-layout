@@ -34,6 +34,7 @@ const queueListResponses = (...responses: ReadonlyArray<WeztermListResult>): voi
 const makeList = (
   windows: ReadonlyArray<{
     windowId: string
+    workspace?: string
     panes: ReadonlyArray<{ paneId: string; active?: boolean }>
   }>,
 ): WeztermListResult => {
@@ -41,6 +42,7 @@ const makeList = (
     windows: windows.map((window, index) => ({
       windowId: window.windowId,
       isActive: index === 0,
+      workspace: window.workspace,
       tabs: [
         {
           tabId: `${window.windowId}-tab`,
@@ -81,6 +83,7 @@ const createContext = (overrides: Partial<TerminalBackendContext> = {}): Termina
   verbose: false,
   prompt: undefined,
   cwd: "/workspace",
+  paneId: undefined,
   ...overrides,
 })
 
@@ -130,6 +133,31 @@ describe("createWeztermBackend", () => {
     expect(runMock).toHaveBeenNthCalledWith(
       1,
       ["spawn", "--window-id", "7", "--cwd", "/workspace"],
+      expect.objectContaining({ message: "Failed to spawn wezterm tab" }),
+    )
+    expect(result.focusPaneId).toBe("42")
+  })
+
+  it("targets the workspace of the current pane when multiple workspaces exist", async () => {
+    queueListResponses(
+      makeList([
+        { windowId: "w-main", workspace: "main", panes: [{ paneId: "1", active: true }] },
+        { windowId: "w-dev", workspace: "dev", panes: [{ paneId: "20", active: true }] },
+      ]),
+      makeList([
+        { windowId: "w-main", workspace: "main", panes: [{ paneId: "1", active: true }] },
+        { windowId: "w-dev", workspace: "dev", panes: [{ paneId: "20", active: true }, { paneId: "42" }] },
+      ]),
+    )
+    runMock.mockResolvedValueOnce("42 w-dev\n")
+
+    const backend = createWeztermBackend(createContext({ paneId: "20" }))
+    const emission = minimalEmission()
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(runMock).toHaveBeenNthCalledWith(
+      1,
+      ["spawn", "--window-id", "w-dev", "--cwd", "/workspace"],
       expect.objectContaining({ message: "Failed to spawn wezterm tab" }),
     )
     expect(result.focusPaneId).toBe("42")

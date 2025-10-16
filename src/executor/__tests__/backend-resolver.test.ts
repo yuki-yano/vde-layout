@@ -66,6 +66,7 @@ describe("createTerminalBackend", () => {
       dryRun: false,
       verbose: false,
       cwd: "/workspace",
+      paneId: undefined,
     }
 
     const backend = createTerminalBackend("tmux", context)
@@ -87,6 +88,7 @@ describe("createTerminalBackend", () => {
       dryRun: false,
       verbose: false,
       cwd: "/workspace",
+      paneId: undefined,
     }
 
     const backend = createTerminalBackend("wezterm", context)
