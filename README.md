@@ -1,12 +1,13 @@
 # vde-layout
 
-vde-layout is a CLI that reproduces tmux pane layouts from YAML presets. Define the panes you need once, then bring them back with a single command.
+vde-layout is a CLI that reproduces terminal layouts (tmux or WezTerm) from YAML presets. Define the panes you need once, then bring them back with a single command.
 
 ## Key Capabilities
 - Keep reusable presets for development, monitoring, reviews, and more.
 - Build nested horizontal/vertical splits with ratio-based sizing.
 - Launch commands in each pane with custom working directories, environment variables, delays, and titles.
 - Preview every tmux step in dry-run mode before you apply a preset.
+- Target tmux or WezTerm backends with the same preset definitions.
 - Switch between configuration files by flag or environment variables.
 
 ## Installation
@@ -59,13 +60,22 @@ bun add -g vde-layout
 - `vde-layout list` – Show available presets with descriptions.
 - `vde-layout dev --dry-run` – Display the tmux steps without executing them.
 - `vde-layout dev --verbose` – Print informational logs, including resolved presets and plan details.
-- `vde-layout dev --current-window` – Reuse the current tmux window after confirming that other panes can be closed.
-- `vde-layout dev --new-window` – Force creation of a new tmux window even when presets or defaults request reuse.
+- `vde-layout dev --backend wezterm` – Use the WezTerm backend (defaults to `tmux` when omitted).
+- `vde-layout dev --current-window` – Reuse the current tmux window (or active WezTerm tab) after confirming that other panes can be closed.
+- `vde-layout dev --new-window` – Force creation of a new tmux window or WezTerm tab even when presets or defaults request reuse.
 - `vde-layout --config /path/to/layout.yml` – Load presets from a specific file.
 - `vde-layout --help` – Show usage.
 - `vde-layout --version` / `vde-layout -v` – Print package version (`-V` is kept for compatibility).
 
-> **Note:** Applying a preset (without `--dry-run`) must be done inside an active tmux session.
+> **Note:** Applying a preset (without `--dry-run`) must be done inside an active tmux session when using the tmux backend. For the WezTerm backend, ensure a WezTerm window is running and focused so the CLI can discover it.
+
+## Terminal Backends
+vde-layout resolves backends in the following order: CLI flag (`--backend`), preset configuration, then defaults to `tmux`.
+
+- **tmux (default)** – Requires an active tmux session for non-dry runs. `--current-window` closes other panes in the selected window after confirmation; `--new-window` always creates a new tmux window.
+- **WezTerm** – Requires the `wezterm` CLI to be available (nightly channel recommended). Start WezTerm beforehand so at least one window exists.  
+  - `--current-window` targets the active tab and confirms before closing other panes.  
+  - `--new-window` spawns a new tab in the active window when one is available, otherwise creates a fresh window.
 
 ## Configuration Search Order
 When no `--config` flag is provided, vde-layout searches for configuration files in the following order:
@@ -147,7 +157,8 @@ presets:
 
 ## Requirements
 - Node.js 22 or higher
-- tmux 2.0 or higher
+- tmux 2.0 or higher (required for the tmux backend)
+- WezTerm nightly build with `wezterm` on `$PATH` (required for the WezTerm backend)
 
 ## Contributing
 Please submit bug reports and feature requests through [GitHub Issues](https://github.com/yuki-yano/vde-layout/issues).

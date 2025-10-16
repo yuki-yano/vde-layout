@@ -18,6 +18,10 @@ export const ErrorCodes = {
   TMUX_NOT_FOUND: "TMUX_NOT_FOUND",
   TMUX_NOT_INSTALLED: "TMUX_NOT_INSTALLED",
   UNSUPPORTED_TMUX_VERSION: "UNSUPPORTED_TMUX_VERSION",
+  BACKEND_NOT_FOUND: "BACKEND_NOT_FOUND",
+  TERMINAL_COMMAND_FAILED: "TERMINAL_COMMAND_FAILED",
+  WEZTERM_NOT_FOUND: "WEZTERM_NOT_FOUND",
+  UNSUPPORTED_WEZTERM_VERSION: "UNSUPPORTED_WEZTERM_VERSION",
   USER_CANCELLED: "USER_CANCELLED",
 } as const
 
@@ -119,6 +123,43 @@ const formatters: Record<string, (error: VDELayoutError) => string> = {
       return ""
     }
     return `\nRequired tmux version: ${requiredVersion} or higher\n`
+  },
+  [ErrorCodes.BACKEND_NOT_FOUND]: (error) => {
+    const backend = typeof error.details.backend === "string" ? error.details.backend : "terminal backend"
+    const binary = typeof error.details.binary === "string" ? error.details.binary : backend
+    const suggestion =
+      backend === "wezterm"
+        ? [
+            "",
+            `${backend} is required but not installed.`,
+            "Install wezterm using your package manager:",
+            "  - macOS: brew install --cask wezterm",
+            "  - Ubuntu/Debian: sudo apt-get install wezterm",
+            "  - Fedora: sudo dnf install wezterm",
+          ].join("\n")
+        : ""
+    return `\nMissing binary: ${binary}${suggestion}`
+  },
+  [ErrorCodes.WEZTERM_NOT_FOUND]: () => {
+    return (
+      "\nwezterm command was not found.\n" +
+      "Install wezterm using your package manager:\n" +
+      "  - macOS: brew install --cask wezterm\n" +
+      "  - Ubuntu/Debian: sudo apt-get install wezterm\n" +
+      "  - Fedora: sudo dnf install wezterm\n"
+    )
+  },
+  [ErrorCodes.UNSUPPORTED_WEZTERM_VERSION]: (error) => {
+    const requiredVersion = typeof error.details.requiredVersion === "string" ? error.details.requiredVersion : ""
+    const detected = typeof error.details.detectedVersion === "string" ? error.details.detectedVersion : ""
+    const lines = ["", "Unsupported wezterm version detected."]
+    if (detected) {
+      lines.push(`Detected version: ${detected}`)
+    }
+    if (requiredVersion) {
+      lines.push(`Required version: ${requiredVersion} or higher`)
+    }
+    return lines.join("\n")
   },
 }
 

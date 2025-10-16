@@ -116,7 +116,7 @@ describe("E2E Tests", () => {
         TMUX: "fake-tmux-session",
       })
       expect(result.code).toBe(0)
-      expect(result.stdout).toContain("Planned tmux steps")
+      expect(result.stdout).toContain("Planned terminal steps")
       expect(result.stdout).toContain("split root.0 (-h): tmux split-window")
       expect(result.stdout).toContain("select pane root.0: tmux select-pane")
     })
@@ -197,7 +197,7 @@ presets:
       })
       expect(result.code).toBe(0)
       expect(result.stdout).toContain("[DRY RUN]")
-      expect(result.stdout).toContain("Planned tmux steps")
+      expect(result.stdout).toContain("Planned terminal steps")
     })
 
     it("short options work correctly", () => {
