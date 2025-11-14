@@ -4,6 +4,7 @@ import type { WindowMode } from "../models/types.ts"
 import { ErrorCodes } from "../utils/errors.ts"
 import { createFunctionalError } from "../core/errors.ts"
 import type { ConfirmPaneClosure } from "../types/confirm-pane.ts"
+import { buildNameToRealIdMap, replaceTemplateTokens } from "../utils/template-tokens.ts"
 
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'
@@ -103,7 +104,12 @@ export const executePlan = async ({
     executedSteps += 1
   }
 
-  await executeTerminalCommands({ terminals: emission.terminals, executor, paneMap })
+  await executeTerminalCommands({
+    terminals: emission.terminals,
+    executor,
+    paneMap,
+    focusPaneVirtualId: emission.summary.focusPaneId,
+  })
 
   const finalRealFocus = resolvePaneId(paneMap, emission.summary.focusPaneId)
   if (typeof finalRealFocus === "string" && finalRealFocus.length > 0) {
@@ -199,11 +205,24 @@ const executeTerminalCommands = async ({
   terminals,
   executor,
   paneMap,
+  focusPaneVirtualId,
 }: {
   readonly terminals: ReadonlyArray<EmittedTerminal>
   readonly executor: CommandExecutor
   readonly paneMap: Map<string, string>
+  readonly focusPaneVirtualId: string
 }): Promise<void> => {
+  // Build name-to-real-ID mapping for template token replacement
+  const nameToRealIdMap = buildNameToRealIdMap(terminals, paneMap)
+
+  // Resolve focus pane real ID
+  const focusPaneRealId = ensureNonEmpty(resolvePaneId(paneMap, focusPaneVirtualId), () =>
+    raiseExecutionError("UNKNOWN_PANE", {
+      message: `Unknown focus pane: ${focusPaneVirtualId}`,
+      path: focusPaneVirtualId,
+    }),
+  )
+
   for (const terminal of terminals) {
     const realPaneId = ensureNonEmpty(resolvePaneId(paneMap, terminal.virtualPaneId), () =>
       raiseExecutionError("UNKNOWN_PANE", {
@@ -234,7 +253,27 @@ const executeTerminalCommands = async ({
     }
 
     if (typeof terminal.command === "string" && terminal.command.length > 0) {
-      await executeCommand(executor, ["send-keys", "-t", realPaneId, terminal.command, "Enter"], {
+      // Replace template tokens in the command
+      let commandWithTokensReplaced = replaceTemplateTokens({
+        command: terminal.command,
+        currentPaneRealId: realPaneId,
+        focusPaneRealId,
+        nameToRealIdMap,
+      })
+
+      // Handle ephemeral panes
+      if (terminal.ephemeral === true) {
+        const closeOnError = terminal.closeOnError === true
+        if (closeOnError) {
+          // Close pane regardless of command success/failure
+          commandWithTokensReplaced = `${commandWithTokensReplaced}; exit`
+        } else {
+          // Close pane only on success (default behavior)
+          commandWithTokensReplaced = `${commandWithTokensReplaced}; [ $? -eq 0 ] && exit`
+        }
+      }
+
+      await executeCommand(executor, ["send-keys", "-t", realPaneId, commandWithTokensReplaced, "Enter"], {
         code: ErrorCodes.TMUX_COMMAND_FAILED,
         message: `Failed to execute command for pane ${terminal.virtualPaneId}`,
         path: terminal.virtualPaneId,

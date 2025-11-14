@@ -16,6 +16,7 @@ import {
   type RunWeztermErrorContext,
   type WeztermListResult,
 } from "../../wezterm/cli.ts"
+import { buildNameToRealIdMap, replaceTemplateTokens } from "../../utils/template-tokens.ts"
 
 type PaneMap = Map<string, string>
 
@@ -545,11 +546,19 @@ const applyTerminalCommands = async ({
   terminals,
   paneMap,
   runCommand,
+  focusPaneVirtualId,
 }: {
   readonly terminals: ReadonlyArray<EmittedTerminal>
   readonly paneMap: PaneMap
   readonly runCommand: ExecuteWeztermCommand
+  readonly focusPaneVirtualId: string
 }): Promise<void> => {
+  // Build name-to-real-ID mapping for template token replacement
+  const nameToRealIdMap = buildNameToRealIdMap(terminals, paneMap)
+
+  // Resolve focus pane real ID
+  const focusPaneRealId = resolveRealPaneId(paneMap, focusPaneVirtualId, { stepId: focusPaneVirtualId })
+
   for (const terminal of terminals) {
     const realPaneId = resolveRealPaneId(paneMap, terminal.virtualPaneId, { stepId: terminal.virtualPaneId })
 
@@ -583,9 +592,29 @@ const applyTerminalCommands = async ({
     }
 
     if (typeof terminal.command === "string" && terminal.command.length > 0) {
+      // Replace template tokens in the command
+      let commandWithTokensReplaced = replaceTemplateTokens({
+        command: terminal.command,
+        currentPaneRealId: realPaneId,
+        focusPaneRealId,
+        nameToRealIdMap,
+      })
+
+      // Handle ephemeral panes
+      if (terminal.ephemeral === true) {
+        const closeOnError = terminal.closeOnError === true
+        if (closeOnError) {
+          // Close pane regardless of command success/failure
+          commandWithTokensReplaced = `${commandWithTokensReplaced}; exit`
+        } else {
+          // Close pane only on success (default behavior)
+          commandWithTokensReplaced = `${commandWithTokensReplaced}; [ $? -eq 0 ] && exit`
+        }
+      }
+
       await sendTextToPane({
         paneId: realPaneId,
-        text: terminal.command,
+        text: commandWithTokensReplaced,
         runCommand,
         context: {
           message: `Failed to execute command for pane ${terminal.virtualPaneId}`,
@@ -757,6 +786,7 @@ export const createWeztermBackend = (context: TerminalBackendContext): TerminalB
       terminals: emission.terminals,
       paneMap,
       runCommand,
+      focusPaneVirtualId: emission.summary.focusPaneId,
     })
 
     const focusVirtual = emission.summary.focusPaneId
