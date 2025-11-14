@@ -13,6 +13,8 @@ export type FunctionalTerminalPane = {
   readonly cwd?: string
   readonly env?: Readonly<Record<string, string>>
   readonly focus?: boolean
+  readonly ephemeral?: boolean
+  readonly closeOnError?: boolean
   readonly options?: Readonly<Record<string, unknown>>
 }
 
@@ -188,9 +190,11 @@ const parseTerminalPane = (node: Record<string, unknown>): FunctionalTerminalPan
   const command = typeof node.command === "string" ? node.command : undefined
   const cwd = typeof node.cwd === "string" ? node.cwd : undefined
   const focus = node.focus === true ? true : undefined
+  const ephemeral = node.ephemeral === true ? true : undefined
+  const closeOnError = node.closeOnError === true ? true : undefined
   const env = normalizeEnv(node.env)
 
-  const knownKeys = new Set(["name", "command", "cwd", "env", "focus", "options", "title", "delay"])
+  const knownKeys = new Set(["name", "command", "cwd", "env", "focus", "ephemeral", "closeOnError", "options", "title", "delay"])
   const options = collectOptions(node, knownKeys)
 
   return {
@@ -200,6 +204,8 @@ const parseTerminalPane = (node: Record<string, unknown>): FunctionalTerminalPan
     cwd,
     env,
     focus,
+    ephemeral,
+    closeOnError,
     options,
   }
 }

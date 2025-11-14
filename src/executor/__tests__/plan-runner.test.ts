@@ -222,4 +222,198 @@ describe("executePlan", () => {
       ["select-pane", "-t", "%2"],
     ])
   })
+
+  it("replaces template tokens in terminal commands", async () => {
+    const emissionWithTokens: PlanEmission = {
+      steps: [
+        {
+          id: "root:split:1",
+          kind: "split",
+          command: ["split-window", "-h", "-t", "root.0", "-p", "50"],
+          summary: "split root.0 (-h)",
+          targetPaneId: "root.0",
+          createdPaneId: "root.1",
+        },
+        {
+          id: "root.1:focus",
+          kind: "focus",
+          command: ["select-pane", "-t", "root.1"],
+          summary: "select pane root.1",
+          targetPaneId: "root.1",
+        },
+      ],
+      hash: "hash",
+      summary: {
+        focusPaneId: "root.1",
+        stepsCount: 2,
+        initialPaneId: "root.0",
+      },
+      terminals: [
+        {
+          virtualPaneId: "root.0",
+          command: 'echo "I am {{this_pane}}, focus is {{focus_pane}}"',
+          cwd: undefined,
+          env: undefined,
+          focus: false,
+          name: "left",
+        },
+        {
+          virtualPaneId: "root.1",
+          command: 'echo "I am {{this_pane}}, left pane is {{pane_id:left}}"',
+          cwd: undefined,
+          env: undefined,
+          focus: true,
+          name: "right",
+        },
+      ],
+    }
+
+    const executor = createMockExecutor()
+    const result = await executePlan({ emission: emissionWithTokens, executor, windowMode: "new-window" })
+
+    expect(result.executedSteps).toBe(2)
+    const commands = executor.getExecutedCommands()
+
+    // Check that template tokens were replaced in the commands
+    expect(commands).toContainEqual(["send-keys", "-t", "%0", 'echo "I am %0, focus is %1"', "Enter"])
+    expect(commands).toContainEqual(["send-keys", "-t", "%1", 'echo "I am %1, left pane is %0"', "Enter"])
+  })
+
+  it("handles ephemeral panes with closeOnError=false (default)", async () => {
+    const ephemeralEmission: PlanEmission = {
+      steps: [
+        {
+          id: "root:focus",
+          kind: "focus",
+          command: ["select-pane", "-t", "root.0"],
+          summary: "select pane root.0",
+          targetPaneId: "root.0",
+        },
+      ],
+      hash: "hash",
+      summary: {
+        focusPaneId: "root.0",
+        stepsCount: 1,
+        initialPaneId: "root.0",
+      },
+      terminals: [
+        {
+          virtualPaneId: "root.0",
+          command: "npm test",
+          cwd: undefined,
+          env: undefined,
+          focus: true,
+          name: "test",
+          ephemeral: true,
+          closeOnError: false, // Explicitly set to false (default)
+        },
+      ],
+    }
+
+    const executor = createMockExecutor()
+    const result = await executePlan({ emission: ephemeralEmission, executor, windowMode: "new-window" })
+
+    expect(result.executedSteps).toBe(1)
+    const commands = executor.getExecutedCommands()
+
+    // Check that the command includes exit only on success
+    expect(commands).toContainEqual(["send-keys", "-t", "%0", "npm test; [ $? -eq 0 ] && exit", "Enter"])
+  })
+
+  it("handles ephemeral panes with closeOnError=true", async () => {
+    const ephemeralEmission: PlanEmission = {
+      steps: [
+        {
+          id: "root:focus",
+          kind: "focus",
+          command: ["select-pane", "-t", "root.0"],
+          summary: "select pane root.0",
+          targetPaneId: "root.0",
+        },
+      ],
+      hash: "hash",
+      summary: {
+        focusPaneId: "root.0",
+        stepsCount: 1,
+        initialPaneId: "root.0",
+      },
+      terminals: [
+        {
+          virtualPaneId: "root.0",
+          command: "npm run build",
+          cwd: undefined,
+          env: undefined,
+          focus: true,
+          name: "build",
+          ephemeral: true,
+          closeOnError: true,
+        },
+      ],
+    }
+
+    const executor = createMockExecutor()
+    const result = await executePlan({ emission: ephemeralEmission, executor, windowMode: "new-window" })
+
+    expect(result.executedSteps).toBe(1)
+    const commands = executor.getExecutedCommands()
+
+    // Check that the command includes unconditional exit
+    expect(commands).toContainEqual(["send-keys", "-t", "%0", "npm run build; exit", "Enter"])
+  })
+
+  it("combines template tokens with ephemeral panes", async () => {
+    const combinedEmission: PlanEmission = {
+      steps: [
+        {
+          id: "root:split:1",
+          kind: "split",
+          command: ["split-window", "-h", "-t", "root.0", "-p", "50"],
+          summary: "split root.0 (-h)",
+          targetPaneId: "root.0",
+          createdPaneId: "root.1",
+        },
+        {
+          id: "root.0:focus",
+          kind: "focus",
+          command: ["select-pane", "-t", "root.0"],
+          summary: "select pane root.0",
+          targetPaneId: "root.0",
+        },
+      ],
+      hash: "hash",
+      summary: {
+        focusPaneId: "root.0",
+        stepsCount: 2,
+        initialPaneId: "root.0",
+      },
+      terminals: [
+        {
+          virtualPaneId: "root.0",
+          command: "nvim",
+          cwd: undefined,
+          env: undefined,
+          focus: true,
+          name: "editor",
+        },
+        {
+          virtualPaneId: "root.1",
+          command: 'echo "Editor is {{pane_id:editor}}"',
+          cwd: undefined,
+          env: undefined,
+          focus: false,
+          name: "watcher",
+          ephemeral: true,
+        },
+      ],
+    }
+
+    const executor = createMockExecutor()
+    const result = await executePlan({ emission: combinedEmission, executor, windowMode: "new-window" })
+
+    expect(result.executedSteps).toBe(2)
+    const commands = executor.getExecutedCommands()
+
+    // Check that template tokens are replaced AND ephemeral logic is applied
+    expect(commands).toContainEqual(["send-keys", "-t", "%1", 'echo "Editor is %0"; [ $? -eq 0 ] && exit', "Enter"])
+  })
 })
