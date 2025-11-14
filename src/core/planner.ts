@@ -13,6 +13,8 @@ type PlanTerminal = {
   readonly cwd?: string
   readonly env?: Readonly<Record<string, string>>
   readonly focus: boolean
+  readonly ephemeral?: boolean
+  readonly closeOnError?: boolean
   readonly options?: Readonly<Record<string, unknown>>
 }
 
@@ -165,6 +167,8 @@ const createTerminalNode = ({
     env: terminal.env,
     options: terminal.options,
     focus: focusOverride === true ? true : terminal.focus === true,
+    ephemeral: terminal.ephemeral,
+    closeOnError: terminal.closeOnError,
   }
 }
 

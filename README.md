@@ -112,11 +112,78 @@ layout:
       focus: true               # optional; only one pane should be true
       delay: 500                # optional; wait (ms) before running command
       title: "Server"           # optional; tmux pane title
+      ephemeral: true           # optional; close pane after command completes
+      closeOnError: false       # optional; if ephemeral, close on error (default: false)
     - type: vertical            # nested split
       ratio: [1, 1]
       panes:
         - name: "tests"
         - name: "shell"
+```
+
+### Template Tokens
+You can reference dynamically-assigned pane IDs within pane commands using template tokens. These tokens are resolved after the layout finishes splitting panes but before commands execute:
+
+- **`{{this_pane}}`** – References the current pane receiving the command
+- **`{{focus_pane}}`** – References the pane that will receive focus
+- **`{{pane_id:<name>}}`** – References a specific pane by its name
+
+Example:
+```yaml
+presets:
+  cross-pane-demo:
+    name: Cross Pane Coordination
+    layout:
+      type: vertical
+      ratio: [2, 1]
+      panes:
+        - name: editor
+          command: 'echo "Editor pane ID: {{this_pane}}"'
+          focus: true
+        - name: terminal
+          command: 'echo "I can reference the editor pane: {{pane_id:editor}}"'
+```
+
+**Common use cases:**
+- Send commands to other panes: `tmux send-keys -t {{pane_id:editor}} "npm test" Enter`
+- Display pane information for debugging: `echo "Current: {{this_pane}}, Focus: {{focus_pane}}"`
+- Coordinate tasks across multiple panes within your preset configuration
+
+### Ephemeral Panes
+Ephemeral panes automatically close after their command completes. This is useful for one-time tasks like builds, tests, or initialization scripts.
+
+```yaml
+panes:
+  - name: build
+    command: npm run build
+    ephemeral: true  # Pane closes when command finishes
+```
+
+**Error handling:**
+- By default, ephemeral panes remain open if the command fails, allowing you to inspect errors
+- Set `closeOnError: true` to close the pane regardless of success or failure
+
+```yaml
+panes:
+  - name: quick-test
+    command: npm test
+    ephemeral: true
+    closeOnError: false  # Default: stays open on error
+
+  - name: build-and-exit
+    command: npm run build
+    ephemeral: true
+    closeOnError: true  # Closes even if build fails
+```
+
+**Combining with template tokens:**
+```yaml
+panes:
+  - name: editor
+    command: nvim
+  - name: test-runner
+    command: 'tmux send-keys -t {{pane_id:editor}} ":!npm test" Enter'
+    ephemeral: true  # Run once and close
 ```
 
 ### Ratio Normalization
