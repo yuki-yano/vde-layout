@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { replaceTemplateTokens, buildNameToRealIdMap } from "../template-tokens.ts"
+import { replaceTemplateTokens, buildNameToRealIdMap, TemplateTokenError } from "../template-tokens.ts"
 import type { EmittedTerminal } from "../../core/emitter.ts"
 
 describe("replaceTemplateTokens", () => {
@@ -71,7 +71,7 @@ describe("replaceTemplateTokens", () => {
     expect(result).toBe("echo 'Hello, world!'")
   })
 
-  it("should throw error when referencing non-existent pane name", () => {
+  it("should throw TemplateTokenError when referencing non-existent pane name", () => {
     const nameToRealIdMap = new Map([["editor", "%3"]])
     expect(() => {
       replaceTemplateTokens({
@@ -80,7 +80,36 @@ describe("replaceTemplateTokens", () => {
         focusPaneRealId: "%2",
         nameToRealIdMap,
       })
-    }).toThrow(/pane name "nonexistent" not found/)
+    }).toThrow(TemplateTokenError)
+
+    try {
+      replaceTemplateTokens({
+        command: 'tmux send-keys -t {{pane_id:nonexistent}} "test"',
+        currentPaneRealId: "%1",
+        focusPaneRealId: "%2",
+        nameToRealIdMap,
+      })
+    } catch (error) {
+      expect(error).toBeInstanceOf(TemplateTokenError)
+      if (error instanceof TemplateTokenError) {
+        expect(error.tokenType).toBe("pane_id")
+        expect(error.availablePanes).toEqual(["editor"])
+        expect(error.message).toContain("nonexistent")
+      }
+    }
+  })
+
+  it("should not replace nested tokens (single-pass protection)", () => {
+    // This test ensures that already-replaced tokens are not re-processed
+    const nameToRealIdMap = new Map([["editor", "{{this_pane}}"]])
+    const result = replaceTemplateTokens({
+      command: "{{pane_id:editor}}",
+      currentPaneRealId: "%1",
+      focusPaneRealId: "%2",
+      nameToRealIdMap,
+    })
+    // Should return the literal "{{this_pane}}" value, not replace it again
+    expect(result).toBe("{{this_pane}}")
   })
 
   it("should trim whitespace in pane names", () => {

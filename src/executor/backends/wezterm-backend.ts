@@ -16,7 +16,7 @@ import {
   type RunWeztermErrorContext,
   type WeztermListResult,
 } from "../../wezterm/cli.ts"
-import { buildNameToRealIdMap, replaceTemplateTokens } from "../../utils/template-tokens.ts"
+import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../../utils/template-tokens.ts"
 
 type PaneMap = Map<string, string>
 
@@ -593,12 +593,29 @@ const applyTerminalCommands = async ({
 
     if (typeof terminal.command === "string" && terminal.command.length > 0) {
       // Replace template tokens in the command
-      let commandWithTokensReplaced = replaceTemplateTokens({
-        command: terminal.command,
-        currentPaneRealId: realPaneId,
-        focusPaneRealId,
-        nameToRealIdMap,
-      })
+      let commandWithTokensReplaced: string
+      try {
+        commandWithTokensReplaced = replaceTemplateTokens({
+          command: terminal.command,
+          currentPaneRealId: realPaneId,
+          focusPaneRealId,
+          nameToRealIdMap,
+        })
+      } catch (error) {
+        if (error instanceof TemplateTokenError) {
+          throw createFunctionalError("execution", {
+            code: "TEMPLATE_TOKEN_ERROR",
+            message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
+            path: terminal.virtualPaneId,
+            details: {
+              command: terminal.command,
+              tokenType: error.tokenType,
+              availablePanes: error.availablePanes,
+            },
+          })
+        }
+        throw error
+      }
 
       // Handle ephemeral panes
       if (terminal.ephemeral === true) {
