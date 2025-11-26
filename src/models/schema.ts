@@ -12,6 +12,8 @@ const TerminalPaneSchema = z
     delay: z.number().int().positive().optional(),
     title: z.string().optional(),
     focus: z.boolean().optional(),
+    ephemeral: z.boolean().optional(),
+    closeOnError: z.boolean().optional(),
   })
   .strict()
 

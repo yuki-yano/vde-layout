@@ -380,6 +380,64 @@ describe("createWeztermBackend", () => {
     expect(result.focusPaneId).toBe("200")
   })
 
+  it("throws when focus pane cannot be resolved even if {{focus_pane}} is not used", async () => {
+    queueListResponses(
+      makeList([{ windowId: "win", panes: [{ paneId: "5", active: true }] }]),
+      makeList([{ windowId: "win", panes: [{ paneId: "5", active: true }, { paneId: "200" }] }]),
+    )
+    runMock.mockResolvedValueOnce("200 win\n")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      summary: { ...minimalEmission().summary, focusPaneId: "root.missing" },
+      terminals: [
+        {
+          virtualPaneId: "root",
+          cwd: undefined,
+          env: undefined,
+          command: "echo hello",
+          focus: true,
+          name: "root",
+        },
+      ],
+    }
+
+    await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "INVALID_PANE",
+      path: "root.missing",
+    })
+  })
+
+  it("throws when focus pane cannot be resolved and {{focus_pane}} is used", async () => {
+    queueListResponses(
+      makeList([{ windowId: "win", panes: [{ paneId: "5", active: true }] }]),
+      makeList([{ windowId: "win", panes: [{ paneId: "5", active: true }, { paneId: "200" }] }]),
+    )
+    runMock.mockResolvedValueOnce("200 win\n")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      summary: { ...minimalEmission().summary, focusPaneId: "root.unknown" },
+      terminals: [
+        {
+          virtualPaneId: "root",
+          cwd: undefined,
+          env: undefined,
+          command: "echo {{focus_pane}}",
+          focus: true,
+          name: "root",
+        },
+      ],
+    }
+
+    await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "INVALID_PANE",
+      path: "root.unknown",
+    })
+  })
+
   it("produces dry-run steps for splits, focus, and terminal commands", () => {
     const backend = createWeztermBackend(createContext())
     const emission: PlanEmission = {

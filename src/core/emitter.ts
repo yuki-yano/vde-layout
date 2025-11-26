@@ -23,6 +23,8 @@ export type EmittedTerminal = {
   readonly env?: Readonly<Record<string, string>>
   readonly focus: boolean
   readonly name: string
+  readonly ephemeral?: boolean
+  readonly closeOnError?: boolean
 }
 
 type PlanEmissionSummary = {
@@ -111,6 +113,8 @@ const collectTerminals = (node: PlanNode): EmittedTerminal[] => {
         env: node.env,
         focus: node.focus,
         name: node.name,
+        ephemeral: node.ephemeral,
+        closeOnError: node.closeOnError,
       },
     ]
   }

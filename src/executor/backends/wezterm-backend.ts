@@ -16,6 +16,7 @@ import {
   type RunWeztermErrorContext,
   type WeztermListResult,
 } from "../../wezterm/cli.ts"
+import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../../utils/template-tokens.ts"
 
 type PaneMap = Map<string, string>
 
@@ -545,11 +546,26 @@ const applyTerminalCommands = async ({
   terminals,
   paneMap,
   runCommand,
+  focusPaneVirtualId,
 }: {
   readonly terminals: ReadonlyArray<EmittedTerminal>
   readonly paneMap: PaneMap
   readonly runCommand: ExecuteWeztermCommand
+  readonly focusPaneVirtualId: string
 }): Promise<void> => {
+  // Build name-to-real-ID mapping for template token replacement
+  const nameToRealIdMap = buildNameToRealIdMap(terminals, paneMap)
+
+  // Validate focus pane upfront so layout errors are caught even if {{focus_pane}} is unused
+  if (!paneMap.has(focusPaneVirtualId)) {
+    throw createFunctionalError("execution", {
+      code: ErrorCodes.INVALID_PANE,
+      message: `Unknown focus pane: ${focusPaneVirtualId}`,
+      path: focusPaneVirtualId,
+    })
+  }
+  const focusPaneRealId = resolveRealPaneId(paneMap, focusPaneVirtualId, { stepId: focusPaneVirtualId })
+
   for (const terminal of terminals) {
     const realPaneId = resolveRealPaneId(paneMap, terminal.virtualPaneId, { stepId: terminal.virtualPaneId })
 
@@ -583,9 +599,51 @@ const applyTerminalCommands = async ({
     }
 
     if (typeof terminal.command === "string" && terminal.command.length > 0) {
+      // Replace template tokens in the command
+      const commandUsesFocusToken = terminal.command.includes("{{focus_pane}}")
+      const focusPaneRealIdForCommand = commandUsesFocusToken
+        ? focusPaneRealId
+        : ""
+
+      let commandWithTokensReplaced: string
+      try {
+        commandWithTokensReplaced = replaceTemplateTokens({
+          command: terminal.command,
+          currentPaneRealId: realPaneId,
+          focusPaneRealId: focusPaneRealIdForCommand,
+          nameToRealIdMap,
+        })
+      } catch (error) {
+        if (error instanceof TemplateTokenError) {
+          throw createFunctionalError("execution", {
+            code: "TEMPLATE_TOKEN_ERROR",
+            message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
+            path: terminal.virtualPaneId,
+            details: {
+              command: terminal.command,
+              tokenType: error.tokenType,
+              availablePanes: error.availablePanes,
+            },
+          })
+        }
+        throw error
+      }
+
+      // Handle ephemeral panes
+      if (terminal.ephemeral === true) {
+        const closeOnError = terminal.closeOnError === true
+        if (closeOnError) {
+          // Close pane regardless of command success/failure
+          commandWithTokensReplaced = `${commandWithTokensReplaced}; exit`
+        } else {
+          // Close pane only on success (default behavior)
+          commandWithTokensReplaced = `${commandWithTokensReplaced}; [ $? -eq 0 ] && exit`
+        }
+      }
+
       await sendTextToPane({
         paneId: realPaneId,
-        text: terminal.command,
+        text: commandWithTokensReplaced,
         runCommand,
         context: {
           message: `Failed to execute command for pane ${terminal.virtualPaneId}`,
@@ -757,6 +815,7 @@ export const createWeztermBackend = (context: TerminalBackendContext): TerminalB
       terminals: emission.terminals,
       paneMap,
       runCommand,
+      focusPaneVirtualId: emission.summary.focusPaneId,
     })
 
     const focusVirtual = emission.summary.focusPaneId
