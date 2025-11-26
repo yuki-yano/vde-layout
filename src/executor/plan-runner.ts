@@ -261,9 +261,7 @@ const executeTerminalCommands = async ({
     if (typeof terminal.command === "string" && terminal.command.length > 0) {
       // Replace template tokens in the command
       const commandUsesFocusToken = terminal.command.includes("{{focus_pane}}")
-      const focusPaneRealIdForCommand = commandUsesFocusToken
-        ? focusPaneRealId
-        : ""
+      const focusPaneRealIdForCommand = commandUsesFocusToken ? focusPaneRealId : ""
 
       let commandWithTokensReplaced: string
       try {
