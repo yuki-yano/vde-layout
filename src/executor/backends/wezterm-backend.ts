@@ -556,7 +556,14 @@ const applyTerminalCommands = async ({
   // Build name-to-real-ID mapping for template token replacement
   const nameToRealIdMap = buildNameToRealIdMap(terminals, paneMap)
 
-  // Resolve focus pane real ID
+  // Validate focus pane upfront so layout errors are caught even if {{focus_pane}} is unused
+  if (!paneMap.has(focusPaneVirtualId)) {
+    throw createFunctionalError("execution", {
+      code: ErrorCodes.INVALID_PANE,
+      message: `Unknown focus pane: ${focusPaneVirtualId}`,
+      path: focusPaneVirtualId,
+    })
+  }
   const focusPaneRealId = resolveRealPaneId(paneMap, focusPaneVirtualId, { stepId: focusPaneVirtualId })
 
   for (const terminal of terminals) {
@@ -593,12 +600,17 @@ const applyTerminalCommands = async ({
 
     if (typeof terminal.command === "string" && terminal.command.length > 0) {
       // Replace template tokens in the command
+      const commandUsesFocusToken = terminal.command.includes("{{focus_pane}}")
+      const focusPaneRealIdForCommand = commandUsesFocusToken
+        ? focusPaneRealId
+        : ""
+
       let commandWithTokensReplaced: string
       try {
         commandWithTokensReplaced = replaceTemplateTokens({
           command: terminal.command,
           currentPaneRealId: realPaneId,
-          focusPaneRealId,
+          focusPaneRealId: focusPaneRealIdForCommand,
           nameToRealIdMap,
         })
       } catch (error) {

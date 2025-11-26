@@ -279,6 +279,58 @@ describe("executePlan", () => {
     expect(commands).toContainEqual(["send-keys", "-t", "%1", 'echo "I am %1, left pane is %0"', "Enter"])
   })
 
+  it("throws when focus pane cannot be resolved even if {{focus_pane}} is not used", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      summary: {
+        ...baseEmission.summary,
+        focusPaneId: "root.unknown",
+      },
+      terminals: [
+        {
+          virtualPaneId: "root.0",
+          command: "echo no focus token here",
+          cwd: undefined,
+          env: undefined,
+          focus: true,
+          name: "main",
+        },
+      ],
+    }
+
+    const executor = createMockExecutor()
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "UNKNOWN_PANE",
+      path: "root.unknown",
+    })
+  })
+
+  it("throws when focus pane cannot be resolved and {{focus_pane}} is used", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      summary: {
+        ...baseEmission.summary,
+        focusPaneId: "root.missing",
+      },
+      terminals: [
+        {
+          virtualPaneId: "root.0",
+          command: "echo focus is {{focus_pane}}",
+          cwd: undefined,
+          env: undefined,
+          focus: true,
+          name: "main",
+        },
+      ],
+    }
+
+    const executor = createMockExecutor()
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "UNKNOWN_PANE",
+      path: "root.missing",
+    })
+  })
+
   it("handles ephemeral panes with closeOnError=false (default)", async () => {
     const ephemeralEmission: PlanEmission = {
       steps: [

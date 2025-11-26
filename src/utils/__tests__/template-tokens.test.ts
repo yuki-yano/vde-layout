@@ -15,7 +15,7 @@ describe("replaceTemplateTokens", () => {
 
   it("should replace {{focus_pane}} with focus pane ID", () => {
     const result = replaceTemplateTokens({
-      command: 'tmux select-pane -t {{focus_pane}}',
+      command: "tmux select-pane -t {{focus_pane}}",
       currentPaneRealId: "%1",
       focusPaneRealId: "%2",
       nameToRealIdMap: new Map(),

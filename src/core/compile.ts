@@ -194,7 +194,18 @@ const parseTerminalPane = (node: Record<string, unknown>): FunctionalTerminalPan
   const closeOnError = node.closeOnError === true ? true : undefined
   const env = normalizeEnv(node.env)
 
-  const knownKeys = new Set(["name", "command", "cwd", "env", "focus", "ephemeral", "closeOnError", "options", "title", "delay"])
+  const knownKeys = new Set([
+    "name",
+    "command",
+    "cwd",
+    "env",
+    "focus",
+    "ephemeral",
+    "closeOnError",
+    "options",
+    "title",
+    "delay",
+  ])
   const options = collectOptions(node, knownKeys)
 
   return {

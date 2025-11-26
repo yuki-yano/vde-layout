@@ -14,16 +14,35 @@ type ReplaceTemplateTokensInput = {
   readonly nameToRealIdMap: ReadonlyMap<string, string>
 }
 
-export class TemplateTokenError extends Error {
-  constructor(
-    message: string,
-    public readonly tokenType: string,
-    public readonly availablePanes?: ReadonlyArray<string>,
-  ) {
-    super(message)
-    this.name = "TemplateTokenError"
-  }
+export type TemplateTokenError = Error & {
+  readonly tokenType: string
+  readonly availablePanes?: ReadonlyArray<string>
 }
+
+type TemplateTokenErrorConstructor = {
+  new (message: string, tokenType: string, availablePanes?: ReadonlyArray<string>): TemplateTokenError
+  (message: string, tokenType: string, availablePanes?: ReadonlyArray<string>): TemplateTokenError
+  readonly prototype: TemplateTokenError
+}
+
+const TemplateTokenErrorImpl = function TemplateTokenError(
+  message: string,
+  tokenType: string,
+  availablePanes?: ReadonlyArray<string>,
+): TemplateTokenError {
+  type MutableTemplateTokenError = Error & { tokenType: string; availablePanes?: ReadonlyArray<string> }
+  const error = new Error(message) as MutableTemplateTokenError
+  Object.setPrototypeOf(error, TemplateTokenErrorImpl.prototype)
+  error.name = "TemplateTokenError"
+  error.tokenType = tokenType
+  error.availablePanes = availablePanes
+  return error as TemplateTokenError
+}
+
+TemplateTokenErrorImpl.prototype = Object.create(Error.prototype)
+TemplateTokenErrorImpl.prototype.constructor = TemplateTokenErrorImpl
+
+export const TemplateTokenError = TemplateTokenErrorImpl as TemplateTokenErrorConstructor
 
 /**
  * Replaces template tokens in a command string with actual pane IDs.
