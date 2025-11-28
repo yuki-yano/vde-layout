@@ -30,7 +30,7 @@ describe("normalizeRatio", () => {
 
   it("should handle decimal ratios [1.5, 2.5] to [37, 63]", () => {
     const result = normalizeRatio([1.5, 2.5])
-    expect(result).toEqual([37, 63]) // 1.5/4*100=37.5 → 37, 2.5/4*100=62.5 → 63
+    expect(result).toEqual([37, 63]) // 1.5/4*100=37.5 -> 37, 2.5/4*100=62.5 -> 63
     expect(result.reduce((a, b) => a + b, 0)).toBe(100) // Adjusted to sum to 100
   })
 
@@ -56,7 +56,7 @@ describe("normalizeRatio", () => {
 
   it("should handle all zeros with three elements", () => {
     const result = normalizeRatio([0, 0, 0])
-    expect(result).toEqual([33, 33, 34]) // 100/3 = 33.33... → 33, 33, 34 (remainder distributed to last)
+    expect(result).toEqual([33, 33, 34]) // 100/3 = 33.33... -> 33, 33, 34 (remainder distributed to last)
   })
 
   it("should ensure sum is always 100 for multi-element arrays", () => {

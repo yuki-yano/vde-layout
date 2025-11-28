@@ -108,7 +108,7 @@ describe("E2E Tests", () => {
       })
       expect(result.code).toBe(0)
       expect(result.stdout).toContain("[DRY RUN] No actual commands will be executed")
-      expect(result.stdout).toContain('✓ Applied preset "dev"')
+      expect(result.stdout).toContain('Applied preset "dev"')
     })
 
     it("executes preset in verbose mode", () => {
@@ -126,7 +126,7 @@ describe("E2E Tests", () => {
         TMUX: "fake-tmux-session",
       })
       expect(result.code).toBe(0)
-      expect(result.stdout).toContain('✓ Applied preset "Development Default Layout"')
+      expect(result.stdout).toContain('Applied preset "Development Default Layout"')
     })
 
     it("throws error when specifying non-existent preset", () => {
@@ -204,10 +204,6 @@ presets:
       const versionResult = runCommand("-v")
       expect(versionResult.code).toBe(0)
       expect(versionResult.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/)
-
-      const deprecatedVersionResult = runCommand("-V")
-      expect(deprecatedVersionResult.code).toBe(0)
-      expect(deprecatedVersionResult.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/)
 
       const helpResult = runCommand("-h")
       expect(helpResult.code).toBe(0)

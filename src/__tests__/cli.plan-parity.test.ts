@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { createCli, type CLI, type FunctionalCoreBridge } from "../cli.ts"
+import { createCli, type CLI, type CoreBridge } from "../cli.ts"
 import type { Preset, PresetInfo } from "../models/types.ts"
 import type { CommandExecutor } from "../types/command-executor.ts"
 import type { PresetManager } from "../types/preset-manager.ts"
@@ -154,7 +154,7 @@ describe("CLI plan parity", () => {
 
     const presetManager = createFixturePresetManager()
 
-    const functionalCore: FunctionalCoreBridge = {
+    const coreBridge: CoreBridge = {
       compilePreset: defaultCompilePreset,
       createLayoutPlan: defaultCreateLayoutPlan,
       emitPlan: (input) => {
@@ -170,7 +170,7 @@ describe("CLI plan parity", () => {
         executor = createRecordingExecutor(dryRun)
         return executor
       },
-      functionalCore,
+      core: coreBridge,
     })
   })
 

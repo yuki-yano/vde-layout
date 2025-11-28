@@ -1,28 +1,28 @@
-import type { CompilePresetInput, CompilePresetSuccess, FunctionalPreset } from "./compile.ts"
+import type { CompilePresetInput, CompilePresetSuccess, CompiledPreset } from "./compile.ts"
 import { compilePreset } from "./compile.ts"
 import type { CreateLayoutPlanSuccess, LayoutPlan } from "./planner.ts"
 import { createLayoutPlan } from "./planner.ts"
 import type { PlanEmission } from "./emitter.ts"
 import { emitPlan } from "./emitter.ts"
 
-type CompileFunctionalCorePipelineSuccess = {
-  readonly preset: FunctionalPreset
+type CompileCorePipelineSuccess = {
+  readonly preset: CompiledPreset
   readonly plan: LayoutPlan
   readonly emission: PlanEmission
 }
 
-type FunctionalCorePipelineDependencies = {
+type CorePipelineDependencies = {
   readonly compilePreset: typeof compilePreset
   readonly createLayoutPlan: typeof createLayoutPlan
   readonly emitPlan: typeof emitPlan
 }
 
-type CompileFunctionalCorePipelineInput = CompilePresetInput
+type CompileCorePipelineInput = CompilePresetInput
 
-export const compileFunctionalCorePipeline = (
-  input: CompileFunctionalCorePipelineInput,
-  dependencies: Partial<FunctionalCorePipelineDependencies> = {},
-): CompileFunctionalCorePipelineSuccess => {
+export const compileCorePipeline = (
+  input: CompileCorePipelineInput,
+  dependencies: Partial<CorePipelineDependencies> = {},
+): CompileCorePipelineSuccess => {
   const compile = dependencies.compilePreset ?? compilePreset
   const planBuilder = dependencies.createLayoutPlan ?? createLayoutPlan
   const emitter = dependencies.emitPlan ?? emitPlan

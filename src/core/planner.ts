@@ -1,8 +1,8 @@
-import type { FunctionalLayoutNode, FunctionalPreset, FunctionalSplitPane, FunctionalTerminalPane } from "./compile.ts"
-import { createFunctionalError, type FunctionalCoreError } from "./errors.ts"
+import type { CompiledLayoutNode, CompiledPreset, CompiledSplitPane, CompiledTerminalPane } from "./compile.ts"
+import { createCoreError, type CoreError } from "./errors.ts"
 
 type CreateLayoutPlanInput = {
-  readonly preset: FunctionalPreset
+  readonly preset: CompiledPreset
 }
 
 type PlanTerminal = {
@@ -65,7 +65,7 @@ export const createLayoutPlan = ({ preset }: CreateLayoutPlanInput): CreateLayou
 
   if (focusPaneIds.length > 1) {
     throw planError("FOCUS_CONFLICT", {
-      message: "複数のペインでfocusが指定されています",
+      message: "Multiple panes specify focus=true",
       path: "preset.layout",
       source: preset.metadata.source,
       details: { focusPaneIds },
@@ -74,7 +74,7 @@ export const createLayoutPlan = ({ preset }: CreateLayoutPlanInput): CreateLayou
 
   if (terminalPaneIds.length === 0) {
     throw planError("NO_TERMINAL_PANES", {
-      message: "ターミナルペインが存在しません",
+      message: "No terminal panes are defined",
       path: "preset.layout",
       source: preset.metadata.source,
     })
@@ -98,7 +98,7 @@ type BuildResult = {
 }
 
 const buildLayoutNode = (
-  node: FunctionalLayoutNode,
+  node: CompiledLayoutNode,
   context: { readonly parentId: string; readonly path: string; readonly source: string },
 ): BuildResult => {
   if (node.kind === "split") {
@@ -113,7 +113,7 @@ const buildLayoutNode = (
 }
 
 const buildSplitNode = (
-  node: FunctionalSplitPane,
+  node: CompiledSplitPane,
   context: { readonly parentId: string; readonly path: string; readonly source: string },
 ): BuildResult => {
   const ratio = normalizeRatio(node.ratio, context)
@@ -155,7 +155,7 @@ const createTerminalNode = ({
   focusOverride,
 }: {
   readonly id: string
-  readonly terminal: FunctionalTerminalPane
+  readonly terminal: CompiledTerminalPane
   readonly focusOverride?: boolean
 }): PlanTerminal => {
   return {
@@ -193,7 +193,7 @@ const normalizeRatio = (
   const total = ratio.reduce((sum, value, index) => {
     if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
       throw planError("RATIO_INVALID_VALUE", {
-        message: "ratio の値が非負の数値ではありません",
+        message: "ratio value must be a non-negative number",
         path: `${context.path}.ratio[${index}]`,
         source: context.source,
         details: { value },
@@ -217,8 +217,8 @@ const planError = (
     readonly path?: string
     readonly details?: Readonly<Record<string, unknown>>
   },
-): FunctionalCoreError => {
-  return createFunctionalError("plan", {
+): CoreError => {
+  return createCoreError("plan", {
     code,
     message: error.message,
     source: error.source,

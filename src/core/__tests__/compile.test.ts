@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { compilePreset } from "../compile.ts"
-import { isFunctionalCoreError } from "../errors.ts"
+import { isCoreError } from "../errors.ts"
 
 describe("compilePreset", () => {
-  it("プリセットYAMLを純粋データモデルへ変換する", () => {
+  it("converts preset YAML into the data model", () => {
     const document = `
-name: sample-functional
+name: sample-core
 layout:
   type: horizontal
   ratio: [1, 2]
@@ -24,7 +24,7 @@ layout:
       source: "tests/sample.yml",
     })
 
-    expect(result.preset.name).toBe("sample-functional")
+    expect(result.preset.name).toBe("sample-core")
     expect(result.preset.version).toBe("legacy")
     expect(result.preset.metadata.source).toBe("tests/sample.yml")
 
@@ -41,7 +41,7 @@ layout:
     })
   })
 
-  it("YAML解析エラーを返す", () => {
+  it("returns a YAML parse error", () => {
     const document = "name: [unclosed"
 
     expect.assertions(2)
@@ -52,14 +52,14 @@ layout:
       })
       throw new Error("expected failure")
     } catch (error) {
-      expect(isFunctionalCoreError(error)).toBe(true)
-      if (isFunctionalCoreError(error)) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
         expect(error.code).toBe("PRESET_PARSE_ERROR")
       }
     }
   })
 
-  it("splitノードのratioとpanesの長さが一致しない場合はエラーを返す", () => {
+  it("throws when split ratio and panes length mismatch", () => {
     const document = `
 name: mismatch
 layout:
@@ -77,14 +77,14 @@ layout:
       })
       throw new Error("expected failure")
     } catch (error) {
-      expect(isFunctionalCoreError(error)).toBe(true)
-      if (isFunctionalCoreError(error)) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
         expect(error.code).toBe("LAYOUT_RATIO_MISMATCH")
       }
     }
   })
 
-  it("ターミナルペインのenvと追加オプションを正規化する", () => {
+  it("normalizes terminal env and additional options", () => {
     const document = `
 name: env-options
 layout:
@@ -121,7 +121,7 @@ layout:
     expect(terminal.focus).toBe(true)
   })
 
-  it("未知のlayoutノードはStructuredErrorを返す", () => {
+  it("throws a structured error for unknown layout nodes", () => {
     const document = `
 name: invalid-node
 layout:
@@ -139,14 +139,14 @@ layout:
       })
       throw new Error("expected failure")
     } catch (error) {
-      expect(isFunctionalCoreError(error)).toBe(true)
-      if (isFunctionalCoreError(error)) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
         expect(error.code).toBe("LAYOUT_INVALID_NODE")
       }
     }
   })
 
-  it("不正なorientationを検出する", () => {
+  it("detects invalid orientation", () => {
     const document = `
 name: invalid-orientation
 layout:
@@ -164,8 +164,8 @@ layout:
       })
       throw new Error("expected failure")
     } catch (error) {
-      expect(isFunctionalCoreError(error)).toBe(true)
-      if (isFunctionalCoreError(error)) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
         expect(error.code).toBe("LAYOUT_INVALID_ORIENTATION")
       }
     }

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
-import { compileFunctionalCorePipeline } from "../index.ts"
+import { compileCorePipeline } from "../index.ts"
 import type { CompilePresetInput, CompilePresetSuccess } from "../compile.ts"
 import { compilePreset } from "../compile.ts"
 import { createLayoutPlan } from "../planner.ts"
 import { emitPlan } from "../emitter.ts"
-import { createFunctionalError } from "../errors.ts"
-import { isFunctionalCoreError } from "../errors.ts"
+import { createCoreError } from "../errors.ts"
+import { isCoreError } from "../errors.ts"
 
 const validDocument = `
 name: pipeline
@@ -19,9 +19,9 @@ layout:
     - name: aux
 `
 
-describe("compileFunctionalCorePipeline", () => {
-  it("ドキュメントからPlan Emissionまでを生成する", () => {
-    const result = compileFunctionalCorePipeline({
+describe("compileCorePipeline", () => {
+  it("builds a plan emission from a document", () => {
+    const result = compileCorePipeline({
       document: validDocument,
       source: "tests/pipeline.yml",
     })
@@ -32,23 +32,23 @@ describe("compileFunctionalCorePipeline", () => {
     expect(result.emission.hash).toMatch(/^[a-f0-9]{64}$/)
   })
 
-  it("コンパイルエラーを伝播する", () => {
+  it("propagates compile errors", () => {
     expect.assertions(2)
     try {
-      compileFunctionalCorePipeline({
+      compileCorePipeline({
         document: "name: [unterminated",
         source: "tests/broken.yml",
       })
       throw new Error("expected failure")
     } catch (error) {
-      expect(isFunctionalCoreError(error)).toBe(true)
-      if (isFunctionalCoreError(error)) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
         expect(error.code).toBe("PRESET_PARSE_ERROR")
       }
     }
   })
 
-  it("依存を差し替えて各ステージ呼び出しを検証する", () => {
+  it("invokes each stage with injected dependencies", () => {
     const compileSpy = vi.fn<[CompilePresetInput], CompilePresetSuccess>(({ document, source }) => {
       expect(document).toBe(validDocument)
       expect(source).toBe("tests/pipeline.yml")
@@ -100,7 +100,7 @@ describe("compileFunctionalCorePipeline", () => {
       }),
     )
 
-    const result = compileFunctionalCorePipeline(
+    const result = compileCorePipeline(
       {
         document: validDocument,
         source: "tests/pipeline.yml",
@@ -118,18 +118,18 @@ describe("compileFunctionalCorePipeline", () => {
     expect(emissionSpy).toHaveBeenCalledTimes(1)
   })
 
-  it("プラン生成エラーを伝播する", () => {
+  it("propagates plan creation errors", () => {
     const planSpy = vi.fn<[{ preset: CompilePresetSuccess["preset"] }], ReturnType<typeof createLayoutPlan>>(() => {
-      throw createFunctionalError("plan", {
+      throw createCoreError("plan", {
         code: "FOCUS_CONFLICT",
-        message: "複数のペインでfocusが指定されています",
+        message: "Multiple panes specify focus=true",
         path: "preset.layout",
       })
     })
 
     expect.assertions(2)
     try {
-      compileFunctionalCorePipeline(
+      compileCorePipeline(
         {
           document: validDocument,
           source: "tests/pipeline.yml",
@@ -142,19 +142,19 @@ describe("compileFunctionalCorePipeline", () => {
       )
       throw new Error("expected failure")
     } catch (error) {
-      expect(isFunctionalCoreError(error)).toBe(true)
-      if (isFunctionalCoreError(error)) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
         expect(error.code).toBe("FOCUS_CONFLICT")
       }
     }
   })
 
-  it("Plan Emitterエラーを伝播する", () => {
+  it("propagates plan emitter errors", () => {
     const emissionSpy = vi.fn<[{ plan: ReturnType<typeof createLayoutPlan>["plan"] }], ReturnType<typeof emitPlan>>(
       () => {
-        throw createFunctionalError("emit", {
+        throw createCoreError("emit", {
           code: "LAYOUT_INVALID_NODE",
-          message: "レイアウトノードの形式が不正です",
+          message: "Layout node is invalid",
           path: "preset.layout.panes[0]",
         })
       },
@@ -162,7 +162,7 @@ describe("compileFunctionalCorePipeline", () => {
 
     expect.assertions(2)
     try {
-      compileFunctionalCorePipeline(
+      compileCorePipeline(
         {
           document: validDocument,
           source: "tests/pipeline.yml",
@@ -175,8 +175,8 @@ describe("compileFunctionalCorePipeline", () => {
       )
       throw new Error("expected failure")
     } catch (error) {
-      expect(isFunctionalCoreError(error)).toBe(true)
-      if (isFunctionalCoreError(error)) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
         expect(error.code).toBe("LAYOUT_INVALID_NODE")
       }
     }

@@ -5,7 +5,7 @@ import { isVDELayoutError, type VDELayoutError } from "../../utils/errors.ts"
 const captureValidationError = (fn: () => unknown): VDELayoutError => {
   try {
     fn()
-    expect.fail("ValidationError が投げられることを期待しました")
+    expect.fail("Expected ValidationError to be thrown")
   } catch (error) {
     expect(isVDELayoutError(error)).toBe(true)
     const vdeError = error as VDELayoutError

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { compilePreset, createLayoutPlan, emitPlan } from "../index.ts"
 
 describe("emitPlan", () => {
-  it("プランからtmuxコマンドステップを生成する", () => {
+  it("generates tmux command steps from a plan", () => {
     const document = `
 name: emit-sample
 layout:
@@ -29,7 +29,7 @@ layout:
     expect(emission.hash).toMatch(/^[a-f0-9]{64}$/)
   })
 
-  it("Planが変更されなくても成功結果を返す", () => {
+  it("returns success even when the plan is unchanged", () => {
     const document = `
 name: stable
 layout:
@@ -47,7 +47,7 @@ layout:
     expect(emission.hash).toMatch(/^[a-f0-9]{64}$/)
   })
 
-  it("単一ペインのPlanではフォーカスステップのみを生成する", () => {
+  it("generates only a focus step for a single-pane plan", () => {
     const document = `
 name: single
 `
@@ -65,7 +65,7 @@ name: single
     expect(emission.hash).toMatch(/^[a-f0-9]{64}$/)
   })
 
-  it("複数のsplitを含むPlanで割合を丸めてコマンドを生成する", () => {
+  it("rounds ratios when generating commands for multi-split plans", () => {
     const document = `
 name: nested
 layout:
@@ -102,7 +102,7 @@ layout:
     expect(emission.summary.stepsCount).toBe(emission.steps.length)
   })
 
-  it("同一Planであればhashが決定的になる", () => {
+  it("produces a deterministic hash for the same plan", () => {
     const document = `
 name: deterministic
 layout:

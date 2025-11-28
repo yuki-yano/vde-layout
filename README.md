@@ -20,7 +20,7 @@ bun add -g vde-layout
 ```
 
 ## Quick Start
-1. Create a YAML file at `~/.config/vde/layout.yml` (or any supported location; see “Configuration Search Order”).
+1. Create a YAML file at `~/.config/vde/layout.yml` (or any supported location; see "Configuration Search Order").
 2. Paste a preset definition:
    ```yaml
    presets:
@@ -56,24 +56,24 @@ bun add -g vde-layout
    ```
 
 ## CLI Commands
-- `vde-layout [preset]` – Apply the named preset. When omitted, vde-layout uses the `default` preset; if none exists it lists available presets and exits.
-- `vde-layout list` – Show available presets with descriptions.
-- `vde-layout dev --dry-run` – Display the tmux steps without executing them.
-- `vde-layout dev --verbose` – Print informational logs, including resolved presets and plan details.
-- `vde-layout dev --backend wezterm` – Use the WezTerm backend (defaults to `tmux` when omitted).
-- `vde-layout dev --current-window` – Reuse the current tmux window (or active WezTerm tab) after confirming that other panes can be closed.
-- `vde-layout dev --new-window` – Force creation of a new tmux window or WezTerm tab even when presets or defaults request reuse.
-- `vde-layout --config /path/to/layout.yml` – Load presets from a specific file.
-- `vde-layout --help` – Show usage.
-- `vde-layout --version` / `vde-layout -v` – Print package version (`-V` is kept for compatibility).
+- `vde-layout [preset]` - Apply the named preset. When omitted, vde-layout uses the `default` preset; if none exists it lists available presets and exits.
+- `vde-layout list` - Show available presets with descriptions.
+- `vde-layout dev --dry-run` - Display the tmux steps without executing them.
+- `vde-layout dev --verbose` - Print informational logs, including resolved presets and plan details.
+- `vde-layout dev --backend wezterm` - Use the WezTerm backend (defaults to `tmux` when omitted).
+- `vde-layout dev --current-window` - Reuse the current tmux window (or active WezTerm tab) after confirming that other panes can be closed.
+- `vde-layout dev --new-window` - Force creation of a new tmux window or WezTerm tab even when presets or defaults request reuse.
+- `vde-layout --config /path/to/layout.yml` - Load presets from a specific file.
+- `vde-layout --help` - Show usage.
+- `vde-layout --version` / `vde-layout -v` - Print package version.
 
 > **Note:** Applying a preset (without `--dry-run`) must be done inside an active tmux session when using the tmux backend. For the WezTerm backend, ensure a WezTerm window is running and focused so the CLI can discover it.
 
 ## Terminal Backends
 vde-layout resolves backends in the following order: CLI flag (`--backend`), preset configuration, then defaults to `tmux`.
 
-- **tmux (default)** – Requires an active tmux session for non-dry runs. `--current-window` closes other panes in the selected window after confirmation; `--new-window` always creates a new tmux window.
-- **WezTerm** – Requires the `wezterm` CLI to be available (nightly channel recommended). Start WezTerm beforehand so at least one window exists.  
+- **tmux (default)** - Requires an active tmux session for non-dry runs. `--current-window` closes other panes in the selected window after confirmation; `--new-window` always creates a new tmux window.
+- **WezTerm** - Requires the `wezterm` CLI to be available (nightly channel recommended). Start WezTerm beforehand so at least one window exists.  
   - `--current-window` targets the active tab and confirms before closing other panes.  
   - `--new-window` spawns a new tab in the active window when one is available, otherwise creates a fresh window.
 
@@ -124,9 +124,9 @@ layout:
 ### Template Tokens
 You can reference dynamically-assigned pane IDs within pane commands using template tokens. These tokens are resolved after the layout finishes splitting panes but before commands execute:
 
-- **`{{this_pane}}`** – References the current pane receiving the command
-- **`{{focus_pane}}`** – References the pane that will receive focus
-- **`{{pane_id:<name>}}`** – References a specific pane by its name
+- **`{{this_pane}}`** - References the current pane receiving the command
+- **`{{focus_pane}}`** - References the pane that will receive focus
+- **`{{pane_id:<name>}}`** - References a specific pane by its name
 
 Example:
 ```yaml
@@ -188,9 +188,9 @@ panes:
 
 ### Ratio Normalization
 Ratios can be any set of positive integers. vde-layout normalizes them to percentages:
-- `[1, 1]` → `[50, 50]`
-- `[2, 3]` → `[40, 60]`
-- `[1, 2, 1]` → `[25, 50, 25]`
+- `[1, 1]` -> `[50, 50]`
+- `[2, 3]` -> `[40, 60]`
+- `[1, 2, 1]` -> `[25, 50, 25]`
 
 ### Single Command Presets
 If you omit `layout`, the preset runs a single command in one pane (or opens the default shell when `command` is omitted):
@@ -216,11 +216,11 @@ presets:
 - If an error occurs (for example, a tmux command fails or the configuration is invalid), vde-layout returns a structured error with the failing step and guidance.
 
 ## Environment Variables
-- `VDE_CONFIG_PATH` – Override the base directory for configuration files.
-- `XDG_CONFIG_HOME` – XDG base directory root; defaults to `~/.config` when unset.
-- `VDE_DEBUG=true` – Enable debug-level logs (includes stack traces).
-- `VDE_VERBOSE=true` – Enable info-level logs without full debug output.
-- `TMUX` – Automatically set by tmux. vde-layout checks this to ensure execution happens inside a session.
+- `VDE_CONFIG_PATH` - Override the base directory for configuration files.
+- `XDG_CONFIG_HOME` - XDG base directory root; defaults to `~/.config` when unset.
+- `VDE_DEBUG=true` - Enable debug-level logs (includes stack traces).
+- `VDE_VERBOSE=true` - Enable info-level logs without full debug output.
+- `TMUX` - Automatically set by tmux. vde-layout checks this to ensure execution happens inside a session.
 
 ## Requirements
 - Node.js 22 or higher

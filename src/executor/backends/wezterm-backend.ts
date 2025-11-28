@@ -1,5 +1,5 @@
 import type { PlanEmission, CommandStep, EmittedTerminal } from "../../core/emitter.ts"
-import { createFunctionalError } from "../../core/errors.ts"
+import { createCoreError } from "../../core/errors.ts"
 import { ErrorCodes } from "../../utils/errors.ts"
 import type {
   ApplyPlanParameters,
@@ -37,7 +37,7 @@ type CurrentWindowResolution = InitialPaneResolution & {
 const ensureVirtualPaneId = (emission: PlanEmission): string => {
   const { initialPaneId } = emission.summary
   if (typeof initialPaneId !== "string" || initialPaneId.length === 0) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.INVALID_PANE,
       message: "Plan emission is missing initial pane metadata",
       path: "plan.initialPaneId",
@@ -84,7 +84,7 @@ const resolveRealPaneId = (paneMap: PaneMap, virtualId: string, context: { reado
     }
   }
 
-  throw createFunctionalError("execution", {
+  throw createCoreError("execution", {
     code: ErrorCodes.INVALID_PANE,
     message: `Unknown wezterm pane mapping for ${virtualId}`,
     path: context.stepId,
@@ -181,7 +181,7 @@ const resolveCurrentWindow = async (context: {
     context.list.windows[0]
 
   if (!activeWindow) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.TERMINAL_COMMAND_FAILED,
       message: "No active wezterm window detected",
       details: { hint: "Launch wezterm and ensure a window is focused, or run with --new-window." },
@@ -196,7 +196,7 @@ const resolveCurrentWindow = async (context: {
     activeWindow.tabs[0]
 
   if (!activeTab) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.TERMINAL_COMMAND_FAILED,
       message: "No active wezterm tab detected",
       path: activeWindow.windowId,
@@ -210,7 +210,7 @@ const resolveCurrentWindow = async (context: {
     activeTab.panes[0]
 
   if (!activePane) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.TERMINAL_COMMAND_FAILED,
       message: "No active wezterm pane detected",
       path: activeTab.tabId,
@@ -227,7 +227,7 @@ const resolveCurrentWindow = async (context: {
     }
 
     if (confirmed !== true) {
-      throw createFunctionalError("execution", {
+      throw createCoreError("execution", {
         code: ErrorCodes.USER_CANCELLED,
         message: "Aborted layout application for current wezterm window",
         path: activePane.paneId,
@@ -330,7 +330,7 @@ const waitForPaneRegistration = async ({
     }
   }
 
-  throw createFunctionalError("execution", {
+  throw createCoreError("execution", {
     code: ErrorCodes.TERMINAL_COMMAND_FAILED,
     message: "Unable to locate spawned wezterm window",
     details: { paneId, hint: "Verify that wezterm is running and the CLI client can connect." },
@@ -388,7 +388,7 @@ const resolveInitialPane = async ({
     })
     const paneId = extractSpawnPaneId(spawnOutput)
     if (paneId.length === 0) {
-      throw createFunctionalError("execution", {
+      throw createCoreError("execution", {
         code: ErrorCodes.TERMINAL_COMMAND_FAILED,
         message: "wezterm spawn did not return a pane id",
         details: { stdout: spawnOutput },
@@ -414,7 +414,7 @@ const resolveInitialPane = async ({
   })
   const paneId = extractSpawnPaneId(spawnOutput)
   if (paneId.length === 0) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.TERMINAL_COMMAND_FAILED,
       message: "wezterm spawn did not return a pane id",
       details: { stdout: spawnOutput },
@@ -431,7 +431,7 @@ const resolveInitialPane = async ({
 const collectPaneIdsForWindow = (list: WeztermListResult, windowId: string): Set<string> => {
   const targetWindow = list.windows.find((window) => window.windowId === windowId)
   if (!targetWindow) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.TERMINAL_COMMAND_FAILED,
       message: `Wezterm window ${windowId} not found`,
       details: { windowId },
@@ -505,7 +505,7 @@ const applyFocusStep = async ({
 }): Promise<void> => {
   const targetVirtualId = step.targetPaneId
   if (typeof targetVirtualId !== "string" || targetVirtualId.length === 0) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.INVALID_PANE,
       message: "Focus step missing target pane metadata",
       path: step.id,
@@ -558,7 +558,7 @@ const applyTerminalCommands = async ({
 
   // Validate focus pane upfront so layout errors are caught even if {{focus_pane}} is unused
   if (!paneMap.has(focusPaneVirtualId)) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.INVALID_PANE,
       message: `Unknown focus pane: ${focusPaneVirtualId}`,
       path: focusPaneVirtualId,
@@ -613,7 +613,7 @@ const applyTerminalCommands = async ({
         })
       } catch (error) {
         if (error instanceof TemplateTokenError) {
-          throw createFunctionalError("execution", {
+          throw createCoreError("execution", {
             code: "TEMPLATE_TOKEN_ERROR",
             message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
             path: terminal.virtualPaneId,
@@ -670,7 +670,7 @@ const applySplitStep = async ({
 }): Promise<void> => {
   const targetVirtualId = step.targetPaneId
   if (typeof targetVirtualId !== "string" || targetVirtualId.length === 0) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.INVALID_PANE,
       message: "Split step missing target pane metadata",
       path: step.id,
@@ -698,7 +698,7 @@ const applySplitStep = async ({
 
   const newPaneId = findNewPaneId(beforePaneIds, afterPaneIds)
   if (typeof newPaneId !== "string" || newPaneId.length === 0) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.TERMINAL_COMMAND_FAILED,
       message: "Unable to determine newly created wezterm pane",
       path: step.id,

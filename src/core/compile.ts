@@ -1,12 +1,12 @@
 import { parse } from "yaml"
-import { createFunctionalError, type FunctionalCoreError } from "./errors.ts"
+import { createCoreError, type CoreError } from "./errors.ts"
 
 export type CompilePresetInput = {
   readonly document: string
   readonly source: string
 }
 
-export type FunctionalTerminalPane = {
+export type CompiledTerminalPane = {
   readonly kind: "terminal"
   readonly name: string
   readonly command?: string
@@ -18,29 +18,29 @@ export type FunctionalTerminalPane = {
   readonly options?: Readonly<Record<string, unknown>>
 }
 
-export type FunctionalSplitPane = {
+export type CompiledSplitPane = {
   readonly kind: "split"
   readonly orientation: "horizontal" | "vertical"
   readonly ratio: ReadonlyArray<number>
-  readonly panes: ReadonlyArray<FunctionalLayoutNode>
+  readonly panes: ReadonlyArray<CompiledLayoutNode>
 }
 
-export type FunctionalLayoutNode = FunctionalTerminalPane | FunctionalSplitPane
+export type CompiledLayoutNode = CompiledTerminalPane | CompiledSplitPane
 
-type FunctionalPresetMetadata = {
+type CompiledPresetMetadata = {
   readonly source: string
 }
 
-export type FunctionalPreset = {
+export type CompiledPreset = {
   readonly name: string
   readonly version: string
   readonly command?: string
-  readonly layout?: FunctionalLayoutNode
-  readonly metadata: FunctionalPresetMetadata
+  readonly layout?: CompiledLayoutNode
+  readonly metadata: CompiledPresetMetadata
 }
 
 export type CompilePresetSuccess = {
-  readonly preset: FunctionalPreset
+  readonly preset: CompiledPreset
 }
 
 export const compilePreset = ({ document, source }: CompilePresetInput): CompilePresetSuccess => {
@@ -50,7 +50,7 @@ export const compilePreset = ({ document, source }: CompilePresetInput): Compile
   } catch (error) {
     throw compileError("PRESET_PARSE_ERROR", {
       source,
-      message: `YAMLの解析に失敗しました: ${(error as Error).message}`,
+      message: `Failed to parse YAML: ${(error as Error).message}`,
       details: {
         reason: error instanceof Error ? error.message : String(error),
       },
@@ -60,7 +60,7 @@ export const compilePreset = ({ document, source }: CompilePresetInput): Compile
   if (!isRecord(parsed)) {
     throw compileError("PRESET_INVALID_DOCUMENT", {
       source,
-      message: "プリセット定義がオブジェクトではありません",
+      message: "Preset definition is not an object",
       path: "preset",
     })
   }
@@ -86,7 +86,7 @@ export const compilePreset = ({ document, source }: CompilePresetInput): Compile
 const parseLayoutNode = (
   node: unknown,
   context: { readonly source: string; readonly path: string },
-): FunctionalLayoutNode | null => {
+): CompiledLayoutNode | null => {
   if (node === undefined || node === null) {
     return null
   }
@@ -94,7 +94,7 @@ const parseLayoutNode = (
   if (!isRecord(node)) {
     throw compileError("LAYOUT_INVALID_NODE", {
       source: context.source,
-      message: "レイアウトノードの形式が不正です",
+      message: "Layout node is invalid",
       path: context.path,
       details: { node },
     })
@@ -110,7 +110,7 @@ const parseLayoutNode = (
 
   throw compileError("LAYOUT_INVALID_NODE", {
     source: context.source,
-    message: "レイアウトノードの形式が不正です",
+    message: "Layout node is invalid",
     path: context.path,
     details: { node },
   })
@@ -119,12 +119,12 @@ const parseLayoutNode = (
 const parseSplitPane = (
   node: Record<string, unknown>,
   context: { readonly source: string; readonly path: string },
-): FunctionalSplitPane => {
+): CompiledSplitPane => {
   const orientation = node.type
   if (orientation !== "horizontal" && orientation !== "vertical") {
     throw compileError("LAYOUT_INVALID_ORIENTATION", {
       source: context.source,
-      message: "layout.type は horizontal か vertical である必要があります",
+      message: "layout.type must be horizontal or vertical",
       path: `${context.path}.type`,
       details: { type: orientation },
     })
@@ -133,7 +133,7 @@ const parseSplitPane = (
   if (!Array.isArray(node.panes) || node.panes.length === 0) {
     throw compileError("LAYOUT_PANES_MISSING", {
       source: context.source,
-      message: "panes 配列が存在しません",
+      message: "panes array is missing",
       path: `${context.path}.panes`,
     })
   }
@@ -141,7 +141,7 @@ const parseSplitPane = (
   if (!Array.isArray(node.ratio) || node.ratio.length === 0) {
     throw compileError("LAYOUT_RATIO_MISSING", {
       source: context.source,
-      message: "ratio 配列が存在しません",
+      message: "ratio array is missing",
       path: `${context.path}.ratio`,
     })
   }
@@ -149,7 +149,7 @@ const parseSplitPane = (
   if (node.ratio.length !== node.panes.length) {
     throw compileError("LAYOUT_RATIO_MISMATCH", {
       source: context.source,
-      message: "ratio 配列と panes 配列の長さが一致しません",
+      message: "ratio and panes arrays must have the same length",
       path: context.path,
       details: {
         ratioLength: node.ratio.length,
@@ -162,7 +162,7 @@ const parseSplitPane = (
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
       throw compileError("RATIO_INVALID_VALUE", {
         source: context.source,
-        message: "ratio の値が正の数値ではありません",
+        message: "ratio value must be a positive number",
         path: `${context.path}.ratio[${index}]`,
         details: { value },
       })
@@ -181,11 +181,11 @@ const parseSplitPane = (
     kind: "split",
     orientation,
     ratio,
-    panes: panes.filter((pane): pane is FunctionalLayoutNode => pane !== null),
+    panes: panes.filter((pane): pane is CompiledLayoutNode => pane !== null),
   }
 }
 
-const parseTerminalPane = (node: Record<string, unknown>): FunctionalTerminalPane => {
+const parseTerminalPane = (node: Record<string, unknown>): CompiledTerminalPane => {
   const name = typeof node.name === "string" ? node.name : ""
   const command = typeof node.command === "string" ? node.command : undefined
   const cwd = typeof node.cwd === "string" ? node.cwd : undefined
@@ -263,8 +263,8 @@ const compileError = (
     readonly path?: string
     readonly details?: Readonly<Record<string, unknown>>
   },
-): FunctionalCoreError => {
-  return createFunctionalError("compile", {
+): CoreError => {
+  return createCoreError("compile", {
     code,
     message: error.message,
     source: error.source,

@@ -1,6 +1,6 @@
 import { execa } from "execa"
 import { createEnvironmentError, ErrorCodes } from "../utils/errors.ts"
-import { createFunctionalError } from "../core/errors.ts"
+import { createCoreError } from "../core/errors.ts"
 
 const WEZTERM_BINARY = "wezterm"
 const MINIMUM_VERSION = "20220624-141144-bd1b7c5d"
@@ -85,7 +85,7 @@ export const runWeztermCli = async (args: string[], errorContext: RunWeztermErro
     return result.stdout
   } catch (error) {
     const execaError = error as ExecaLikeError
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.TERMINAL_COMMAND_FAILED,
       message: errorContext.message,
       path: errorContext.path,
@@ -104,7 +104,7 @@ export const listWeztermWindows = async (): Promise<WeztermListResult> => {
   const stdout = await runWeztermCli(["list", "--format", "json"], { message: "Failed to list wezterm panes" })
   const result = parseListResult(stdout)
   if (result === undefined) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.TERMINAL_COMMAND_FAILED,
       message: "Invalid wezterm list output",
       details: { stdout },

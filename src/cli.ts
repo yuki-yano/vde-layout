@@ -14,41 +14,20 @@ import { resolveTerminalBackendKind } from "./executor/backend-resolver.ts"
 import type { DryRunStep, TerminalBackendKind } from "./executor/terminal-backend.ts"
 import { createLogger, LogLevel, type Logger } from "./utils/logger.ts"
 import {
-  runDiagnostics,
   compilePreset as defaultCompilePreset,
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
 } from "./core/index.ts"
 import type {
-  DiagnosticsReport,
-  DiagnosticsSeverity,
   CompilePresetInput,
   PlanEmission,
-  FunctionalCoreError,
+  CoreError,
   CompilePresetSuccess,
   CreateLayoutPlanSuccess,
 } from "./core/index.ts"
-import { isFunctionalCoreError } from "./core/index.ts"
+import { isCoreError } from "./core/index.ts"
 
-const KNOWN_ISSUES: ReadonlyArray<string> = [
-  "LayoutEngineがtmux依存とI/Oを同一クラスで扱っている",
-  "dry-run実行と本番適用でPlan構造が共有されていない",
-  "Loggerが境界層とFunctional Coreの責務を混在させている",
-]
-
-const formatSeverityTag = (severity: DiagnosticsSeverity): string => {
-  switch (severity) {
-    case "high":
-      return chalk.red("[HIGH]")
-    case "medium":
-      return chalk.yellow("[MEDIUM]")
-    case "low":
-    default:
-      return chalk.blue("[LOW]")
-  }
-}
-
-export type FunctionalCoreBridge = {
+export type CoreBridge = {
   readonly compilePreset: (input: CompilePresetInput) => ReturnType<typeof defaultCompilePreset>
   readonly createLayoutPlan: (
     input: Parameters<typeof defaultCreateLayoutPlan>[0],
@@ -59,7 +38,7 @@ export type FunctionalCoreBridge = {
 export type CLIOptions = {
   readonly presetManager?: PresetManager
   readonly createCommandExecutor?: (options: { verbose: boolean; dryRun: boolean }) => CommandExecutor
-  readonly functionalCore?: FunctionalCoreBridge
+  readonly core?: CoreBridge
 }
 
 export type CLI = {
@@ -77,8 +56,8 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       return createRealExecutor({ verbose: opts.verbose })
     })
 
-  const functionalCore: FunctionalCoreBridge =
-    options.functionalCore ??
+  const core: CoreBridge =
+    options.core ??
     ({
       compilePreset: defaultCompilePreset,
       createLayoutPlan: defaultCreateLayoutPlan,
@@ -89,38 +68,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
   const require = createRequire(import.meta.url)
   const { version } = require("../package.json") as { version: string }
   let logger: Logger = createLogger()
-
-  const renderDiagnosticsReport = (report: DiagnosticsReport): void => {
-    console.log(chalk.bold("\nFunctional Core Diagnostics\n"))
-
-    if (report.backlog.length > 0) {
-      console.log(chalk.bold("改善バックログ"))
-      report.backlog.forEach((item, index) => {
-        const prefix = `${index + 1}. ${formatSeverityTag(item.severity)}`
-        console.log(`${prefix} ${item.summary}`)
-        item.actions.forEach((action) => {
-          console.log(`   - ${action}`)
-        })
-      })
-      console.log("")
-    }
-
-    if (report.findings.length > 0) {
-      console.log(chalk.bold("診断結果"))
-      report.findings.forEach((finding) => {
-        console.log(`${formatSeverityTag(finding.severity)} ${finding.path} :: ${finding.description}`)
-      })
-      console.log("")
-    }
-
-    if (report.nextSteps.length > 0) {
-      console.log(chalk.bold("次のアクション"))
-      report.nextSteps.forEach((step) => {
-        console.log(` - ${step}`)
-      })
-      console.log("")
-    }
-  }
 
   const renderDryRun = (steps: ReadonlyArray<DryRunStep>): void => {
     console.log(chalk.bold("\nPlanned terminal steps (dry-run)"))
@@ -170,7 +117,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     return undefined
   }
 
-  const handleFunctionalError = (error: FunctionalCoreError): never => {
+  const handleCoreError = (error: CoreError): never => {
     const header = [`[${error.kind}]`, `[${error.code}]`]
     if (typeof error.path === "string" && error.path.length > 0) {
       header.push(`[${error.path}]`)
@@ -214,8 +161,8 @@ export const createCli = (options: CLIOptions = {}): CLI => {
   }
 
   const handlePipelineFailure = (error: unknown): never => {
-    if (isFunctionalCoreError(error)) {
-      return handleFunctionalError(error)
+    if (isCoreError(error)) {
+      return handleCoreError(error)
     }
     return handleError(error)
   }
@@ -240,27 +187,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         console.log(`  ${chalk.cyan(paddedKey)} ${description}`)
       })
 
-      process.exit(0)
-    } catch (error) {
-      return handleError(error)
-    }
-  }
-
-  const diagnosePreset = async (presetName: string | undefined): Promise<never> => {
-    try {
-      await presetManager.loadConfig()
-      const preset =
-        typeof presetName === "string" && presetName.length > 0
-          ? presetManager.getPreset(presetName)
-          : presetManager.getDefaultPreset()
-
-      const presetDocument = toYAML(preset ?? {})
-      const report = runDiagnostics({
-        presetDocument,
-        knownIssues: KNOWN_ISSUES,
-      })
-
-      renderDiagnosticsReport(report)
       process.exit(0)
     } catch (error) {
       return handleError(error)
@@ -331,12 +257,12 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       let emission: PlanEmission
 
       try {
-        compileResult = functionalCore.compilePreset({
+        compileResult = core.compilePreset({
           document: buildPresetDocument(preset, presetName),
           source: buildPresetSource(presetName),
         })
-        planResult = functionalCore.createLayoutPlan({ preset: compileResult.preset })
-        emission = functionalCore.emitPlan({ plan: planResult.plan })
+        planResult = core.createLayoutPlan({ preset: compileResult.preset })
+        emission = core.emitPlan({ plan: planResult.plan })
       } catch (error) {
         return handlePipelineFailure(error)
       }
@@ -357,7 +283,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         }
       }
 
-      logger.success(`✓ Applied preset "${preset.name}"`)
+      logger.success(`Applied preset "${preset.name}"`)
       process.exit(0)
     } catch (error) {
       return handleError(error)
@@ -372,7 +298,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       .helpOption("-h, --help", "Show help")
 
     program.option("--verbose", "Show detailed logs", false)
-    program.option("-V", "Show version (deprecated; use -v)")
     program.option("--dry-run", "Display commands without executing", false)
     program.option("--backend <backend>", "Select terminal backend (tmux or wezterm)")
     program.option("--config <path>", "Path to configuration file")
@@ -384,14 +309,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       .description("List available presets")
       .action(async () => {
         await listPresets()
-      })
-
-    program
-      .command("diagnose")
-      .description("Functional Coreリライトに向けた診断レポートを表示する")
-      .argument("[preset]", 'Preset name (defaults to "default" preset when omitted)')
-      .action(async (presetName?: string) => {
-        await diagnosePreset(presetName)
       })
 
     program
@@ -417,11 +334,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
   setupProgram()
 
   const run = async (args: string[] = process.argv.slice(2)): Promise<void> => {
-    if (args.includes("-V")) {
-      console.log(version)
-      return
-    }
-
     const requestedVersion = args.some((arg) => arg === "--version" || arg === "-v")
     const requestedHelp = args.includes("--help") || args.includes("-h")
     try {

@@ -4,7 +4,7 @@ vi.mock("../executor/backend-factory.ts", () => ({
   createTerminalBackend: vi.fn(),
 }))
 
-import { createCli, type FunctionalCoreBridge } from "../cli.ts"
+import { createCli, type CoreBridge } from "../cli.ts"
 import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock.ts"
 import { createTerminalBackend } from "../executor/backend-factory.ts"
 import type { TerminalBackend } from "../executor/terminal-backend.ts"
@@ -13,15 +13,15 @@ import type {
   CompilePresetInput,
   CompilePresetSuccess,
   CreateLayoutPlanSuccess,
-  FunctionalPreset,
+  CompiledPreset,
   LayoutPlan,
   PlanEmission,
 } from "../core/index.ts"
-import { createFunctionalError } from "../core/errors.ts"
+import { createCoreError } from "../core/errors.ts"
 
 const createTerminalBackendMock = vi.mocked(createTerminalBackend)
 
-const sampleFunctionalPreset: FunctionalPreset = {
+const samplePreset: CompiledPreset = {
   name: "development",
   version: "legacy",
   metadata: { source: "preset://dev" },
@@ -113,7 +113,7 @@ describe("CLI WezTerm backend integration", () => {
   let compilePresetMock: ReturnType<typeof vi.fn>
   let createLayoutPlanMock: ReturnType<typeof vi.fn>
   let emitPlanMock: ReturnType<typeof vi.fn>
-  let functionalCore: FunctionalCoreBridge
+  let coreBridge: CoreBridge
   let exitCode: number | undefined
   let processExitCalled = false
   let originalExit: typeof process.exit
@@ -123,14 +123,14 @@ describe("CLI WezTerm backend integration", () => {
   beforeEach(() => {
     createTerminalBackendMock.mockReset()
     mockPresetManager = createMockPresetManager()
-    compilePresetMock = vi.fn((): CompilePresetSuccess => ({ preset: sampleFunctionalPreset }))
+    compilePresetMock = vi.fn((): CompilePresetSuccess => ({ preset: samplePreset }))
     createLayoutPlanMock = vi.fn((): CreateLayoutPlanSuccess => ({ plan: samplePlan }))
     emitPlanMock = vi.fn(() => sampleEmission)
 
-    functionalCore = {
-      compilePreset: compilePresetMock as unknown as FunctionalCoreBridge["compilePreset"],
-      createLayoutPlan: createLayoutPlanMock as unknown as FunctionalCoreBridge["createLayoutPlan"],
-      emitPlan: emitPlanMock as unknown as FunctionalCoreBridge["emitPlan"],
+    coreBridge = {
+      compilePreset: compilePresetMock as unknown as CoreBridge["compilePreset"],
+      createLayoutPlan: createLayoutPlanMock as unknown as CoreBridge["createLayoutPlan"],
+      emitPlan: emitPlanMock as unknown as CoreBridge["emitPlan"],
     }
 
     const createCommandExecutor = vi.fn(
@@ -145,7 +145,7 @@ describe("CLI WezTerm backend integration", () => {
     cli = createCli({
       presetManager: mockPresetManager,
       createCommandExecutor,
-      functionalCore,
+      core: coreBridge,
     })
 
     originalExit = process.exit
@@ -223,7 +223,7 @@ describe("CLI WezTerm backend integration", () => {
   it("propagates wezterm backend failures with detailed error output", async () => {
     const verifyEnvironment = vi.fn(async () => {})
     const getDryRunSteps = vi.fn(() => [])
-    const failure = createFunctionalError("execution", {
+    const failure = createCoreError("execution", {
       code: "TERMINAL_COMMAND_FAILED",
       message: "WezTerm command failed",
       path: "root",

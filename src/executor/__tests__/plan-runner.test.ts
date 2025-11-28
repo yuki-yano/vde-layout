@@ -105,7 +105,7 @@ describe("executePlan", () => {
     expect(commands[0]).toEqual(["new-window", "-P", "-F", "#{pane_id}", "-n", "dev layout"])
   })
 
-  it("throws FunctionalCoreError when tmux command fails", async () => {
+  it("throws CoreError when tmux command fails", async () => {
     const executor = {
       execute: vi
         .fn()

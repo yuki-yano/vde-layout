@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
 import packageJson from "../../package.json"
-import { createCli, type CLI, type FunctionalCoreBridge } from "../cli.ts"
+import { createCli, type CLI, type CoreBridge } from "../cli.ts"
 import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock.ts"
 import type { CommandExecutor } from "../types/command-executor.ts"
 import type {
@@ -8,7 +8,7 @@ import type {
   CompilePresetSuccess,
   CreateLayoutPlanSuccess,
   PlanEmission,
-  FunctionalPreset,
+  CompiledPreset,
   PlanNode,
   LayoutPlan,
 } from "../core/index.ts"
@@ -87,7 +87,7 @@ describe("CLI", () => {
   let errorOutput: string[] = []
   let processExitCalled = false
 
-  const sampleFunctionalPreset: FunctionalPreset = {
+  const samplePreset: CompiledPreset = {
     name: "development",
     version: "legacy",
     metadata: { source: "preset://dev" },
@@ -182,14 +182,14 @@ describe("CLI", () => {
   let compilePresetMock: ReturnType<typeof vi.fn>
   let createLayoutPlanMock: ReturnType<typeof vi.fn>
   let emitPlanMock: ReturnType<typeof vi.fn>
-  let functionalCore: FunctionalCoreBridge
+  let coreBridge: CoreBridge
 
   beforeEach(() => {
     mockPresetManager = createMockPresetManager()
     originalTMUX = process.env.TMUX
     process.env.TMUX = "/tmp/tmux-1000/default,1234,0"
 
-    compilePresetMock = vi.fn((): CompilePresetSuccess => ({ preset: sampleFunctionalPreset }))
+    compilePresetMock = vi.fn((): CompilePresetSuccess => ({ preset: samplePreset }))
     createLayoutPlanMock = vi.fn((): CreateLayoutPlanSuccess => ({ plan: samplePlan }))
     emitPlanMock = vi.fn(() => sampleEmission)
 
@@ -198,16 +198,16 @@ describe("CLI", () => {
       return recordingExecutor
     })
 
-    functionalCore = {
-      compilePreset: compilePresetMock as unknown as FunctionalCoreBridge["compilePreset"],
-      createLayoutPlan: createLayoutPlanMock as unknown as FunctionalCoreBridge["createLayoutPlan"],
-      emitPlan: emitPlanMock as unknown as FunctionalCoreBridge["emitPlan"],
+    coreBridge = {
+      compilePreset: compilePresetMock as unknown as CoreBridge["compilePreset"],
+      createLayoutPlan: createLayoutPlanMock as unknown as CoreBridge["createLayoutPlan"],
+      emitPlan: emitPlanMock as unknown as CoreBridge["emitPlan"],
     }
 
     cli = createCli({
       presetManager: mockPresetManager,
       createCommandExecutor,
-      functionalCore,
+      core: coreBridge,
     })
 
     originalExit = process.exit
@@ -245,7 +245,7 @@ describe("CLI", () => {
     vi.restoreAllMocks()
   })
 
-  const expectFunctionalPipelineCalled = () => {
+  const expectCorePipelineCalled = () => {
     expect(compilePresetMock).toHaveBeenCalled()
     expect(createLayoutPlanMock).toHaveBeenCalled()
     expect(emitPlanMock).toHaveBeenCalled()
@@ -254,11 +254,6 @@ describe("CLI", () => {
   describe("basic commands", () => {
     it("should display version", async () => {
       await cli.run(["--version"])
-      expect(processExitCalled || consoleOutput.some((line) => line.includes(packageVersion))).toBe(true)
-    })
-
-    it("should display version with -V", async () => {
-      await cli.run(["-V"])
       expect(processExitCalled || consoleOutput.some((line) => line.includes(packageVersion))).toBe(true)
     })
 
@@ -317,7 +312,7 @@ describe("CLI", () => {
     it("should execute named preset", async () => {
       await cli.run(["dev"])
 
-      expectFunctionalPipelineCalled()
+      expectCorePipelineCalled()
       expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", 'cd "\/repo"', "Enter"])
       expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", 'export NODE_ENV="test"', "Enter"])
       expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", "nvim", "Enter"])
@@ -329,7 +324,7 @@ describe("CLI", () => {
     it("should execute default preset when no name provided", async () => {
       await cli.run([])
 
-      expectFunctionalPipelineCalled()
+      expectCorePipelineCalled()
       expect(recordingExecutor.commands.some((command) => command.includes("nvim"))).toBe(true)
       expect(exitCode).toBe(0)
     })
@@ -355,7 +350,7 @@ describe("CLI", () => {
     it("should accept verbose option", async () => {
       await cli.run(["dev", "--verbose"])
 
-      expectFunctionalPipelineCalled()
+      expectCorePipelineCalled()
       expect(recordingExecutor.commands.some((command) => command.includes("nvim"))).toBe(true)
       expect(exitCode).toBe(0)
     })
@@ -363,7 +358,7 @@ describe("CLI", () => {
     it("should accept dry-run option", async () => {
       await cli.run(["dev", "--dry-run"])
 
-      expectFunctionalPipelineCalled()
+      expectCorePipelineCalled()
       expect(recordingExecutor.commands).toHaveLength(0)
       expect(consoleOutput.join("\n")).toContain("[DRY RUN]")
       expect(consoleOutput.join("\n")).toContain("Planned terminal steps")
@@ -383,7 +378,7 @@ describe("CLI", () => {
     it("should accept both verbose and dry-run options", async () => {
       await cli.run(["dev", "--verbose", "--dry-run"])
 
-      expectFunctionalPipelineCalled()
+      expectCorePipelineCalled()
       expect(recordingExecutor.commands).toHaveLength(0)
       expect(exitCode).toBe(0)
     })
@@ -400,7 +395,7 @@ describe("CLI", () => {
       const cliWithConfig = createCli({
         presetManager: customPresetManager,
         createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => createRecordingExecutor(dryRun),
-        functionalCore,
+        core: coreBridge,
       })
 
       await cliWithConfig.run(["dev", "--config", "/tmp/custom.yml", "--dry-run"])
@@ -465,7 +460,7 @@ describe("CLI", () => {
           verbose: boolean
           dryRun: boolean
         }) => CommandExecutor,
-        functionalCore,
+        core: coreBridge,
       })
 
       await expect(failingCli.run(["dev"])).rejects.toThrow("Process exited")

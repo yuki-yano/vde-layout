@@ -2,7 +2,7 @@ import type { CommandExecutor } from "../types/command-executor.ts"
 import type { PlanEmission, CommandStep, EmittedTerminal } from "../core/emitter.ts"
 import type { WindowMode } from "../models/types.ts"
 import { ErrorCodes } from "../utils/errors.ts"
-import { createFunctionalError } from "../core/errors.ts"
+import { createCoreError } from "../core/errors.ts"
 import type { ConfirmPaneClosure } from "../types/confirm-pane.ts"
 import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../utils/template-tokens.ts"
 
@@ -59,7 +59,7 @@ export const executePlan = async ({
       }
 
       if (confirmed !== true) {
-        throw createFunctionalError("execution", {
+        throw createCoreError("execution", {
           code: ErrorCodes.USER_CANCELLED,
           message: "Aborted layout application for current window",
           path: initialVirtualPaneId,
@@ -273,7 +273,7 @@ const executeTerminalCommands = async ({
         })
       } catch (error) {
         if (error instanceof TemplateTokenError) {
-          throw createFunctionalError("execution", {
+          throw createCoreError("execution", {
             code: "TEMPLATE_TOKEN_ERROR",
             message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
             path: terminal.virtualPaneId,
@@ -324,7 +324,7 @@ const executeCommand = async (
   } catch (error) {
     if (error instanceof Error && "code" in error && "message" in error) {
       const candidate = error as { code?: string; message?: string; details?: Record<string, unknown> }
-      throw createFunctionalError("execution", {
+      throw createCoreError("execution", {
         code: typeof candidate.code === "string" ? candidate.code : context.code,
         message: candidate.message ?? context.message,
         path: context.path,
@@ -332,7 +332,7 @@ const executeCommand = async (
       })
     }
 
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: context.code,
       message: context.message,
       path: context.path,
@@ -367,7 +367,7 @@ const resolveCurrentPaneId = async ({
 
   const paneId = output.trim()
   if (paneId.length === 0) {
-    throw createFunctionalError("execution", {
+    throw createCoreError("execution", {
       code: ErrorCodes.NOT_IN_TMUX_SESSION,
       message: "Unable to determine current tmux pane",
       path: contextPath,
@@ -465,7 +465,7 @@ const raiseExecutionError = (
     readonly details?: Record<string, unknown>
   },
 ): never => {
-  throw createFunctionalError("execution", {
+  throw createCoreError("execution", {
     code,
     message: error.message,
     path: error.path,

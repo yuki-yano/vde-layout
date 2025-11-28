@@ -1,10 +1,10 @@
-import type { FunctionalPreset } from "../compile.ts"
+import type { CompiledPreset } from "../compile.ts"
 import { describe, expect, it } from "vitest"
 import { compilePreset, createLayoutPlan } from "../index.ts"
-import { isFunctionalCoreError } from "../errors.ts"
+import { isCoreError } from "../errors.ts"
 
 describe("createLayoutPlan", () => {
-  it("比率を正規化し決定的なペインIDとフォーカスを付与する", () => {
+  it("normalizes ratios and assigns deterministic pane IDs and focus", () => {
     const document = `
 name: layout-sample
 layout:
@@ -43,7 +43,7 @@ layout:
     expect(nested.panes.map((pane) => pane.id)).toEqual(["root.1.0", "root.1.1"])
   })
 
-  it("フォーカス指定が重複している場合はエラーを返す", () => {
+  it("throws when multiple panes request focus", () => {
     const document = `
 name: multi-focus
 layout:
@@ -63,14 +63,14 @@ layout:
       createLayoutPlan({ preset })
       throw new Error("expected failure")
     } catch (error) {
-      expect(isFunctionalCoreError(error)).toBe(true)
-      if (isFunctionalCoreError(error)) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
         expect(error.code).toBe("FOCUS_CONFLICT")
       }
     }
   })
 
-  it("フォーカス未指定の場合は最初のターミナルへフォーカスを割り当てる", () => {
+  it("assigns focus to the first terminal when none is specified", () => {
     const document = `
 name: no-focus
 layout:
@@ -97,7 +97,7 @@ layout:
     expect(terminalFocusStates.filter(Boolean).length).toBe(1)
   })
 
-  it("layoutが未定義でも単一ペインのPlanを生成する", () => {
+  it("builds a single-pane plan when layout is undefined", () => {
     const document = `
 name: single-pane
 `
@@ -113,8 +113,8 @@ name: single-pane
     })
   })
 
-  it("比率の合計が0の場合は均等配分に正規化する", () => {
-    const preset: FunctionalPreset = {
+  it("normalizes ratios evenly when the total is zero", () => {
+    const preset: CompiledPreset = {
       name: "zero-ratio",
       version: "legacy",
       metadata: { source: "tests/manual" },
@@ -138,8 +138,8 @@ name: single-pane
     expect(root.ratio).toEqual([0.5, 0.5])
   })
 
-  it("ターミナルが存在しないレイアウトではエラーを返す", () => {
-    const preset: FunctionalPreset = {
+  it("throws when no terminal panes exist in the layout", () => {
+    const preset: CompiledPreset = {
       name: "no-terminal",
       version: "legacy",
       metadata: { source: "tests/manual" },
@@ -163,8 +163,8 @@ name: single-pane
       createLayoutPlan({ preset })
       throw new Error("expected failure")
     } catch (error) {
-      expect(isFunctionalCoreError(error)).toBe(true)
-      if (isFunctionalCoreError(error)) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
         expect(error.code).toBe("NO_TERMINAL_PANES")
       }
     }
