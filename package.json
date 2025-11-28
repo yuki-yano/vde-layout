@@ -1,6 +1,6 @@
 {
   "name": "vde-layout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Terminal multiplexer layout management tool for VDE (Vibe Coding Development Environment)",
   "type": "module",
   "main": "dist/index.js",
