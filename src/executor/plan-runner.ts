@@ -5,6 +5,7 @@ import { ErrorCodes } from "../utils/errors.ts"
 import { createCoreError } from "../core/errors.ts"
 import type { ConfirmPaneClosure } from "../types/confirm-pane.ts"
 import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../utils/template-tokens.ts"
+import { waitForDelay } from "../utils/async.ts"
 
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'
@@ -19,12 +20,6 @@ type ExecutePlanInput = {
 
 type ExecutePlanSuccess = {
   readonly executedSteps: number
-}
-
-const waitForDelay = async (ms: number): Promise<void> => {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, ms)
-  })
 }
 
 export const executePlan = async ({
