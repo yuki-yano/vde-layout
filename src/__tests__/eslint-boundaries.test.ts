@@ -37,30 +37,29 @@ const extractRestrictedPatterns = (filesPattern: string): ReadonlyArray<string> 
 describe("eslint import boundaries", () => {
   it("defines architectural restrictions for core layer", () => {
     const patterns = extractRestrictedPatterns("src/core/**/*.ts")
-    expect(patterns).toContain("../executor/*")
-    expect(patterns).toContain("../backends/*")
-    expect(patterns).toContain("../cli/*")
-    expect(patterns).toContain("../config/*")
+    expect(patterns).toContain("../executor/**")
+    expect(patterns).toContain("../backends/**")
+    expect(patterns).toContain("../cli/**")
+    expect(patterns).toContain("../config/**")
   })
 
   it("defines architectural restrictions for executor layer", () => {
     const patterns = extractRestrictedPatterns("src/executor/**/*.ts")
-    expect(patterns).toContain("../cli/*")
-    expect(patterns).toContain("../config/*")
+    expect(patterns).toContain("../cli/**")
+    expect(patterns).toContain("../config/**")
   })
 
   it("defines architectural restrictions for config layer", () => {
     const patterns = extractRestrictedPatterns("src/config/**/*.ts")
-    expect(patterns).toContain("../executor/*")
-    expect(patterns).toContain("../backends/*")
-    expect(patterns).toContain("../cli/*")
+    expect(patterns).toContain("../executor/**")
+    expect(patterns).toContain("../backends/**")
+    expect(patterns).toContain("../cli/**")
   })
 
   it("defines architectural restrictions for backends layer", () => {
     const patterns = extractRestrictedPatterns("src/backends/**/*.ts")
-    expect(patterns).toContain("../../cli.ts")
-    expect(patterns).toContain("../../cli/*")
-    expect(patterns).toContain("../../config/*")
+    expect(patterns).toContain("../../cli/**")
+    expect(patterns).toContain("../../config/**")
   })
 
   it("forbids legacy backend import paths globally", () => {

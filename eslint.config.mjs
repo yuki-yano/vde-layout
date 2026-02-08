@@ -15,33 +15,29 @@ const LEGACY_BACKEND_IMPORT_PATTERNS = [
 
 const CORE_LAYER_IMPORT_PATTERNS = [
   ...LEGACY_BACKEND_IMPORT_PATTERNS,
-  "../executor/*",
-  "../backends/*",
-  "../cli.ts",
-  "../cli/*",
-  "../config/*",
+  "../executor/**",
+  "../backends/**",
+  "../cli/**",
+  "../config/**",
 ]
 
 const EXECUTOR_LAYER_IMPORT_PATTERNS = [
   ...LEGACY_BACKEND_IMPORT_PATTERNS,
-  "../cli.ts",
-  "../cli/*",
-  "../config/*",
+  "../cli/**",
+  "../config/**",
 ]
 
 const CONFIG_LAYER_IMPORT_PATTERNS = [
   ...LEGACY_BACKEND_IMPORT_PATTERNS,
-  "../executor/*",
-  "../backends/*",
-  "../cli.ts",
-  "../cli/*",
+  "../executor/**",
+  "../backends/**",
+  "../cli/**",
 ]
 
 const BACKENDS_LAYER_IMPORT_PATTERNS = [
   ...LEGACY_BACKEND_IMPORT_PATTERNS,
-  "../../cli.ts",
-  "../../cli/*",
-  "../../config/*",
+  "../../cli/**",
+  "../../config/**",
 ]
 
 const createRestrictedImportRule = (patterns) => {
