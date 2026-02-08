@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { createCli, type CLI, type CoreBridge } from "../cli.ts"
+import { createCli, type CLI, type CoreBridge } from "../cli/index.ts"
 import type { Preset, PresetInfo } from "../models/types.ts"
 import type { CommandExecutor } from "../types/command-executor.ts"
 import type { PresetManager } from "../types/preset-manager.ts"
