@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
-import { createTmuxExecutor, type TmuxExecutor } from "../executor.ts"
+import { createTmuxExecutor, type TmuxExecutor } from "./executor.ts"
 import { createMockExecutor, type MockExecutor } from "../../executor/mock-executor.ts"
 
 describe("createTmuxExecutor", () => {

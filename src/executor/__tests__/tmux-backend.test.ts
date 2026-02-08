@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { CommandExecutor } from "../../types/command-executor.ts"
 import type { PlanEmission } from "../../core/emitter.ts"
-import { createTmuxBackend } from "../backends/tmux-backend.ts"
+import { createTmuxBackend } from "../../backends/tmux/backend.ts"
 import { LogLevel } from "../../utils/logger.ts"
 import type { Logger } from "../../utils/logger.ts"
 import type { TerminalBackendContext } from "../terminal-backend.ts"
@@ -19,7 +19,7 @@ const { executePlanMock } = vi.hoisted(() => ({
   executePlanMock: vi.fn(),
 }))
 
-vi.mock("../../tmux/executor.ts", () => {
+vi.mock("../../backends/tmux/executor.ts", () => {
   return {
     createTmuxExecutor: vi.fn(() => ({
       verifyTmuxEnvironment: verifyEnvironmentMock,

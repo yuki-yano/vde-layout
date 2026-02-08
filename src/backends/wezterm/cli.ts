@@ -1,6 +1,6 @@
 import { execa } from "execa"
-import { createEnvironmentError, ErrorCodes } from "../utils/errors.ts"
-import { createCoreError } from "../core/errors.ts"
+import { createEnvironmentError, ErrorCodes } from "../../utils/errors.ts"
+import { createCoreError } from "../../core/errors.ts"
 
 const WEZTERM_BINARY = "wezterm"
 const MINIMUM_VERSION = "20220624-141144-bd1b7c5d"
