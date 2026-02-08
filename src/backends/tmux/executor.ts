@@ -23,7 +23,7 @@ export const createTmuxExecutor = (options: TmuxExecutorOptions = {}): TmuxExecu
 
   const verifyTmuxEnvironment = async (): Promise<void> => {
     if (!isInTmuxSession()) {
-      throw createEnvironmentError("Must be run inside a tmux session", ErrorCodes.NOT_IN_TMUX, {
+      throw createEnvironmentError("Must be run inside a tmux session", ErrorCodes.NOT_IN_TMUX_SESSION, {
         hint: "Please start a tmux session and try again",
       })
     }
