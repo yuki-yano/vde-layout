@@ -23,14 +23,15 @@
     "dev": "tsdown --watch",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "test": "pnpm build && vitest run",
-    "ci": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
+    "ci": "pnpm format:check && pnpm typecheck && pnpm typecheck:test && pnpm lint && pnpm test",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "ci:fix": "pnpm format && pnpm typecheck && pnpm lint:fix && pnpm test",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "ci:fix": "pnpm format && pnpm typecheck && pnpm typecheck:test && pnpm lint:fix && pnpm test",
     "prepublishOnly": "pnpm clean && pnpm build"
   },
   "keywords": [
