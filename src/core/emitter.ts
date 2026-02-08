@@ -10,7 +10,7 @@ type CommandStepKind = "split" | "focus"
 export type CommandStep = {
   readonly id: string
   readonly kind: CommandStepKind
-  readonly command: ReadonlyArray<string>
+  readonly command?: ReadonlyArray<string>
   readonly summary: string
   readonly targetPaneId?: string
   readonly createdPaneId?: string
@@ -53,7 +53,6 @@ export const emitPlan = ({ plan }: EmitPlanInput): PlanEmission => {
   steps.push({
     id: `${plan.focusPaneId}:focus`,
     kind: "focus",
-    command: ["select-pane", "-t", plan.focusPaneId],
     summary: `select pane ${plan.focusPaneId}`,
     targetPaneId: plan.focusPaneId,
   })
@@ -99,7 +98,6 @@ const appendSplitSteps = (node: SplitNode, steps: CommandStep[]): void => {
     steps.push({
       id: `${node.id}:split:${index}`,
       kind: "split",
-      command: ["split-window", directionFlag, "-t", targetPaneId, "-p", String(percentage)],
       summary: `split ${targetPaneId} (${directionFlag})`,
       targetPaneId,
       createdPaneId,

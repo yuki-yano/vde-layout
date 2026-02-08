@@ -70,7 +70,7 @@ const buildTmuxCommand = (step: CommandStep): string[] => {
     return ["select-pane", "-t", target]
   }
 
-  return [...step.command]
+  return [...(step.command ?? [])]
 }
 
 const resolveTargetPaneId = (step: CommandStep): string => {
@@ -78,9 +78,10 @@ const resolveTargetPaneId = (step: CommandStep): string => {
     return step.targetPaneId
   }
 
-  const targetIndex = step.command.findIndex((segment) => segment === "-t")
-  if (targetIndex >= 0 && targetIndex + 1 < step.command.length) {
-    const raw = step.command[targetIndex + 1]
+  const command = step.command ?? []
+  const targetIndex = command.findIndex((segment) => segment === "-t")
+  if (targetIndex >= 0 && targetIndex + 1 < command.length) {
+    const raw = command[targetIndex + 1]
     if (typeof raw === "string" && raw.length > 0) {
       return raw
     }

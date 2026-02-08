@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { compilePreset, createLayoutPlan, emitPlan } from "../index.ts"
 
 describe("emitPlan", () => {
-  it("generates tmux command steps from a plan", () => {
+  it("generates backend-neutral steps from a plan", () => {
     const document = `
 name: emit-sample
 layout:
@@ -23,8 +23,9 @@ layout:
       kind: "split",
       orientation: "horizontal",
       percentage: 50,
-      command: ["split-window", "-h", "-t", "root.0", "-p", expect.any(String)],
+      targetPaneId: "root.0",
     })
+    expect(emission.steps[0]?.command).toBeUndefined()
     expect(emission.summary.stepsCount).toBe(2)
     expect(emission.summary.focusPaneId).toBe("root.0")
     expect(emission.summary.initialPaneId).toBe("root.0")
@@ -85,8 +86,9 @@ name: single
     expect(emission.steps).toHaveLength(1)
     expect(emission.steps[0]).toMatchObject({
       kind: "focus",
-      command: ["select-pane", "-t", "root"],
+      targetPaneId: "root",
     })
+    expect(emission.steps[0]?.command).toBeUndefined()
     expect(emission.summary.stepsCount).toBe(1)
     expect(emission.summary.initialPaneId).toBe("root")
     expect(emission.hash).toMatch(/^[a-f0-9]{64}$/)
@@ -117,21 +119,25 @@ layout:
         id: "root:split:1",
         orientation: "horizontal",
         percentage: 67,
-        command: ["split-window", "-h", "-t", "root.0", "-p", "67"],
+        targetPaneId: "root.0",
+        createdPaneId: "root.1",
       }),
       expect.objectContaining({
         id: "root:split:2",
         orientation: "horizontal",
         percentage: 50,
-        command: ["split-window", "-h", "-t", "root.1", "-p", "50"],
+        targetPaneId: "root.1",
+        createdPaneId: "root.2",
       }),
       expect.objectContaining({
         id: "root.1:split:1",
         orientation: "vertical",
         percentage: 67,
-        command: ["split-window", "-v", "-t", "root.1.0", "-p", "67"],
+        targetPaneId: "root.1.0",
+        createdPaneId: "root.1.1",
       }),
     ])
+    expect(splitSteps.every((step) => step.command === undefined)).toBe(true)
     expect(emission.summary.stepsCount).toBe(emission.steps.length)
   })
 
