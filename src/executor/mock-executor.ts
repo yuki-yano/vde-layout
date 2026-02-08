@@ -99,7 +99,7 @@ export const createMockExecutor = (): MockExecutor => {
     isInTmuxSession,
     async verifyTmuxEnvironment(): Promise<void> {
       if (!isInTmuxSession()) {
-        throw createEnvironmentError("Must be run inside a tmux session", ErrorCodes.NOT_IN_TMUX, {
+        throw createEnvironmentError("Must be run inside a tmux session", ErrorCodes.NOT_IN_TMUX_SESSION, {
           hint: "Please start a tmux session and try again",
         })
       }
