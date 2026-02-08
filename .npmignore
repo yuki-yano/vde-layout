@@ -8,7 +8,6 @@ __tests__/
 *.test.ts
 *.spec.ts
 vitest.config.*
-tsconfig.test.json
 
 # Development files
 .claude/
