@@ -393,7 +393,7 @@ describe("createWeztermBackend", () => {
     }
 
     await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
-      code: "INVALID_PANE",
+      code: "INVALID_PLAN",
       path: "plan.initialPaneId",
     })
   })
