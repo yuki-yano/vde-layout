@@ -1,8 +1,4 @@
 dist
-ai
-.serena
+tmp
 scripts
-CLAUDE.md
-.claude
-.kiro
 node_modules
