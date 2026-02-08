@@ -6,7 +6,7 @@ import { resolveTerminalBackendKind } from "../backend-resolver.ts"
 import { LogLevel } from "../../utils/logger.ts"
 import type { Logger } from "../../utils/logger.ts"
 
-vi.mock("../backends/tmux-backend.ts", () => {
+vi.mock("../../backends/tmux/backend.ts", () => {
   return {
     createTmuxBackend: vi.fn((): TerminalBackend => {
       return {
@@ -18,7 +18,7 @@ vi.mock("../backends/tmux-backend.ts", () => {
   }
 })
 
-vi.mock("../backends/wezterm-backend.ts", () => {
+vi.mock("../../backends/wezterm/backend.ts", () => {
   return {
     createWeztermBackend: vi.fn((): TerminalBackend => {
       return {

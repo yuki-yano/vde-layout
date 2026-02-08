@@ -7,7 +7,7 @@ import type {
   DryRunStep,
   TerminalBackend,
   TerminalBackendContext,
-} from "../terminal-backend.ts"
+} from "../../executor/terminal-backend.ts"
 import {
   killWeztermPane,
   listWeztermWindows,
@@ -15,13 +15,13 @@ import {
   verifyWeztermAvailability,
   type RunWeztermErrorContext,
   type WeztermListResult,
-} from "../../wezterm/cli.ts"
+} from "./cli.ts"
 import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../../utils/template-tokens.ts"
 import { waitForDelay } from "../../utils/async.ts"
 import {
   resolveSplitOrientation as resolveSplitOrientationFromStep,
   resolveSplitPercentage as resolveSplitPercentageFromStep,
-} from "../split-step.ts"
+} from "../../executor/split-step.ts"
 
 type PaneMap = Map<string, string>
 
