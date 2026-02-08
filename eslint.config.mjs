@@ -3,6 +3,47 @@ import eslintConfigPrettier from "eslint-config-prettier"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 
+const LEGACY_BACKEND_IMPORT_PATTERNS = [
+  "../tmux/*",
+  "../../tmux/*",
+  "../wezterm/*",
+  "../../wezterm/*",
+  "./backends/*",
+  "../executor/backends/*",
+  "../../executor/backends/*",
+]
+
+const CORE_LAYER_IMPORT_PATTERNS = [
+  ...LEGACY_BACKEND_IMPORT_PATTERNS,
+  "../executor/*",
+  "../backends/*",
+  "../cli.ts",
+  "../cli/*",
+  "../config/*",
+]
+
+const EXECUTOR_LAYER_IMPORT_PATTERNS = [
+  ...LEGACY_BACKEND_IMPORT_PATTERNS,
+  "../cli.ts",
+  "../cli/*",
+  "../config/*",
+]
+
+const CONFIG_LAYER_IMPORT_PATTERNS = [
+  ...LEGACY_BACKEND_IMPORT_PATTERNS,
+  "../executor/*",
+  "../backends/*",
+  "../cli.ts",
+  "../cli/*",
+]
+
+const BACKENDS_LAYER_IMPORT_PATTERNS = [
+  ...LEGACY_BACKEND_IMPORT_PATTERNS,
+  "../../cli.ts",
+  "../../cli/*",
+  "../../config/*",
+]
+
 export default [
   {
     files: ["src/**/*.ts"],
@@ -46,6 +87,61 @@ export default [
         },
       ],
       "no-restricted-syntax": ["error"],
+    },
+  },
+  {
+    files: ["src/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: LEGACY_BACKEND_IMPORT_PATTERNS,
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/core/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: CORE_LAYER_IMPORT_PATTERNS,
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/executor/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: EXECUTOR_LAYER_IMPORT_PATTERNS,
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/config/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: CONFIG_LAYER_IMPORT_PATTERNS,
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/backends/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: BACKENDS_LAYER_IMPORT_PATTERNS,
+        },
+      ],
     },
   },
   {
