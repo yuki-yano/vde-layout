@@ -209,8 +209,21 @@ describe("createWeztermBackend", () => {
       ],
     }
 
-    expect(() => backend.getDryRunSteps(emission)).toThrowError(/Template token resolution failed/)
-    expect(() => backend.getDryRunSteps(emission)).toThrowError(/missing-pane/)
+    let caughtError: unknown
+    try {
+      backend.getDryRunSteps(emission)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError).toMatchObject({
+      code: "TEMPLATE_TOKEN_ERROR",
+      path: "root",
+      details: expect.objectContaining({ tokenType: "pane_id" }),
+    })
+    if (caughtError instanceof Error) {
+      expect(caughtError.message).toMatch(/Template token resolution failed.*missing-pane/)
+    }
   })
 
   it("spawns a new tab when a wezterm window exists", async () => {
@@ -666,17 +679,24 @@ describe("createWeztermBackend", () => {
   })
 
   it("retries pane registration until pane appears", async () => {
-    queueListResponses(
-      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
-      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
-      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "42" }] }]),
-    )
-    runMock.mockResolvedValueOnce("42 w1\n")
+    vi.useFakeTimers()
+    try {
+      queueListResponses(
+        makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+        makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+        makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "42" }] }]),
+      )
+      runMock.mockResolvedValueOnce("42 w1\n")
 
-    const backend = createWeztermBackend(createContext())
-    const result = await backend.applyPlan({ emission: minimalEmission(), windowMode: "new-window" })
+      const backend = createWeztermBackend(createContext())
+      const applyPromise = backend.applyPlan({ emission: minimalEmission(), windowMode: "new-window" })
+      await vi.advanceTimersByTimeAsync(1000)
 
-    expect(result.focusPaneId).toBe("42")
+      const result = await applyPromise
+      expect(result.focusPaneId).toBe("42")
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("executes split steps and registers new panes", async () => {
