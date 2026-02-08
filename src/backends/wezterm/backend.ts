@@ -29,6 +29,8 @@ type ExecuteWeztermCommand = (args: ReadonlyArray<string>, errorContext: RunWezt
 
 const PANE_REGISTRATION_RETRIES = 5
 const PANE_REGISTRATION_DELAY_MS = 100
+const SINGLE_QUOTE = "'"
+const SHELL_SINGLE_QUOTE_ESCAPE = `'"'"'`
 
 type InitialPaneResolution = {
   readonly paneId: string
@@ -132,33 +134,51 @@ const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
     })
   }
 
-  for (const terminal of emission.terminals) {
-    const paneId = terminal.virtualPaneId
-    if (typeof terminal.cwd === "string" && terminal.cwd.length > 0) {
-      const cwdCommand = `cd "${terminal.cwd.split('"').join('\\"')}"`
+  const prepared = prepareTerminalCommands({
+    terminals: emission.terminals,
+    focusPaneVirtualId: emission.summary.focusPaneId,
+    resolveRealPaneId: (virtualPaneId: string): string => virtualPaneId,
+    onTemplateTokenError: ({ terminal, error }): never => {
+      throw createCoreError("execution", {
+        code: "TEMPLATE_TOKEN_ERROR",
+        message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
+        path: terminal.virtualPaneId,
+        details: {
+          command: terminal.command,
+          tokenType: error.tokenType,
+          availablePanes: error.availablePanes,
+        },
+      })
+    },
+  })
+
+  const quoteForShellDisplay = (value: string): string => {
+    return `${SINGLE_QUOTE}${value.split(SINGLE_QUOTE).join(SHELL_SINGLE_QUOTE_ESCAPE)}${SINGLE_QUOTE}`
+  }
+
+  for (const commandSet of prepared.commands) {
+    const paneId = commandSet.terminal.virtualPaneId
+    if (typeof commandSet.cwdCommand === "string") {
       steps.push({
         backend: "wezterm",
         summary: `set cwd for ${paneId}`,
-        command: `wezterm cli send-text --pane-id ${paneId} --no-paste -- '${cwdCommand.replace(/'/g, "\\'")}'`,
+        command: `wezterm cli send-text --pane-id ${paneId} --no-paste -- ${quoteForShellDisplay(commandSet.cwdCommand)}`,
       })
     }
 
-    if (terminal.env !== undefined) {
-      for (const [key, value] of Object.entries(terminal.env)) {
-        const envCommand = `export ${key}="${String(value).split('"').join('\\"')}"`
-        steps.push({
-          backend: "wezterm",
-          summary: `set env ${key} for ${paneId}`,
-          command: `wezterm cli send-text --pane-id ${paneId} --no-paste -- '${envCommand.replace(/'/g, "\\'")}'`,
-        })
-      }
+    for (const envEntry of commandSet.envCommands) {
+      steps.push({
+        backend: "wezterm",
+        summary: `set env ${envEntry.key} for ${paneId}`,
+        command: `wezterm cli send-text --pane-id ${paneId} --no-paste -- ${quoteForShellDisplay(envEntry.command)}`,
+      })
     }
 
-    if (typeof terminal.command === "string" && terminal.command.length > 0) {
+    if (commandSet.command !== undefined) {
       steps.push({
         backend: "wezterm",
         summary: `run command for ${paneId}`,
-        command: `wezterm cli send-text --pane-id ${paneId} --no-paste -- '${terminal.command.replace(/'/g, "\\'")}'`,
+        command: `wezterm cli send-text --pane-id ${paneId} --no-paste -- ${quoteForShellDisplay(commandSet.command.text)}`,
       })
     }
   }

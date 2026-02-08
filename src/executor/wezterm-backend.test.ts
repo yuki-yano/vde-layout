@@ -593,12 +593,12 @@ describe("createWeztermBackend", () => {
       {
         backend: "wezterm",
         summary: "set cwd for root:1",
-        command: 'wezterm cli send-text --pane-id root:1 --no-paste -- \'cd "/tmp/\\"workspace\\""\'',
+        command: "wezterm cli send-text --pane-id root:1 --no-paste -- 'cd -- '\"'\"'/tmp/\"workspace\"'\"'\"''",
       },
       {
         backend: "wezterm",
         summary: "set env NODE_ENV for root:1",
-        command: "wezterm cli send-text --pane-id root:1 --no-paste -- 'export NODE_ENV=\"test\"'",
+        command: "wezterm cli send-text --pane-id root:1 --no-paste -- 'export NODE_ENV='\"'\"'test'\"'\"''",
       },
       {
         backend: "wezterm",
