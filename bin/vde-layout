@@ -1,10 +1,38 @@
 #!/usr/bin/env node
+
+const isModuleNotFoundFor = (error, entryFile) => {
+  if (typeof error !== "object" || error === null) {
+    return false
+  }
+
+  const withMeta = /** @type {{ code?: string; url?: string; message?: string }} */ (error)
+  if (withMeta.code !== "ERR_MODULE_NOT_FOUND") {
+    return false
+  }
+
+  const expected = `dist/${entryFile}`
+  if (typeof withMeta.url === "string" && (withMeta.url.includes(expected) || withMeta.url.includes(`dist\\${entryFile}`))) {
+    return true
+  }
+
+  return typeof withMeta.message === "string" && withMeta.message.includes(expected)
+}
+
 try {
   await import("../dist/index.mjs")
 } catch (error) {
-  if (error && typeof error === "object" && "code" in error && error.code === "ERR_MODULE_NOT_FOUND") {
-    await import("../dist/index.js")
-  } else {
+  if (!isModuleNotFoundFor(error, "index.mjs")) {
     throw error
+  }
+
+  try {
+    await import("../dist/index.js")
+  } catch (fallbackError) {
+    if (isModuleNotFoundFor(fallbackError, "index.js")) {
+      console.error('Failed to load vde-layout entrypoint from dist. Run "pnpm run build" and try again.')
+      process.exit(1)
+    }
+
+    throw fallbackError
   }
 }
