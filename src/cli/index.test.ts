@@ -262,6 +262,12 @@ describe("CLI", () => {
       runExitCode = await cli.run(["-h"])
       expect(runExitCode).toBe(0)
     })
+
+    it("treats values after -- as positional arguments", async () => {
+      runExitCode = await cli.run(["--", "-h"])
+      expect(runExitCode).toBe(1)
+      expect(errorOutput.join("\n")).toContain('Preset "-h" not found')
+    })
   })
 
   describe("list command", () => {

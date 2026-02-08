@@ -327,12 +327,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
 
   const run = async (args: string[] = process.argv.slice(2)): Promise<number> => {
     lastExitCode = 0
-    const requestedVersion = args.some((arg) => arg === "--version" || arg === "-v")
-    const requestedHelp = args.includes("--help") || args.includes("-h")
-
-    if (args.includes("-h")) {
-      args = args.map((arg) => (arg === "-h" ? "--help" : arg))
-    }
 
     try {
       await program.parseAsync(args, { from: "user" })
@@ -341,10 +335,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         return error.exitCode
       }
       return handleError(error)
-    }
-
-    if (requestedVersion || requestedHelp) {
-      return 0
     }
 
     try {
