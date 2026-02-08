@@ -16,12 +16,12 @@ import {
   type RunWeztermErrorContext,
   type WeztermListResult,
 } from "./cli"
-import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../../utils/template-tokens"
 import { waitForDelay } from "../../utils/async"
 import {
   resolveSplitOrientation as resolveSplitOrientationFromStep,
   resolveSplitPercentage as resolveSplitPercentageFromStep,
 } from "../../executor/split-step"
+import { prepareTerminalCommands } from "../../executor/terminal-command-preparation"
 
 type PaneMap = Map<string, string>
 
@@ -504,10 +504,6 @@ const applyFocusStep = async ({
   })
 }
 
-const escapeDoubleQuotes = (value: string): string => {
-  return value.split('"').join('\\"')
-}
-
 const appendCarriageReturn = (value: string): string => {
   return value.endsWith("\r") ? value : `${value}\r`
 }
@@ -537,10 +533,6 @@ const applyTerminalCommands = async ({
   readonly runCommand: ExecuteWeztermCommand
   readonly focusPaneVirtualId: string
 }): Promise<void> => {
-  // Build name-to-real-ID mapping for template token replacement
-  const nameToRealIdMap = buildNameToRealIdMap(terminals, paneMap)
-
-  // Validate focus pane upfront so layout errors are caught even if {{focus_pane}} is unused
   if (!paneMap.has(focusPaneVirtualId)) {
     throw createCoreError("execution", {
       code: ErrorCodes.INVALID_PANE,
@@ -548,16 +540,35 @@ const applyTerminalCommands = async ({
       path: focusPaneVirtualId,
     })
   }
-  const focusPaneRealId = resolveRealPaneId(paneMap, focusPaneVirtualId, { stepId: focusPaneVirtualId })
 
-  for (const terminal of terminals) {
-    const realPaneId = resolveRealPaneId(paneMap, terminal.virtualPaneId, { stepId: terminal.virtualPaneId })
+  const prepared = prepareTerminalCommands({
+    terminals,
+    focusPaneVirtualId,
+    resolveRealPaneId: (virtualPaneId: string): string =>
+      resolveRealPaneId(paneMap, virtualPaneId, {
+        stepId: virtualPaneId,
+      }),
+    onTemplateTokenError: ({ terminal, error }): never => {
+      throw createCoreError("execution", {
+        code: "TEMPLATE_TOKEN_ERROR",
+        message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
+        path: terminal.virtualPaneId,
+        details: {
+          command: terminal.command,
+          tokenType: error.tokenType,
+          availablePanes: error.availablePanes,
+        },
+      })
+    },
+  })
 
-    if (typeof terminal.cwd === "string" && terminal.cwd.length > 0) {
-      const escapedCwd = escapeDoubleQuotes(terminal.cwd)
+  for (const commandSet of prepared.commands) {
+    const { terminal, realPaneId } = commandSet
+
+    if (typeof commandSet.cwdCommand === "string") {
       await sendTextToPane({
         paneId: realPaneId,
-        text: `cd "${escapedCwd}"`,
+        text: commandSet.cwdCommand,
         runCommand,
         context: {
           message: `Failed to change directory for pane ${terminal.virtualPaneId}`,
@@ -567,69 +578,26 @@ const applyTerminalCommands = async ({
       })
     }
 
-    if (terminal.env !== undefined) {
-      for (const [key, value] of Object.entries(terminal.env)) {
-        const escapedValue = escapeDoubleQuotes(String(value))
-        await sendTextToPane({
-          paneId: realPaneId,
-          text: `export ${key}="${escapedValue}"`,
-          runCommand,
-          context: {
-            message: `Failed to set environment variable ${key}`,
-            path: terminal.virtualPaneId,
-          },
-        })
-      }
+    for (const envEntry of commandSet.envCommands) {
+      await sendTextToPane({
+        paneId: realPaneId,
+        text: envEntry.command,
+        runCommand,
+        context: {
+          message: `Failed to set environment variable ${envEntry.key}`,
+          path: terminal.virtualPaneId,
+        },
+      })
     }
 
-    if (typeof terminal.command === "string" && terminal.command.length > 0) {
-      // Replace template tokens in the command
-      const commandUsesFocusToken = terminal.command.includes("{{focus_pane}}")
-      const focusPaneRealIdForCommand = commandUsesFocusToken ? focusPaneRealId : ""
-
-      let commandWithTokensReplaced: string
-      try {
-        commandWithTokensReplaced = replaceTemplateTokens({
-          command: terminal.command,
-          currentPaneRealId: realPaneId,
-          focusPaneRealId: focusPaneRealIdForCommand,
-          nameToRealIdMap,
-        })
-      } catch (error) {
-        if (error instanceof TemplateTokenError) {
-          throw createCoreError("execution", {
-            code: "TEMPLATE_TOKEN_ERROR",
-            message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
-            path: terminal.virtualPaneId,
-            details: {
-              command: terminal.command,
-              tokenType: error.tokenType,
-              availablePanes: error.availablePanes,
-            },
-          })
-        }
-        throw error
-      }
-
-      // Handle ephemeral panes
-      if (terminal.ephemeral === true) {
-        const closeOnError = terminal.closeOnError === true
-        if (closeOnError) {
-          // Close pane regardless of command success/failure
-          commandWithTokensReplaced = `${commandWithTokensReplaced}; exit`
-        } else {
-          // Close pane only on success (default behavior)
-          commandWithTokensReplaced = `${commandWithTokensReplaced}; [ $? -eq 0 ] && exit`
-        }
-      }
-
-      if (typeof terminal.delay === "number" && Number.isFinite(terminal.delay) && terminal.delay > 0) {
-        await waitForDelay(terminal.delay)
+    if (commandSet.command !== undefined) {
+      if (commandSet.command.delayMs > 0) {
+        await waitForDelay(commandSet.command.delayMs)
       }
 
       await sendTextToPane({
         paneId: realPaneId,
-        text: commandWithTokensReplaced,
+        text: commandSet.command.text,
         runCommand,
         context: {
           message: `Failed to execute command for pane ${terminal.virtualPaneId}`,
