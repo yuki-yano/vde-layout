@@ -212,6 +212,29 @@ describe("ConfigLoader", () => {
       expect(config.presets.dev?.windowMode).toBe("current-window")
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Preset "dev" windowMode conflict'))
     })
+
+    it("emits warning to console by default when windowMode conflicts", async () => {
+      const globalConfigPath = path.join(xdgDir, "vde", "layout.yml")
+      await fs.writeFile(
+        globalConfigPath,
+        "defaults:\n  windowMode: new-window\npresets:\n  dev:\n    name: global dev\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: gleft\n        - name: gright\n",
+        "utf8",
+      )
+
+      const localConfigPath = path.join(projectDir, ".vde", "layout.yml")
+      await fs.writeFile(
+        localConfigPath,
+        "defaults:\n  windowMode: current-window\npresets:\n  dev:\n    name: project dev\n    layout:\n      type: horizontal\n      ratio: [2, 1]\n      panes:\n        - name: left\n        - name: right\n",
+        "utf8",
+      )
+
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+      const loaderWithMerge = createConfigLoader()
+      await loaderWithMerge.loadConfig()
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("defaults.windowMode conflict"))
+      warnSpy.mockRestore()
+    })
   })
 
   // Restore environment
