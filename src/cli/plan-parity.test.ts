@@ -134,24 +134,14 @@ describe("CLI plan parity", () => {
   let cli: CLI
   let executor: ReturnType<typeof createRecordingExecutor> | undefined
   let emissionHashes: string[]
-  let originalExit: typeof process.exit
-  let exitCode: number | undefined
-  let processExitCalled: boolean
+  let runExitCode: number
 
   beforeEach(() => {
     process.env.TMUX = "tmux-test-session"
     process.env.VDE_TEST_MODE = "true"
 
     emissionHashes = []
-    exitCode = undefined
-    processExitCalled = false
-
-    originalExit = process.exit
-    process.exit = ((code?: number) => {
-      exitCode = code
-      processExitCalled = true
-      return undefined as never
-    }) as never
+    runExitCode = 0
 
     const presetManager = createFixturePresetManager()
 
@@ -177,27 +167,23 @@ describe("CLI plan parity", () => {
   })
 
   afterEach(() => {
-    process.exit = originalExit
     delete process.env.TMUX
     delete process.env.VDE_TEST_MODE
   })
 
   it("generates identical plan hashes for dry-run and execution", async () => {
-    await cli.run(["fixture", "--dry-run"])
+    runExitCode = await cli.run(["fixture", "--dry-run"])
 
-    expect(processExitCalled).toBe(true)
-    expect(exitCode).toBe(0)
+    expect(runExitCode).toBe(0)
     expect(emissionHashes).toHaveLength(1)
     const dryRunHash = emissionHashes[0]
 
-    processExitCalled = false
-    exitCode = undefined
+    runExitCode = 0
     emissionHashes = []
 
-    await cli.run(["fixture"])
+    runExitCode = await cli.run(["fixture"])
 
-    expect(processExitCalled).toBe(true)
-    expect(exitCode).toBe(0)
+    expect(runExitCode).toBe(0)
     expect(emissionHashes).toHaveLength(1)
     const executeHash = emissionHashes[0]
 
