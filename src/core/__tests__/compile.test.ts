@@ -95,6 +95,8 @@ layout:
       env:
         PATH: /usr/bin
         COUNT: 1
+      delay: 750
+      title: Main Pane
       layoutHint: floating
       focus: true
     - name: shell
@@ -119,6 +121,8 @@ layout:
     expect(terminal.env).toEqual({ PATH: "/usr/bin" })
     expect(terminal.options).toEqual({ layoutHint: "floating" })
     expect(terminal.focus).toBe(true)
+    expect(terminal.delay).toBe(750)
+    expect(terminal.title).toBe("Main Pane")
   })
 
   it("throws a structured error for unknown layout nodes", () => {

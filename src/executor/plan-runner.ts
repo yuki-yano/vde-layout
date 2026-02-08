@@ -5,6 +5,7 @@ import { ErrorCodes } from "../utils/errors.ts"
 import { createCoreError } from "../core/errors.ts"
 import type { ConfirmPaneClosure } from "../types/confirm-pane.ts"
 import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../utils/template-tokens.ts"
+import { waitForDelay } from "../utils/async.ts"
 
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'
@@ -258,6 +259,15 @@ const executeTerminalCommands = async ({
       }
     }
 
+    if (typeof terminal.title === "string" && terminal.title.length > 0) {
+      await executeCommand(executor, ["select-pane", "-t", realPaneId, "-T", terminal.title], {
+        code: ErrorCodes.TMUX_COMMAND_FAILED,
+        message: `Failed to set pane title for pane ${terminal.virtualPaneId}`,
+        path: terminal.virtualPaneId,
+        details: { title: terminal.title },
+      })
+    }
+
     if (typeof terminal.command === "string" && terminal.command.length > 0) {
       // Replace template tokens in the command
       const commandUsesFocusToken = terminal.command.includes("{{focus_pane}}")
@@ -297,6 +307,10 @@ const executeTerminalCommands = async ({
           // Close pane only on success (default behavior)
           commandWithTokensReplaced = `${commandWithTokensReplaced}; [ $? -eq 0 ] && exit`
         }
+      }
+
+      if (typeof terminal.delay === "number" && Number.isFinite(terminal.delay) && terminal.delay > 0) {
+        await waitForDelay(terminal.delay)
       }
 
       await executeCommand(executor, ["send-keys", "-t", realPaneId, commandWithTokensReplaced, "Enter"], {

@@ -12,6 +12,8 @@ type PlanTerminal = {
   readonly command?: string
   readonly cwd?: string
   readonly env?: Readonly<Record<string, string>>
+  readonly delay?: number
+  readonly title?: string
   readonly focus: boolean
   readonly ephemeral?: boolean
   readonly closeOnError?: boolean
@@ -165,6 +167,8 @@ const createTerminalNode = ({
     command: terminal.command,
     cwd: terminal.cwd,
     env: terminal.env,
+    delay: terminal.delay,
+    title: terminal.title,
     options: terminal.options,
     focus: focusOverride === true ? true : terminal.focus === true,
     ephemeral: terminal.ephemeral,

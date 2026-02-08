@@ -17,6 +17,7 @@ import {
   type WeztermListResult,
 } from "../../wezterm/cli.ts"
 import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../../utils/template-tokens.ts"
+import { waitForDelay } from "../../utils/async.ts"
 
 type PaneMap = Map<string, string>
 
@@ -291,12 +292,6 @@ const filterWindowsByWorkspace = (list: WeztermListResult, workspace?: string): 
   return { windows: scoped }
 }
 
-const delay = (ms: number): Promise<void> => {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
-}
-
 const waitForPaneRegistration = async ({
   paneId,
   listWindows,
@@ -326,7 +321,7 @@ const waitForPaneRegistration = async ({
     }
 
     if (attempt < PANE_REGISTRATION_RETRIES - 1) {
-      await delay(PANE_REGISTRATION_DELAY_MS)
+      await waitForDelay(PANE_REGISTRATION_DELAY_MS)
     }
   }
 
@@ -637,6 +632,10 @@ const applyTerminalCommands = async ({
           // Close pane only on success (default behavior)
           commandWithTokensReplaced = `${commandWithTokensReplaced}; [ $? -eq 0 ] && exit`
         }
+      }
+
+      if (typeof terminal.delay === "number" && Number.isFinite(terminal.delay) && terminal.delay > 0) {
+        await waitForDelay(terminal.delay)
       }
 
       await sendTextToPane({
