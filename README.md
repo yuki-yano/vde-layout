@@ -102,6 +102,7 @@ presets:
   preset-key:
     name: "Display Name"        # required
     description: "Summary"      # optional
+    backend: wezterm            # optional; "tmux" (default) or "wezterm"
     windowMode: new-window       # optional; "new-window" (default) or "current-window"
     layout:                     # optional; omit for single command presets
       # see Layout Structure

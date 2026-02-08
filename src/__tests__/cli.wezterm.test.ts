@@ -220,6 +220,31 @@ describe("CLI WezTerm backend integration", () => {
     expect(exitCode).toBe(0)
   })
 
+  it("uses preset backend when --backend is omitted", async () => {
+    mockPresetManager.setPresets({
+      default: {
+        name: "Default Layout",
+        backend: "wezterm",
+      },
+    })
+
+    const verifyEnvironment = vi.fn(async () => {})
+    const applyPlan = vi.fn()
+    const getDryRunSteps = vi.fn(() => [])
+
+    createTerminalBackendMock.mockReturnValue({
+      verifyEnvironment,
+      applyPlan,
+      getDryRunSteps,
+    })
+
+    await cli.run(["--dry-run"])
+
+    expect(createTerminalBackendMock).toHaveBeenCalledWith("wezterm", expect.objectContaining({ dryRun: true }))
+    expect(processExitCalled).toBe(true)
+    expect(exitCode).toBe(0)
+  })
+
   it("propagates wezterm backend failures with detailed error output", async () => {
     const verifyEnvironment = vi.fn(async () => {})
     const getDryRunSteps = vi.fn(() => [])

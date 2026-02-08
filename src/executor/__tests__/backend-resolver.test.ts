@@ -36,9 +36,29 @@ describe("resolveTerminalBackendKind", () => {
     expect(backend).toBe("tmux")
   })
 
+  it("uses preset backend when CLI flag is not provided", () => {
+    const backend = resolveTerminalBackendKind({ presetBackend: "wezterm", env: {} })
+    expect(backend).toBe("wezterm")
+  })
+
+  it("keeps CLI flag precedence over preset backend", () => {
+    const backend = resolveTerminalBackendKind({
+      cliFlag: "tmux",
+      presetBackend: "wezterm",
+      env: {},
+    })
+    expect(backend).toBe("tmux")
+  })
+
   it("throws when CLI flag is invalid", () => {
     expect(() => resolveTerminalBackendKind({ cliFlag: "invalid" as never, env: {} })).toThrow(
       'Unknown backend "invalid"',
+    )
+  })
+
+  it("throws when preset backend is invalid", () => {
+    expect(() => resolveTerminalBackendKind({ presetBackend: "screen" as never, env: {} })).toThrow(
+      'Unknown backend "screen"',
     )
   })
 

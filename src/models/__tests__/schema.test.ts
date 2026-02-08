@@ -155,6 +155,24 @@ describe("Zod schema validation", () => {
       const result = PresetSchema.safeParse(validPreset)
       expect(result.success).toBe(true)
     })
+
+    it("accepts backend in preset definition", () => {
+      const result = PresetSchema.safeParse({
+        name: "WezTerm Preset",
+        backend: "wezterm",
+      })
+
+      expect(result.success).toBe(true)
+    })
+
+    it("rejects unknown backend value in preset definition", () => {
+      const result = validatePreset({
+        name: "Invalid Backend Preset",
+        backend: "screen",
+      })
+
+      expect(result.success).toBe(false)
+    })
   })
 
   describe("ConfigSchema", () => {
