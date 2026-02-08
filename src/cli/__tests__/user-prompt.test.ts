@@ -40,9 +40,13 @@ describe("createPaneKillPrompter", () => {
   afterEach(() => {
     if (stdinTTYDescriptor) {
       Object.defineProperty(process.stdin, "isTTY", stdinTTYDescriptor)
+    } else {
+      Reflect.deleteProperty(process.stdin, "isTTY")
     }
     if (stdoutTTYDescriptor) {
       Object.defineProperty(process.stdout, "isTTY", stdoutTTYDescriptor)
+    } else {
+      Reflect.deleteProperty(process.stdout, "isTTY")
     }
   })
 
@@ -85,7 +89,7 @@ describe("createPaneKillPrompter", () => {
     const prompt = createPaneKillPrompter(logger)
     setTTY(true, true)
     const question = vi.fn(async () => "yes")
-    const close = vi.fn(async () => undefined)
+    const close = vi.fn(() => undefined)
     createInterfaceMock.mockReturnValue({ question, close })
 
     const result = await prompt({ panesToClose: ["%1"], dryRun: false })
@@ -102,7 +106,7 @@ describe("createPaneKillPrompter", () => {
     setTTY(true, true)
     createInterfaceMock.mockReturnValue({
       question: vi.fn(async () => "no"),
-      close: vi.fn(async () => undefined),
+      close: vi.fn(() => undefined),
     })
 
     const result = await prompt({ panesToClose: ["%1"], dryRun: false })
