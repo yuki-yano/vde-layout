@@ -3,16 +3,7 @@ import eslintConfigPrettier from "eslint-config-prettier"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 
-const RELATIVE_TS_IMPORT_PATTERNS = [
-  "./*.ts",
-  "./**/*.ts",
-  "../*.ts",
-  "../**/*.ts",
-  "../../*.ts",
-  "../../**/*.ts",
-  "../../../*.ts",
-  "../../../**/*.ts",
-]
+const RELATIVE_TS_IMPORT_PATTERNS = ["./**/*.ts", "../**/*.ts"]
 
 export default [
   {
