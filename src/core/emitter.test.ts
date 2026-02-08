@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { compilePreset, createLayoutPlan, emitPlan } from "../index"
+import { compilePreset, createLayoutPlan, emitPlan } from "./index"
 
 describe("emitPlan", () => {
   it("generates backend-neutral steps from a plan", () => {

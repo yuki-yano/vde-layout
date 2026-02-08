@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { resolveSplitOrientation, resolveSplitPercentage } from "../split-step"
-import type { CommandStep } from "../../core/emitter"
+import { resolveSplitOrientation, resolveSplitPercentage } from "./split-step"
+import type { CommandStep } from "../core/emitter"
 
 const splitStep = (overrides: Partial<CommandStep> = {}): CommandStep => {
   return {

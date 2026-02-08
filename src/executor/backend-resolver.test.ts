@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest"
 
-import type { TerminalBackend } from "../terminal-backend"
-import { createTerminalBackend } from "../backend-factory"
-import { resolveTerminalBackendKind } from "../backend-resolver"
-import { LogLevel } from "../../utils/logger"
-import type { Logger } from "../../utils/logger"
+import type { TerminalBackend } from "./terminal-backend"
+import { createTerminalBackend } from "./backend-factory"
+import { resolveTerminalBackendKind } from "./backend-resolver"
+import { LogLevel } from "../utils/logger"
+import type { Logger } from "../utils/logger"
 
-vi.mock("../../backends/tmux/backend.ts", () => {
+vi.mock("../backends/tmux/backend.ts", () => {
   return {
     createTmuxBackend: vi.fn((): TerminalBackend => {
       return {
@@ -18,7 +18,7 @@ vi.mock("../../backends/tmux/backend.ts", () => {
   }
 })
 
-vi.mock("../../backends/wezterm/backend.ts", () => {
+vi.mock("../backends/wezterm/backend.ts", () => {
   return {
     createWeztermBackend: vi.fn((): TerminalBackend => {
       return {

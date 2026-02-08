@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { resolveWindowMode } from "../window-mode"
+import { resolveWindowMode } from "./window-mode"
 
 describe("resolveWindowMode", () => {
   it("prefers CLI override over other sources", () => {

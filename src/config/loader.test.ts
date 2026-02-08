@@ -2,7 +2,7 @@ import fs from "fs-extra"
 import os from "os"
 import path from "path"
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest"
-import { createConfigLoader, type ConfigLoader } from "../loader"
+import { createConfigLoader, type ConfigLoader } from "./loader"
 
 describe("ConfigLoader", () => {
   let loader: ConfigLoader

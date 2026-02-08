@@ -6,9 +6,9 @@ vi.mock("node:readline/promises", () => ({
   createInterface: createInterfaceMock,
 }))
 
-import { createPaneKillPrompter } from "../user-prompt"
-import type { Logger } from "../../utils/logger"
-import { LogLevel } from "../../utils/logger"
+import { createPaneKillPrompter } from "./user-prompt"
+import type { Logger } from "../utils/logger"
+import { LogLevel } from "../utils/logger"
 
 const createMockLogger = (): Logger => {
   const logger: Logger = {

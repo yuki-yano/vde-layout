@@ -1,7 +1,7 @@
-import type { CompiledPreset } from "../compile"
+import type { CompiledPreset } from "./compile"
 import { describe, expect, it } from "vitest"
-import { compilePreset, createLayoutPlan } from "../index"
-import { isCoreError } from "../errors"
+import { compilePreset, createLayoutPlan } from "./index"
+import { isCoreError } from "./errors"
 
 describe("createLayoutPlan", () => {
   it("normalizes ratios and assigns deterministic pane IDs and focus", () => {

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
-import { compileCorePipeline } from "../index"
-import type { CompilePresetInput, CompilePresetSuccess } from "../compile"
-import { compilePreset } from "../compile"
-import { createLayoutPlan } from "../planner"
-import { emitPlan } from "../emitter"
-import { createCoreError } from "../errors"
-import { isCoreError } from "../errors"
+import { compileCorePipeline } from "./index"
+import type { CompilePresetInput, CompilePresetSuccess } from "./compile"
+import { compilePreset } from "./compile"
+import { createLayoutPlan } from "./planner"
+import { emitPlan } from "./emitter"
+import { createCoreError } from "./errors"
+import { isCoreError } from "./errors"
 
 const validDocument = `
 name: pipeline
