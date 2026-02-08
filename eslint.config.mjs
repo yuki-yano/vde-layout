@@ -43,6 +43,15 @@ const BACKENDS_LAYER_IMPORT_PATTERNS = [
 ]
 
 const createRestrictedImportRule = (patterns) => {
+  const normalizePattern = (pattern) => {
+    if (typeof pattern === "string") {
+      return {
+        group: [pattern],
+      }
+    }
+    return pattern
+  }
+
   return [
     "error",
     {
@@ -51,7 +60,7 @@ const createRestrictedImportRule = (patterns) => {
           group: RELATIVE_TS_IMPORT_PATTERNS,
           message: "Use extensionless relative imports.",
         },
-        ...patterns,
+        ...patterns.map(normalizePattern),
       ],
     },
   ]
