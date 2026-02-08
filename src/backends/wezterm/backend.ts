@@ -22,6 +22,7 @@ import {
   resolveSplitPercentage as resolveSplitPercentageFromStep,
 } from "../../executor/split-step"
 import { prepareTerminalCommands } from "../../executor/terminal-command-preparation"
+import { createUnsupportedStepKindError } from "../../executor/unsupported-step-kind"
 
 type PaneMap = Map<string, string>
 
@@ -127,11 +128,7 @@ const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
       continue
     }
 
-    throw createCoreError("execution", {
-      code: ErrorCodes.INVALID_PLAN,
-      message: `Unsupported step kind in emission: ${String((step as { kind?: unknown }).kind)}`,
-      path: step.id,
-    })
+    throw createUnsupportedStepKindError(step)
   }
 
   const prepared = prepareTerminalCommands({
@@ -783,11 +780,7 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
         })
         executedSteps += 1
       } else {
-        throw createCoreError("execution", {
-          code: ErrorCodes.INVALID_PLAN,
-          message: `Unsupported step kind in emission: ${String((step as { kind?: unknown }).kind)}`,
-          path: step.id,
-        })
+        throw createUnsupportedStepKindError(step)
       }
     }
 

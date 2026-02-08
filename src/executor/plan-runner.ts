@@ -7,6 +7,7 @@ import type { ConfirmPaneClosure } from "../types/confirm-pane"
 import { waitForDelay } from "../utils/async"
 import { resolveSplitOrientation, resolveSplitPercentage } from "./split-step"
 import { prepareTerminalCommands } from "./terminal-command-preparation"
+import { createUnsupportedStepKindError } from "./unsupported-step-kind"
 
 type ExecutePlanInput = {
   readonly emission: PlanEmission
@@ -102,10 +103,7 @@ export const executePlan = async ({
       await executeFocusStep({ step, executor, paneMap })
       executedSteps += 1
     } else {
-      raiseExecutionError(ErrorCodes.INVALID_PLAN, {
-        message: `Unsupported step kind in emission: ${String((step as { kind?: unknown }).kind)}`,
-        path: step.id,
-      })
+      throw createUnsupportedStepKindError(step)
     }
   }
 
