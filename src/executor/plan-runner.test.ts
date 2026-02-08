@@ -346,7 +346,7 @@ describe("executePlan", () => {
 
     const executor = createMockExecutor()
     await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
-      code: "UNKNOWN_PANE",
+      code: ErrorCodes.INVALID_PANE,
       path: "root.unknown",
     })
   })
@@ -372,7 +372,7 @@ describe("executePlan", () => {
 
     const executor = createMockExecutor()
     await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
-      code: "UNKNOWN_PANE",
+      code: ErrorCodes.INVALID_PANE,
       path: "root.missing",
     })
   })
