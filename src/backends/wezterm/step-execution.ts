@@ -148,7 +148,7 @@ export const applyTerminalCommands = async ({
       }),
     onTemplateTokenError: ({ terminal, error }): never => {
       throw createCoreError("execution", {
-        code: "TEMPLATE_TOKEN_ERROR",
+        code: ErrorCodes.TEMPLATE_TOKEN_ERROR,
         message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
         path: terminal.virtualPaneId,
         details: {
