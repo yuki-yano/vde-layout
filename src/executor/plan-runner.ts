@@ -148,7 +148,7 @@ const executeSplitStep = async ({
   )
 
   const panesBefore = await listPaneIds(executor, step)
-  const splitCommand = replaceTarget(step.command, targetRealId)
+  const splitCommand = buildSplitCommand(step, targetRealId)
   await executeCommand(executor, splitCommand, {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
     message: `Failed to execute split step ${step.id}`,
@@ -193,7 +193,7 @@ const executeFocusStep = async ({
     }),
   )
 
-  const command = replaceTarget(step.command, targetRealId)
+  const command = buildFocusCommand(targetRealId)
   await executeCommand(executor, command, {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
     message: `Failed to execute focus step ${step.id}`,
@@ -413,18 +413,45 @@ const findNewPaneId = (before: string[], after: string[]): string | undefined =>
   return after.find((id) => !beforeSet.has(id))
 }
 
-const replaceTarget = (command: ReadonlyArray<string>, realTarget: string): string[] => {
-  const next = [...command]
-  const targetIndex = next.findIndex((value, index) => value === "-t" && index + 1 < next.length)
-  if (targetIndex >= 0) {
-    next[targetIndex + 1] = realTarget
-    return next
+const buildSplitCommand = (step: CommandStep, targetRealId: string): string[] => {
+  const directionFlag = resolveSplitOrientation(step) === "horizontal" ? "-h" : "-v"
+  const percentage = resolveSplitPercentage(step)
+  return ["split-window", directionFlag, "-t", targetRealId, "-p", percentage]
+}
+
+const buildFocusCommand = (targetRealId: string): string[] => {
+  return ["select-pane", "-t", targetRealId]
+}
+
+const resolveSplitOrientation = (step: CommandStep): "horizontal" | "vertical" => {
+  if (step.kind === "split" && (step.orientation === "horizontal" || step.orientation === "vertical")) {
+    return step.orientation
   }
 
-  if (next.length > 0) {
-    next[next.length - 1] = realTarget
+  return step.command.includes("-v") ? "vertical" : "horizontal"
+}
+
+const resolveSplitPercentage = (step: CommandStep): string => {
+  if (step.kind === "split" && typeof step.percentage === "number" && Number.isFinite(step.percentage)) {
+    return String(clampPercentage(step.percentage))
   }
-  return next
+
+  const index = step.command.findIndex((segment) => segment === "-p")
+  if (index >= 0 && index + 1 < step.command.length) {
+    const raw = step.command[index + 1]
+    if (typeof raw === "string" && raw.trim().length > 0) {
+      const parsed = Number(raw)
+      if (Number.isFinite(parsed)) {
+        return String(clampPercentage(parsed))
+      }
+    }
+  }
+
+  return "50"
+}
+
+const clampPercentage = (value: number): number => {
+  return Math.min(99, Math.max(1, Math.round(value)))
 }
 
 const normalizePaneId = (raw: string): string => {

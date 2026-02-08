@@ -14,6 +14,8 @@ export type CommandStep = {
   readonly summary: string
   readonly targetPaneId?: string
   readonly createdPaneId?: string
+  readonly orientation?: "horizontal" | "vertical"
+  readonly percentage?: number
 }
 
 export type EmittedTerminal = {
@@ -101,6 +103,8 @@ const appendSplitSteps = (node: SplitNode, steps: CommandStep[]): void => {
       summary: `split ${targetPaneId} (${directionFlag})`,
       targetPaneId,
       createdPaneId,
+      orientation: node.orientation,
+      percentage: Math.min(percentage, 99),
     })
   }
 }

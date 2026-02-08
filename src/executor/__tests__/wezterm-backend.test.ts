@@ -119,6 +119,39 @@ describe("createWeztermBackend", () => {
     expect(verifyMock).not.toHaveBeenCalled()
   })
 
+  it("uses structured split metadata for dry-run output when available", () => {
+    const backend = createWeztermBackend(createContext())
+    const emission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "root:split:1",
+          kind: "split",
+          summary: "split root",
+          command: ["split-window", "-h", "-t", "root", "-p", "99"],
+          targetPaneId: "root",
+          createdPaneId: "root.1",
+          orientation: "vertical",
+          percentage: 35,
+        },
+        {
+          id: "root:focus",
+          kind: "focus",
+          summary: "focus root.1",
+          command: ["select-pane", "-t", "root.1"],
+          targetPaneId: "root.1",
+        },
+      ],
+      summary: { stepsCount: 2, focusPaneId: "root.1", initialPaneId: "root" },
+    } as unknown as PlanEmission
+
+    expect(backend.getDryRunSteps(emission)[0]).toEqual({
+      backend: "wezterm",
+      summary: "split root",
+      command: "wezterm cli split-pane --bottom --percent 35 --pane-id root",
+    })
+  })
+
   it("spawns a new tab when a wezterm window exists", async () => {
     queueListResponses(
       makeList([{ windowId: "7", panes: [{ paneId: "10", active: true }] }]),

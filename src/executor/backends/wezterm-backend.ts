@@ -100,8 +100,8 @@ const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
       const target = step.targetPaneId ?? "<unknown>"
       const args = buildSplitArguments({
         targetPaneId: target,
-        percent: extractPercent(step.command),
-        horizontal: isHorizontalSplit(step.command),
+        percent: resolveSplitPercent(step),
+        horizontal: resolveSplitOrientation(step) === "horizontal",
       })
       steps.push({
         backend: "wezterm",
@@ -465,21 +465,6 @@ const findNewPaneId = (before: Set<string>, after: Set<string>): string | undefi
   return undefined
 }
 
-const isHorizontalSplit = (command: ReadonlyArray<string>): boolean => {
-  return command.includes("-h")
-}
-
-const extractPercent = (command: ReadonlyArray<string>): string => {
-  const index = command.findIndex((segment) => segment === "-p")
-  if (index >= 0 && index + 1 < command.length) {
-    const value = command[index + 1]
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim()
-    }
-  }
-  return "50"
-}
-
 const buildSplitArguments = (params: {
   readonly targetPaneId: string
   readonly percent: string
@@ -683,8 +668,8 @@ const applySplitStep = async ({
 
   const args = buildSplitArguments({
     targetPaneId: targetRealId,
-    percent: extractPercent(step.command),
-    horizontal: isHorizontalSplit(step.command),
+    percent: resolveSplitPercent(step),
+    horizontal: resolveSplitOrientation(step) === "horizontal",
   })
 
   await runCommand(args, {
@@ -708,6 +693,36 @@ const applySplitStep = async ({
     registerPaneWithAncestors(paneMap, step.createdPaneId, newPaneId)
     logPaneMapping(step.createdPaneId, newPaneId)
   }
+}
+
+const resolveSplitOrientation = (step: CommandStep): "horizontal" | "vertical" => {
+  if (step.kind === "split" && (step.orientation === "horizontal" || step.orientation === "vertical")) {
+    return step.orientation
+  }
+  return step.command.includes("-v") ? "vertical" : "horizontal"
+}
+
+const resolveSplitPercent = (step: CommandStep): string => {
+  if (step.kind === "split" && typeof step.percentage === "number" && Number.isFinite(step.percentage)) {
+    return String(clampPercent(step.percentage))
+  }
+
+  const index = step.command.findIndex((segment) => segment === "-p")
+  if (index >= 0 && index + 1 < step.command.length) {
+    const raw = step.command[index + 1]
+    if (typeof raw === "string" && raw.trim().length > 0) {
+      const parsed = Number(raw)
+      if (Number.isFinite(parsed)) {
+        return String(clampPercent(parsed))
+      }
+    }
+  }
+
+  return "50"
+}
+
+const clampPercent = (value: number): number => {
+  return Math.min(99, Math.max(1, Math.round(value)))
 }
 
 export const createWeztermBackend = (context: TerminalBackendContext): TerminalBackend => {

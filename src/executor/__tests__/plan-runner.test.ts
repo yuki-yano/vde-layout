@@ -68,6 +68,27 @@ describe("executePlan", () => {
     ])
   })
 
+  it("prefers structured split metadata over raw command arguments when provided", async () => {
+    const executor = createMockExecutor()
+    const emission = {
+      ...baseEmission,
+      steps: [
+        {
+          ...baseEmission.steps[0],
+          command: ["split-window", "-h", "-t", "root.0", "-p", "99"],
+          orientation: "vertical",
+          percentage: 33,
+        },
+        baseEmission.steps[1],
+      ],
+    } as unknown as PlanEmission
+
+    await executePlan({ emission, executor, windowMode: "new-window" })
+
+    const splitCommand = executor.getExecutedCommands().find((command) => command[0] === "split-window")
+    expect(splitCommand).toEqual(["split-window", "-v", "-t", "%0", "-p", "33"])
+  })
+
   it("reuses current window and closes other panes when current-window mode is selected", async () => {
     const executor = createMockExecutor()
     executor.setMockPaneIds(["%2", "%3"])
