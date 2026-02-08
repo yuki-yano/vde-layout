@@ -421,12 +421,12 @@ describe("createWeztermBackend", () => {
     )
     expect(runMock).toHaveBeenNthCalledWith(
       2,
-      ["send-text", "--pane-id", "200", "--no-paste", "--", 'cd "/workspace/project"\r'],
+      ["send-text", "--pane-id", "200", "--no-paste", "--", "cd -- '/workspace/project'\r"],
       expect.objectContaining({ message: expect.stringContaining("change directory") }),
     )
     expect(runMock).toHaveBeenNthCalledWith(
       3,
-      ["send-text", "--pane-id", "200", "--no-paste", "--", 'export NODE_ENV="production"\r'],
+      ["send-text", "--pane-id", "200", "--no-paste", "--", "export NODE_ENV='production'\r"],
       expect.objectContaining({ message: expect.stringContaining("set environment variable") }),
     )
     expect(runMock).toHaveBeenNthCalledWith(

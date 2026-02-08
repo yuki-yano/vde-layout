@@ -33,11 +33,18 @@ export type PreparedTerminalCommands = {
   readonly commands: ReadonlyArray<PreparedTerminalCommand>
 }
 
-const DOUBLE_QUOTE = '"'
-const ESCAPED_DOUBLE_QUOTE = '\\"'
+const SINGLE_QUOTE = "'"
+const SHELL_SINGLE_QUOTE_ESCAPE = `'"'"'`
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
 
-const escapeDoubleQuotes = (value: string): string => {
-  return value.split(DOUBLE_QUOTE).join(ESCAPED_DOUBLE_QUOTE)
+const shellQuoteLiteral = (value: string): string => {
+  return `'${value.split(SINGLE_QUOTE).join(SHELL_SINGLE_QUOTE_ESCAPE)}'`
+}
+
+const assertValidEnvKey = (key: string): void => {
+  if (!ENV_KEY_PATTERN.test(key)) {
+    throw new Error(`Invalid environment variable name: ${key}`)
+  }
 }
 
 const normalizeDelay = (delay: unknown): number => {
@@ -74,16 +81,19 @@ export const prepareTerminalCommands = ({
 
     const cwdCommand =
       typeof terminal.cwd === "string" && terminal.cwd.length > 0
-        ? `cd "${escapeDoubleQuotes(terminal.cwd)}"`
+        ? `cd -- ${shellQuoteLiteral(terminal.cwd)}`
         : undefined
 
     const envCommands =
       terminal.env === undefined
         ? []
-        : Object.entries(terminal.env).map(([key, value]) => ({
-            key,
-            command: `export ${key}="${escapeDoubleQuotes(String(value))}"`,
-          }))
+        : Object.entries(terminal.env).map(([key, value]) => {
+            assertValidEnvKey(key)
+            return {
+              key,
+              command: `export ${key}=${shellQuoteLiteral(String(value))}`,
+            }
+          })
 
     const title = typeof terminal.title === "string" && terminal.title.length > 0 ? terminal.title : undefined
 

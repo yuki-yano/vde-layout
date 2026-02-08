@@ -54,10 +54,10 @@ describe("prepareTerminalCommands", () => {
     expect(prepared.commands[0]).toEqual({
       terminal: terminals[0],
       realPaneId: "%0",
-      cwdCommand: 'cd "/workspace/\\"project\\""',
+      cwdCommand: "cd -- '/workspace/\"project\"'",
       envCommands: [
-        { key: "NODE_ENV", command: 'export NODE_ENV="test"' },
-        { key: "QUOTED", command: 'export QUOTED="a\\"b"' },
+        { key: "NODE_ENV", command: "export NODE_ENV='test'" },
+        { key: "QUOTED", command: "export QUOTED='a\"b'" },
       ],
       title: "Main Pane",
       command: { text: "nvim", delayMs: 0 },
@@ -69,6 +69,45 @@ describe("prepareTerminalCommands", () => {
       envCommands: [],
       title: undefined,
       command: { text: "echo %0 %1 %0", delayMs: 0 },
+    })
+  })
+
+  it("quotes cwd and env values as shell literals", () => {
+    const terminals: ReadonlyArray<EmittedTerminal> = [
+      {
+        virtualPaneId: "root.0",
+        cwd: "/workspace/it's/$repo",
+        env: {
+          SIMPLE: "ok",
+          QUOTED: "can't/$HOME",
+        },
+        command: "echo ready",
+        focus: true,
+        name: "main",
+      },
+    ]
+
+    const prepared = prepareTerminalCommands({
+      terminals,
+      focusPaneVirtualId: "root.0",
+      resolveRealPaneId: createResolvePaneId({
+        "root.0": "%0",
+      }),
+      onTemplateTokenError: ({ error }): never => {
+        throw error
+      },
+    })
+
+    expect(prepared.commands[0]).toEqual({
+      terminal: terminals[0],
+      realPaneId: "%0",
+      cwdCommand: "cd -- '/workspace/it'\"'\"'s/$repo'",
+      envCommands: [
+        { key: "SIMPLE", command: "export SIMPLE='ok'" },
+        { key: "QUOTED", command: "export QUOTED='can'\"'\"'t/$HOME'" },
+      ],
+      title: undefined,
+      command: { text: "echo ready", delayMs: 0 },
     })
   })
 
@@ -185,5 +224,33 @@ describe("prepareTerminalCommands", () => {
         },
       }),
     ).toThrow("root.0:pane_id")
+  })
+
+  it("throws for invalid environment variable names", () => {
+    const terminals: ReadonlyArray<EmittedTerminal> = [
+      {
+        virtualPaneId: "root.0",
+        cwd: undefined,
+        env: {
+          "INVALID-KEY": "value",
+        },
+        command: "echo hello",
+        focus: true,
+        name: "main",
+      },
+    ]
+
+    expect(() =>
+      prepareTerminalCommands({
+        terminals,
+        focusPaneVirtualId: "root.0",
+        resolveRealPaneId: createResolvePaneId({
+          "root.0": "%0",
+        }),
+        onTemplateTokenError: ({ error }): never => {
+          throw error
+        },
+      }),
+    ).toThrow("Invalid environment variable name: INVALID-KEY")
   })
 })
