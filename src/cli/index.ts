@@ -2,6 +2,7 @@ import { Command } from "commander"
 import chalk from "chalk"
 import { createRequire } from "module"
 import { createPresetManager } from "../layout/preset.ts"
+import { loadPackageVersion } from "./package-version.ts"
 import { resolveWindowMode } from "./window-mode.ts"
 import { createPaneKillPrompter } from "./user-prompt.ts"
 import type { PresetInfo, WindowMode } from "../models/types"
@@ -47,14 +48,6 @@ export type CLIOptions = {
 
 export type CLI = {
   run(args?: string[]): Promise<void>
-}
-
-const loadPackageVersion = (requireFn: NodeJS.Require): string => {
-  try {
-    return (requireFn("../../package.json") as { version: string }).version
-  } catch {
-    return (requireFn("../package.json") as { version: string }).version
-  }
 }
 
 export const createCli = (options: CLIOptions = {}): CLI => {
