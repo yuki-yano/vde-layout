@@ -1,14 +1,14 @@
 import type { WindowMode } from "../models/types.ts"
 
-export type WindowModeSource = {
+type WindowModeSource = {
   readonly cli?: WindowMode
   readonly preset?: WindowMode
   readonly defaults?: WindowMode
 }
 
-export type WindowModeResolutionSource = "cli" | "preset" | "defaults" | "fallback"
+type WindowModeResolutionSource = "cli" | "preset" | "defaults" | "fallback"
 
-export type WindowModeResolution = {
+type WindowModeResolution = {
   readonly mode: WindowMode
   readonly source: WindowModeResolutionSource
 }
