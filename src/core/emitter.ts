@@ -92,21 +92,25 @@ const appendSplitSteps = (node: SplitNode, steps: CommandStep[]): void => {
 
     const desiredPercentage =
       remainingIncludingTarget === 0 ? 0 : (remainingAfterTarget / remainingIncludingTarget) * 100
-    const percentage = Math.max(1, Math.round(desiredPercentage))
+    const percentage = clampPercent(desiredPercentage)
     const targetPaneId = node.panes[index - 1]?.id ?? node.id
     const createdPaneId = node.panes[index]?.id
 
     steps.push({
       id: `${node.id}:split:${index}`,
       kind: "split",
-      command: ["split-window", directionFlag, "-t", targetPaneId, "-p", String(Math.min(percentage, 99))],
+      command: ["split-window", directionFlag, "-t", targetPaneId, "-p", String(percentage)],
       summary: `split ${targetPaneId} (${directionFlag})`,
       targetPaneId,
       createdPaneId,
       orientation: node.orientation,
-      percentage: Math.min(percentage, 99),
+      percentage,
     })
   }
+}
+
+const clampPercent = (value: number): number => {
+  return Math.min(99, Math.max(1, Math.round(value)))
 }
 
 const collectTerminals = (node: PlanNode): EmittedTerminal[] => {

@@ -121,7 +121,7 @@ describe("createWeztermBackend", () => {
 
   it("uses structured split metadata for dry-run output when available", () => {
     const backend = createWeztermBackend(createContext())
-    const emission = {
+    const emission: PlanEmission = {
       ...minimalEmission(),
       steps: [
         {
@@ -143,12 +143,36 @@ describe("createWeztermBackend", () => {
         },
       ],
       summary: { stepsCount: 2, focusPaneId: "root.1", initialPaneId: "root" },
-    } as unknown as PlanEmission
+    }
 
     expect(backend.getDryRunSteps(emission)[0]).toEqual({
       backend: "wezterm",
       summary: "split root",
       command: "wezterm cli split-pane --bottom --percent 35 --pane-id root",
+    })
+  })
+
+  it("defaults legacy split commands without direction flag to bottom in dry-run", () => {
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "root:split:1",
+          kind: "split",
+          summary: "split root",
+          command: ["split-window", "-t", "root", "-p", "40"],
+          targetPaneId: "root",
+          createdPaneId: "root.1",
+        },
+      ],
+      summary: { stepsCount: 1, focusPaneId: "root", initialPaneId: "root" },
+    }
+
+    expect(backend.getDryRunSteps(emission)[0]).toEqual({
+      backend: "wezterm",
+      summary: "split root",
+      command: "wezterm cli split-pane --bottom --percent 40 --pane-id root",
     })
   })
 

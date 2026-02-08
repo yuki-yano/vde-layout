@@ -70,7 +70,7 @@ describe("executePlan", () => {
 
   it("prefers structured split metadata over raw command arguments when provided", async () => {
     const executor = createMockExecutor()
-    const emission = {
+    const emission: PlanEmission = {
       ...baseEmission,
       steps: [
         {
@@ -81,12 +81,32 @@ describe("executePlan", () => {
         },
         baseEmission.steps[1],
       ],
-    } as unknown as PlanEmission
+    }
 
     await executePlan({ emission, executor, windowMode: "new-window" })
 
     const splitCommand = executor.getExecutedCommands().find((command) => command[0] === "split-window")
     expect(splitCommand).toEqual(["split-window", "-v", "-t", "%0", "-p", "33"])
+  })
+
+  it("defaults legacy split commands without direction flag to vertical", async () => {
+    const executor = createMockExecutor()
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          ...baseEmission.steps[0],
+          command: ["split-window", "-t", "root.0", "-p", "40"],
+          orientation: undefined,
+        },
+        baseEmission.steps[1],
+      ],
+    }
+
+    await executePlan({ emission, executor, windowMode: "new-window" })
+
+    const splitCommand = executor.getExecutedCommands().find((command) => command[0] === "split-window")
+    expect(splitCommand).toEqual(["split-window", "-v", "-t", "%0", "-p", "40"])
   })
 
   it("reuses current window and closes other panes when current-window mode is selected", async () => {

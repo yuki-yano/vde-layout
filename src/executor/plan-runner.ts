@@ -6,6 +6,7 @@ import { createCoreError } from "../core/errors.ts"
 import type { ConfirmPaneClosure } from "../types/confirm-pane.ts"
 import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../utils/template-tokens.ts"
 import { waitForDelay } from "../utils/async.ts"
+import { resolveSplitOrientation, resolveSplitPercentage } from "./split-step.ts"
 
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'
@@ -421,37 +422,6 @@ const buildSplitCommand = (step: CommandStep, targetRealId: string): string[] =>
 
 const buildFocusCommand = (targetRealId: string): string[] => {
   return ["select-pane", "-t", targetRealId]
-}
-
-const resolveSplitOrientation = (step: CommandStep): "horizontal" | "vertical" => {
-  if (step.kind === "split" && (step.orientation === "horizontal" || step.orientation === "vertical")) {
-    return step.orientation
-  }
-
-  return step.command.includes("-v") ? "vertical" : "horizontal"
-}
-
-const resolveSplitPercentage = (step: CommandStep): string => {
-  if (step.kind === "split" && typeof step.percentage === "number" && Number.isFinite(step.percentage)) {
-    return String(clampPercentage(step.percentage))
-  }
-
-  const index = step.command.findIndex((segment) => segment === "-p")
-  if (index >= 0 && index + 1 < step.command.length) {
-    const raw = step.command[index + 1]
-    if (typeof raw === "string" && raw.trim().length > 0) {
-      const parsed = Number(raw)
-      if (Number.isFinite(parsed)) {
-        return String(clampPercentage(parsed))
-      }
-    }
-  }
-
-  return "50"
-}
-
-const clampPercentage = (value: number): number => {
-  return Math.min(99, Math.max(1, Math.round(value)))
 }
 
 const normalizePaneId = (raw: string): string => {

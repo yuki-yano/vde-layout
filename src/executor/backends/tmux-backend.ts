@@ -1,6 +1,10 @@
 import { createTmuxExecutor } from "../../tmux/executor.ts"
 import type { CommandStep, PlanEmission } from "../../core/emitter.ts"
 import { executePlan } from "../plan-runner.ts"
+import {
+  resolveSplitOrientation as resolveSplitOrientationFromStep,
+  resolveSplitPercentage as resolveSplitPercentageFromStep,
+} from "../split-step.ts"
 import type {
   ApplyPlanParameters,
   ApplyPlanResult,
@@ -56,8 +60,8 @@ export const createTmuxBackend = (context: TerminalBackendContext): TerminalBack
 const buildTmuxCommand = (step: CommandStep): string[] => {
   if (step.kind === "split") {
     const target = resolveTargetPaneId(step)
-    const direction = resolveSplitOrientation(step) === "horizontal" ? "-h" : "-v"
-    const percent = resolveSplitPercentage(step)
+    const direction = resolveSplitOrientationFromStep(step) === "horizontal" ? "-h" : "-v"
+    const percent = resolveSplitPercentageFromStep(step)
     return ["split-window", direction, "-t", target, "-p", percent]
   }
 
@@ -83,35 +87,4 @@ const resolveTargetPaneId = (step: CommandStep): string => {
   }
 
   return "<unknown>"
-}
-
-const resolveSplitOrientation = (step: CommandStep): "horizontal" | "vertical" => {
-  if (step.kind === "split" && (step.orientation === "horizontal" || step.orientation === "vertical")) {
-    return step.orientation
-  }
-
-  return step.command.includes("-v") ? "vertical" : "horizontal"
-}
-
-const resolveSplitPercentage = (step: CommandStep): string => {
-  if (step.kind === "split" && typeof step.percentage === "number" && Number.isFinite(step.percentage)) {
-    return String(clampPercentage(step.percentage))
-  }
-
-  const percentIndex = step.command.findIndex((segment) => segment === "-p")
-  if (percentIndex >= 0 && percentIndex + 1 < step.command.length) {
-    const raw = step.command[percentIndex + 1]
-    if (typeof raw === "string" && raw.trim().length > 0) {
-      const parsed = Number(raw)
-      if (Number.isFinite(parsed)) {
-        return String(clampPercentage(parsed))
-      }
-    }
-  }
-
-  return "50"
-}
-
-const clampPercentage = (value: number): number => {
-  return Math.min(99, Math.max(1, Math.round(value)))
 }
