@@ -29,8 +29,7 @@ export type TerminalBackend = {
   readonly getDryRunSteps: (emission: PlanEmission) => DryRunStep[]
 }
 
-export type TerminalBackendContext = {
-  readonly executor: CommandExecutor
+export type TerminalBackendBaseContext = {
   readonly logger: Logger
   readonly dryRun: boolean
   readonly verbose: boolean
@@ -38,3 +37,11 @@ export type TerminalBackendContext = {
   readonly cwd: string
   readonly paneId?: string
 }
+
+export type TmuxTerminalBackendContext = TerminalBackendBaseContext & {
+  readonly executor: CommandExecutor
+}
+
+export type WeztermTerminalBackendContext = TerminalBackendBaseContext
+
+export type TerminalBackendContext = TmuxTerminalBackendContext | WeztermTerminalBackendContext

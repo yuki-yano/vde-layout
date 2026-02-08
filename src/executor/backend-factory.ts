@@ -1,9 +1,20 @@
-import type { TerminalBackend, TerminalBackendContext, TerminalBackendKind } from "./terminal-backend"
+import type {
+  TerminalBackend,
+  TerminalBackendContext,
+  TerminalBackendKind,
+  TmuxTerminalBackendContext,
+  WeztermTerminalBackendContext,
+} from "./terminal-backend"
 import { createTmuxBackend } from "../backends/tmux/backend"
 import { createWeztermBackend } from "../backends/wezterm/backend"
 
-export const createTerminalBackend = (kind: TerminalBackendKind, context: TerminalBackendContext): TerminalBackend => {
+export function createTerminalBackend(kind: "tmux", context: TmuxTerminalBackendContext): TerminalBackend
+export function createTerminalBackend(kind: "wezterm", context: WeztermTerminalBackendContext): TerminalBackend
+export function createTerminalBackend(kind: TerminalBackendKind, context: TerminalBackendContext): TerminalBackend {
   if (kind === "tmux") {
+    if (!("executor" in context)) {
+      throw new Error("tmux backend requires executor context")
+    }
     return createTmuxBackend(context)
   }
 

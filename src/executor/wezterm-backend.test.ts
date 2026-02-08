@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { createWeztermBackend } from "../backends/wezterm/backend"
-import type { TerminalBackendContext } from "./terminal-backend"
+import type { WeztermTerminalBackendContext } from "./terminal-backend"
 import type { Logger } from "../utils/logger"
 import { LogLevel } from "../utils/logger"
 import type { PlanEmission } from "../core/emitter"
@@ -71,13 +71,7 @@ const createMockLogger = (): Logger => {
   return logger
 }
 
-const createContext = (overrides: Partial<TerminalBackendContext> = {}): TerminalBackendContext => ({
-  executor: {
-    execute: vi.fn(),
-    executeMany: vi.fn(),
-    isDryRun: vi.fn(() => false),
-    logCommand: vi.fn(),
-  },
+const createContext = (overrides: Partial<WeztermTerminalBackendContext> = {}): WeztermTerminalBackendContext => ({
   logger: createMockLogger(),
   dryRun: false,
   verbose: false,
