@@ -21,6 +21,8 @@ layout:
     expect(emission.steps).toHaveLength(2)
     expect(emission.steps[0]).toMatchObject({
       kind: "split",
+      orientation: "horizontal",
+      percentage: 50,
       command: ["split-window", "-h", "-t", "root.0", "-p", expect.any(String)],
     })
     expect(emission.summary.stepsCount).toBe(2)
@@ -113,14 +115,20 @@ layout:
     expect(splitSteps).toEqual([
       expect.objectContaining({
         id: "root:split:1",
+        orientation: "horizontal",
+        percentage: 67,
         command: ["split-window", "-h", "-t", "root.0", "-p", "67"],
       }),
       expect.objectContaining({
         id: "root:split:2",
+        orientation: "horizontal",
+        percentage: 50,
         command: ["split-window", "-h", "-t", "root.1", "-p", "50"],
       }),
       expect.objectContaining({
         id: "root.1:split:1",
+        orientation: "vertical",
+        percentage: 67,
         command: ["split-window", "-v", "-t", "root.1.0", "-p", "67"],
       }),
     ])

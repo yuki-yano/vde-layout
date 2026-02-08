@@ -18,6 +18,10 @@ import {
 } from "../../wezterm/cli.ts"
 import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../../utils/template-tokens.ts"
 import { waitForDelay } from "../../utils/async.ts"
+import {
+  resolveSplitOrientation as resolveSplitOrientationFromStep,
+  resolveSplitPercentage as resolveSplitPercentageFromStep,
+} from "../split-step.ts"
 
 type PaneMap = Map<string, string>
 
@@ -100,8 +104,8 @@ const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
       const target = step.targetPaneId ?? "<unknown>"
       const args = buildSplitArguments({
         targetPaneId: target,
-        percent: extractPercent(step.command),
-        horizontal: isHorizontalSplit(step.command),
+        percent: resolveSplitPercentageFromStep(step),
+        horizontal: resolveSplitOrientationFromStep(step) === "horizontal",
       })
       steps.push({
         backend: "wezterm",
@@ -465,21 +469,6 @@ const findNewPaneId = (before: Set<string>, after: Set<string>): string | undefi
   return undefined
 }
 
-const isHorizontalSplit = (command: ReadonlyArray<string>): boolean => {
-  return command.includes("-h")
-}
-
-const extractPercent = (command: ReadonlyArray<string>): string => {
-  const index = command.findIndex((segment) => segment === "-p")
-  if (index >= 0 && index + 1 < command.length) {
-    const value = command[index + 1]
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim()
-    }
-  }
-  return "50"
-}
-
 const buildSplitArguments = (params: {
   readonly targetPaneId: string
   readonly percent: string
@@ -683,8 +672,8 @@ const applySplitStep = async ({
 
   const args = buildSplitArguments({
     targetPaneId: targetRealId,
-    percent: extractPercent(step.command),
-    horizontal: isHorizontalSplit(step.command),
+    percent: resolveSplitPercentageFromStep(step),
+    horizontal: resolveSplitOrientationFromStep(step) === "horizontal",
   })
 
   await runCommand(args, {

@@ -1,6 +1,10 @@
 import { createTmuxExecutor } from "../../tmux/executor.ts"
-import type { PlanEmission } from "../../core/emitter.ts"
+import type { CommandStep, PlanEmission } from "../../core/emitter.ts"
 import { executePlan } from "../plan-runner.ts"
+import {
+  resolveSplitOrientation as resolveSplitOrientationFromStep,
+  resolveSplitPercentage as resolveSplitPercentageFromStep,
+} from "../split-step.ts"
 import type {
   ApplyPlanParameters,
   ApplyPlanResult,
@@ -20,7 +24,7 @@ export const createTmuxBackend = (context: TerminalBackendContext): TerminalBack
     return emission.steps.map((step) => ({
       backend: "tmux" as const,
       summary: step.summary,
-      command: tmuxExecutor.getCommandString([...step.command]),
+      command: tmuxExecutor.getCommandString(buildTmuxCommand(step)),
     }))
   }
 
@@ -51,4 +55,36 @@ export const createTmuxBackend = (context: TerminalBackendContext): TerminalBack
     applyPlan,
     getDryRunSteps: buildDryRunSteps,
   }
+}
+
+const buildTmuxCommand = (step: CommandStep): string[] => {
+  if (step.kind === "split") {
+    const target = resolveTargetPaneId(step)
+    const direction = resolveSplitOrientationFromStep(step) === "horizontal" ? "-h" : "-v"
+    const percent = resolveSplitPercentageFromStep(step)
+    return ["split-window", direction, "-t", target, "-p", percent]
+  }
+
+  if (step.kind === "focus") {
+    const target = resolveTargetPaneId(step)
+    return ["select-pane", "-t", target]
+  }
+
+  return [...step.command]
+}
+
+const resolveTargetPaneId = (step: CommandStep): string => {
+  if (typeof step.targetPaneId === "string" && step.targetPaneId.length > 0) {
+    return step.targetPaneId
+  }
+
+  const targetIndex = step.command.findIndex((segment) => segment === "-t")
+  if (targetIndex >= 0 && targetIndex + 1 < step.command.length) {
+    const raw = step.command[targetIndex + 1]
+    if (typeof raw === "string" && raw.length > 0) {
+      return raw
+    }
+  }
+
+  return "<unknown>"
 }

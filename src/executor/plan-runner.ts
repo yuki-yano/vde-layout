@@ -6,6 +6,7 @@ import { createCoreError } from "../core/errors.ts"
 import type { ConfirmPaneClosure } from "../types/confirm-pane.ts"
 import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../utils/template-tokens.ts"
 import { waitForDelay } from "../utils/async.ts"
+import { resolveSplitOrientation, resolveSplitPercentage } from "./split-step.ts"
 
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'
@@ -148,7 +149,7 @@ const executeSplitStep = async ({
   )
 
   const panesBefore = await listPaneIds(executor, step)
-  const splitCommand = replaceTarget(step.command, targetRealId)
+  const splitCommand = buildSplitCommand(step, targetRealId)
   await executeCommand(executor, splitCommand, {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
     message: `Failed to execute split step ${step.id}`,
@@ -193,7 +194,7 @@ const executeFocusStep = async ({
     }),
   )
 
-  const command = replaceTarget(step.command, targetRealId)
+  const command = buildFocusCommand(targetRealId)
   await executeCommand(executor, command, {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
     message: `Failed to execute focus step ${step.id}`,
@@ -413,18 +414,14 @@ const findNewPaneId = (before: string[], after: string[]): string | undefined =>
   return after.find((id) => !beforeSet.has(id))
 }
 
-const replaceTarget = (command: ReadonlyArray<string>, realTarget: string): string[] => {
-  const next = [...command]
-  const targetIndex = next.findIndex((value, index) => value === "-t" && index + 1 < next.length)
-  if (targetIndex >= 0) {
-    next[targetIndex + 1] = realTarget
-    return next
-  }
+const buildSplitCommand = (step: CommandStep, targetRealId: string): string[] => {
+  const directionFlag = resolveSplitOrientation(step) === "horizontal" ? "-h" : "-v"
+  const percentage = resolveSplitPercentage(step)
+  return ["split-window", directionFlag, "-t", targetRealId, "-p", percentage]
+}
 
-  if (next.length > 0) {
-    next[next.length - 1] = realTarget
-  }
-  return next
+const buildFocusCommand = (targetRealId: string): string[] => {
+  return ["select-pane", "-t", targetRealId]
 }
 
 const normalizePaneId = (raw: string): string => {

@@ -144,7 +144,54 @@ describe("createTmuxBackend", () => {
     expect(steps[0]).toEqual({
       backend: "tmux",
       summary: "split",
-      command: "tmux split-window -h",
+      command: "tmux split-window -h -t root -p 50",
+    })
+  })
+
+  it("uses structured split metadata for dry-run output when available", () => {
+    const emission: PlanEmission = {
+      ...createEmission(),
+      steps: [
+        {
+          ...createEmission().steps[0],
+          command: ["split-window", "-h", "-t", "root", "-p", "99"],
+          orientation: "vertical",
+          percentage: 33,
+        },
+        createEmission().steps[1],
+      ],
+    }
+
+    const backend = createTmuxBackend(createContext())
+    const steps = backend.getDryRunSteps(emission)
+
+    expect(steps[0]).toEqual({
+      backend: "tmux",
+      summary: "split",
+      command: "tmux split-window -v -t root -p 33",
+    })
+  })
+
+  it("defaults legacy split commands without direction flag to vertical in dry-run", () => {
+    const emission: PlanEmission = {
+      ...createEmission(),
+      steps: [
+        {
+          ...createEmission().steps[0],
+          command: ["split-window", "-t", "root", "-p", "40"],
+          orientation: undefined,
+        },
+        createEmission().steps[1],
+      ],
+    }
+
+    const backend = createTmuxBackend(createContext())
+    const steps = backend.getDryRunSteps(emission)
+
+    expect(steps[0]).toEqual({
+      backend: "tmux",
+      summary: "split",
+      command: "tmux split-window -v -t root -p 40",
     })
   })
 })
