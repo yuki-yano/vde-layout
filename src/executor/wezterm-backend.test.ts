@@ -261,6 +261,24 @@ describe("createWeztermBackend", () => {
     expect(result.focusPaneId).toBe("21")
   })
 
+  it("falls back gracefully when prefetching pane workspace fails", async () => {
+    listMock
+      .mockRejectedValueOnce(new Error("prefetch failed"))
+      .mockResolvedValueOnce(makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]))
+      .mockResolvedValueOnce(makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "42" }] }]))
+    runMock.mockResolvedValueOnce("42 w1\n")
+
+    const backend = createWeztermBackend(createContext({ paneId: "dev-pane" }))
+    const result = await backend.applyPlan({ emission: minimalEmission(), windowMode: "new-window" })
+
+    expect(runMock).toHaveBeenNthCalledWith(
+      1,
+      ["spawn", "--window-id", "w1", "--cwd", "/workspace"],
+      expect.objectContaining({ message: "Failed to spawn wezterm tab" }),
+    )
+    expect(result.focusPaneId).toBe("42")
+  })
+
   it("resolves current window and closes extra panes when confirmed", async () => {
     queueListResponses(
       makeList([
@@ -281,6 +299,22 @@ describe("createWeztermBackend", () => {
     expect(prompt).toHaveBeenCalledWith({ panesToClose: ["B"], dryRun: false })
     expect(killMock).toHaveBeenCalledWith("B")
     expect(result.focusPaneId).toBe("A")
+  })
+
+  it("throws when plan summary omits initial pane metadata", async () => {
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      summary: {
+        ...minimalEmission().summary,
+        initialPaneId: "",
+      },
+    }
+
+    await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "INVALID_PANE",
+      path: "plan.initialPaneId",
+    })
   })
 
   it("uses paneId to resolve the current window when it is not active", async () => {
@@ -326,6 +360,62 @@ describe("createWeztermBackend", () => {
       code: "USER_CANCELLED",
     })
     expect(killMock).not.toHaveBeenCalled()
+  })
+
+  it("throws when focus step target cannot be resolved from pane map", async () => {
+    queueListResponses(
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "100" }] }]),
+    )
+    runMock.mockResolvedValueOnce("100 w1\n")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "orphan:focus",
+          kind: "focus",
+          summary: "focus orphan",
+          command: ["select-pane", "-t", "orphan"],
+          targetPaneId: "orphan",
+        },
+      ],
+      summary: { ...minimalEmission().summary, stepsCount: 1 },
+    }
+
+    await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "INVALID_PANE",
+      path: "orphan:focus",
+    })
+  })
+
+  it("throws when split step target metadata is missing", async () => {
+    queueListResponses(
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "100" }] }]),
+    )
+    runMock.mockResolvedValueOnce("100 w1\n")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "root:split:missing-target",
+          kind: "split",
+          summary: "split without target",
+          command: ["split-window", "-h", "-p", "50"],
+          createdPaneId: "root.1",
+        },
+      ],
+      summary: { ...minimalEmission().summary, stepsCount: 1 },
+    }
+
+    await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "INVALID_PANE",
+      path: "root:split:missing-target",
+    })
   })
 
   it("executes split steps and registers new panes", async () => {
@@ -600,5 +690,19 @@ describe("createWeztermBackend", () => {
         command: "wezterm cli send-text --pane-id root:1 --no-paste -- 'npm test'",
       },
     ])
+  })
+
+  it("logs pane mapping via info logger when verbose is enabled", async () => {
+    queueListResponses(
+      makeList([{ windowId: "7", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "7", panes: [{ paneId: "10", active: true }, { paneId: "42" }] }]),
+    )
+    runMock.mockResolvedValueOnce("42 7\n")
+    const logger = createMockLogger()
+    const backend = createWeztermBackend(createContext({ logger, verbose: true }))
+
+    await backend.applyPlan({ emission: minimalEmission(), windowMode: "new-window" })
+
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("[wezterm] pane root -> 42"))
   })
 })

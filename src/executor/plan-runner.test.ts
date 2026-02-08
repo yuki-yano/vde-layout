@@ -574,4 +574,165 @@ describe("executePlan", () => {
     // Check that template tokens are replaced AND ephemeral logic is applied
     expect(commands).toContainEqual(["send-keys", "-t", "%1", 'echo "Editor is %0"; [ $? -eq 0 ] && exit', "Enter"])
   })
+
+  it("resolves parent virtual pane ids from descendant mappings", async () => {
+    const emission: PlanEmission = {
+      steps: [
+        {
+          id: "root:split:from-parent",
+          kind: "split",
+          command: ["split-window", "-h", "-t", "root", "-p", "50"],
+          summary: "split root from descendant map",
+          targetPaneId: "root",
+          createdPaneId: "root.1",
+        },
+      ],
+      hash: "hash",
+      summary: {
+        focusPaneId: "root.0",
+        stepsCount: 1,
+        initialPaneId: "root.0",
+      },
+      terminals: [],
+    }
+
+    const executor = createMockExecutor()
+    const result = await executePlan({ emission, executor, windowMode: "new-window" })
+
+    expect(result.executedSteps).toBe(1)
+    expect(executor.getExecutedCommands()).toEqual([
+      ["new-window", "-P", "-F", "#{pane_id}"],
+      ["list-panes", "-F", "#{pane_id}"],
+      ["split-window", "-h", "-t", "%0", "-p", "50"],
+      ["list-panes", "-F", "#{pane_id}"],
+      ["select-pane", "-t", "%0"],
+    ])
+  })
+
+  it("throws MISSING_TARGET when split step omits target pane metadata", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          id: "root:split:missing-target",
+          kind: "split",
+          command: ["split-window", "-h", "-p", "50"],
+          summary: "invalid split",
+          createdPaneId: "root.1",
+        },
+      ],
+      summary: {
+        ...baseEmission.summary,
+        stepsCount: 1,
+      },
+      terminals: [],
+    }
+
+    const executor = createMockExecutor()
+
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.MISSING_TARGET,
+      path: "root:split:missing-target",
+    })
+  })
+
+  it("uses %0 as current pane id in dry-run when TMUX_PANE is absent", async () => {
+    const originalPane = process.env.TMUX_PANE
+    delete process.env.TMUX_PANE
+
+    try {
+      const executor = createMockExecutor()
+      executor.setMockPaneIds(["%0", "%1"])
+      const onConfirmKill = vi.fn().mockResolvedValue(true)
+
+      const result = await executePlan({
+        emission: baseEmission,
+        executor,
+        windowMode: "current-window",
+        onConfirmKill,
+      })
+
+      expect(result.executedSteps).toBe(2)
+      expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%1"], dryRun: true })
+
+      const commands = executor.getExecutedCommands()
+      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}"])
+      expect(commands[1]).toEqual(["kill-pane", "-a", "-t", "%0"])
+    } finally {
+      if (originalPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalPane
+      }
+    }
+  })
+
+  it("resolves current pane id via tmux display-message outside dry-run", async () => {
+    const originalPane = process.env.TMUX_PANE
+    delete process.env.TMUX_PANE
+
+    try {
+      const baseExecutor = createMockExecutor()
+      baseExecutor.setMockPaneIds(["%9", "%10"])
+      const executor = {
+        ...baseExecutor,
+        isDryRun: () => false,
+      }
+      const onConfirmKill = vi.fn().mockResolvedValue(true)
+
+      const result = await executePlan({
+        emission: baseEmission,
+        executor,
+        windowMode: "current-window",
+        onConfirmKill,
+      })
+
+      expect(result.executedSteps).toBe(2)
+      expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%10"], dryRun: false })
+
+      const commands = executor.getExecutedCommands()
+      expect(commands[0]).toEqual(["display-message", "-p", "#{pane_id}"])
+      expect(commands[1]).toEqual(["list-panes", "-F", "#{pane_id}"])
+      expect(commands[2]).toEqual(["kill-pane", "-a", "-t", "%9"])
+    } finally {
+      if (originalPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalPane
+      }
+    }
+  })
+
+  it("throws NOT_IN_TMUX_SESSION when current pane id cannot be resolved", async () => {
+    const originalPane = process.env.TMUX_PANE
+    delete process.env.TMUX_PANE
+
+    try {
+      const executor = {
+        execute: vi.fn(async (command: string | string[]) => {
+          const args = typeof command === "string" ? command.split(" ").slice(1) : command
+          if (args[0] === "display-message") {
+            return "   "
+          }
+          return ""
+        }),
+        executeMany: vi.fn(async () => {}),
+        isDryRun: () => false,
+        logCommand: vi.fn(),
+      }
+
+      await expect(
+        executePlan({ emission: baseEmission, executor, windowMode: "current-window" }),
+      ).rejects.toMatchObject({
+        code: ErrorCodes.NOT_IN_TMUX_SESSION,
+        path: "root.0",
+      })
+    } finally {
+      if (originalPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalPane
+      }
+    }
+  })
 })

@@ -100,4 +100,89 @@ describe("error helpers", () => {
     expect(isVDELayoutError(vdeError)).toBe(true)
     expect(isVDELayoutError(standardError)).toBe(false)
   })
+
+  it("rejects invalid VDE error candidates in type guard", () => {
+    expect(isVDELayoutError(null)).toBe(false)
+    expect(isVDELayoutError("error")).toBe(false)
+    expect(isVDELayoutError({})).toBe(false)
+    expect(isVDELayoutError({ code: 123, details: {} })).toBe(false)
+    expect(isVDELayoutError({ code: ErrorCodes.INVALID_LAYOUT })).toBe(false)
+  })
+
+  it("omits config search path help when searchPaths is not an array", () => {
+    const error = createConfigError("Configuration file not found", ErrorCodes.CONFIG_NOT_FOUND, {
+      searchPaths: "/home/user/.config/vde/layout.yml",
+    })
+
+    const formatted = formatError(error)
+    expect(formatted).toContain("Error: Configuration file not found")
+    expect(formatted).not.toContain("Searched in the following locations:")
+    expect(formatted).not.toContain("To create a configuration file, run:")
+  })
+
+  it("formats tmux environment guidance messages", () => {
+    const notInSession = createTmuxError("not in session", ErrorCodes.NOT_IN_TMUX_SESSION)
+    const tmuxMissing = createEnvironmentError("tmux missing", ErrorCodes.TMUX_NOT_INSTALLED)
+
+    expect(formatError(notInSession)).toContain("must be run inside a tmux session")
+    expect(formatError(tmuxMissing)).toContain("Install tmux using your package manager")
+  })
+
+  it("formats unsupported tmux version only when required version exists", () => {
+    const withRequired = createEnvironmentError("unsupported", ErrorCodes.UNSUPPORTED_TMUX_VERSION, {
+      requiredVersion: "3.4",
+    })
+    const withoutRequired = createEnvironmentError("unsupported", ErrorCodes.UNSUPPORTED_TMUX_VERSION, {
+      requiredVersion: 34,
+    })
+
+    expect(formatError(withRequired)).toContain("Required tmux version: 3.4 or higher")
+    expect(formatError(withoutRequired)).toContain("Error: unsupported")
+    expect(formatError(withoutRequired)).not.toContain("Required tmux version:")
+  })
+
+  it("formats backend not found message with wezterm specific guidance", () => {
+    const genericBackend = createEnvironmentError("backend not found", ErrorCodes.BACKEND_NOT_FOUND, {
+      backend: "tmux",
+      binary: "tmux",
+    })
+    const weztermBackend = createEnvironmentError("backend not found", ErrorCodes.BACKEND_NOT_FOUND, {
+      backend: "wezterm",
+    })
+    const fallbackBackend = createEnvironmentError("backend not found", ErrorCodes.BACKEND_NOT_FOUND, {
+      backend: 42,
+    })
+
+    expect(formatError(genericBackend)).toContain("Missing binary: tmux")
+    expect(formatError(genericBackend)).not.toContain("Install wezterm")
+
+    const weztermFormatted = formatError(weztermBackend)
+    expect(weztermFormatted).toContain("Missing binary: wezterm")
+    expect(weztermFormatted).toContain("Install wezterm using your package manager")
+
+    expect(formatError(fallbackBackend)).toContain("Missing binary: terminal backend")
+  })
+
+  it("formats wezterm guidance and version details", () => {
+    const missing = createEnvironmentError("wezterm missing", ErrorCodes.WEZTERM_NOT_FOUND)
+    const unsupported = createEnvironmentError("wezterm version", ErrorCodes.UNSUPPORTED_WEZTERM_VERSION, {
+      detectedVersion: "20240203-110809",
+      requiredVersion: "20240203-110000",
+    })
+    const unsupportedWithoutVersions = createEnvironmentError(
+      "wezterm version",
+      ErrorCodes.UNSUPPORTED_WEZTERM_VERSION,
+      {
+        detectedVersion: 1,
+        requiredVersion: 2,
+      },
+    )
+
+    expect(formatError(missing)).toContain("wezterm command was not found")
+    expect(formatError(unsupported)).toContain("Detected version: 20240203-110809")
+    expect(formatError(unsupported)).toContain("Required version: 20240203-110000 or higher")
+    const unsupportedWithoutVersionsFormatted = formatError(unsupportedWithoutVersions)
+    expect(unsupportedWithoutVersionsFormatted).toContain("Error: wezterm version")
+    expect(unsupportedWithoutVersionsFormatted).toContain("Unsupported wezterm version detected.")
+  })
 })
