@@ -59,7 +59,7 @@ export const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
     resolveRealPaneId: (virtualPaneId: string): string => virtualPaneId,
     onTemplateTokenError: ({ terminal, error }): never => {
       throw createCoreError("execution", {
-        code: "TEMPLATE_TOKEN_ERROR",
+        code: ErrorCodes.TEMPLATE_TOKEN_ERROR,
         message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
         path: terminal.virtualPaneId,
         details: {
