@@ -18,7 +18,7 @@ const ensureVirtualPaneId = (emission: PlanEmission): string => {
   const { initialPaneId } = emission.summary
   if (typeof initialPaneId !== "string" || initialPaneId.length === 0) {
     throw createCoreError("execution", {
-      code: ErrorCodes.INVALID_PANE,
+      code: ErrorCodes.INVALID_PLAN,
       message: "Plan emission is missing initial pane metadata",
       path: "plan.initialPaneId",
     })
