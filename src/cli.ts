@@ -1,23 +1,23 @@
 import { Command } from "commander"
 import chalk from "chalk"
 import { createRequire } from "module"
-import { createPresetManager } from "./layout/preset.ts"
-import { resolveWindowMode } from "./cli/window-mode.ts"
-import { createPaneKillPrompter } from "./cli/user-prompt.ts"
+import { createPresetManager } from "./layout/preset"
+import { resolveWindowMode } from "./cli/window-mode"
+import { createPaneKillPrompter } from "./cli/user-prompt"
 import type { PresetInfo, WindowMode } from "./models/types"
-import type { CommandExecutor } from "./types/command-executor.ts"
-import type { PresetManager } from "./types/preset-manager.ts"
-import { createRealExecutor, createDryRunExecutor } from "./executor/index.ts"
-import { createTerminalBackend } from "./executor/backend-factory.ts"
-import { resolveTerminalBackendKind } from "./executor/backend-resolver.ts"
-import type { DryRunStep, TerminalBackendKind } from "./executor/terminal-backend.ts"
-import { createLogger, LogLevel, type Logger } from "./utils/logger.ts"
+import type { CommandExecutor } from "./types/command-executor"
+import type { PresetManager } from "./types/preset-manager"
+import { createRealExecutor, createDryRunExecutor } from "./executor/index"
+import { createTerminalBackend } from "./executor/backend-factory"
+import { resolveTerminalBackendKind } from "./executor/backend-resolver"
+import type { DryRunStep, TerminalBackendKind } from "./executor/terminal-backend"
+import { createLogger, LogLevel, type Logger } from "./utils/logger"
 import {
   compilePreset as defaultCompilePreset,
   compilePresetFromValue as defaultCompilePresetFromValue,
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
-} from "./core/index.ts"
+} from "./core/index"
 import type {
   CompilePresetFromValueInput,
   CompilePresetInput,
@@ -25,8 +25,8 @@ import type {
   CoreError,
   CompilePresetSuccess,
   CreateLayoutPlanSuccess,
-} from "./core/index.ts"
-import { isCoreError } from "./core/index.ts"
+} from "./core/index"
+import { isCoreError } from "./core/index"
 
 export type CoreBridge = {
   readonly compilePreset: (input: CompilePresetInput) => ReturnType<typeof defaultCompilePreset>

@@ -1,7 +1,7 @@
-import { createConfigLoader, type ConfigLoaderOptions } from "../config/loader.ts"
-import { createConfigError, ErrorCodes } from "../utils/errors.ts"
-import type { Config, Preset, PresetInfo } from "../models/types.ts"
-import type { PresetManager } from "../types/preset-manager.ts"
+import { createConfigLoader, type ConfigLoaderOptions } from "../config/loader"
+import { createConfigError, ErrorCodes } from "../utils/errors"
+import type { Config, Preset, PresetInfo } from "../models/types"
+import type { PresetManager } from "../types/preset-manager"
 
 type PresetState = {
   setConfigPath: (filePath: string) => void

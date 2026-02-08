@@ -9,7 +9,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
     "noEmit": true,
     "removeComments": true,
     "noUnusedLocals": true,

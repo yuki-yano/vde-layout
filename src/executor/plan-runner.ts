@@ -1,12 +1,12 @@
-import type { CommandExecutor } from "../types/command-executor.ts"
-import type { PlanEmission, CommandStep, EmittedTerminal } from "../core/emitter.ts"
-import type { WindowMode } from "../models/types.ts"
-import { ErrorCodes } from "../utils/errors.ts"
-import { createCoreError } from "../core/errors.ts"
-import type { ConfirmPaneClosure } from "../types/confirm-pane.ts"
-import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../utils/template-tokens.ts"
-import { waitForDelay } from "../utils/async.ts"
-import { resolveSplitOrientation, resolveSplitPercentage } from "./split-step.ts"
+import type { CommandExecutor } from "../types/command-executor"
+import type { PlanEmission, CommandStep, EmittedTerminal } from "../core/emitter"
+import type { WindowMode } from "../models/types"
+import { ErrorCodes } from "../utils/errors"
+import { createCoreError } from "../core/errors"
+import type { ConfirmPaneClosure } from "../types/confirm-pane"
+import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../utils/template-tokens"
+import { waitForDelay } from "../utils/async"
+import { resolveSplitOrientation, resolveSplitPercentage } from "./split-step"
 
 const DOUBLE_QUOTE = '"'
 const ESCAPED_DOUBLE_QUOTE = '\\"'

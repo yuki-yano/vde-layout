@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { CommandExecutor } from "../../types/command-executor.ts"
-import type { PlanEmission } from "../../core/emitter.ts"
-import { createTmuxBackend } from "../backends/tmux-backend.ts"
-import { LogLevel } from "../../utils/logger.ts"
-import type { Logger } from "../../utils/logger.ts"
-import type { TerminalBackendContext } from "../terminal-backend.ts"
+import type { CommandExecutor } from "../../types/command-executor"
+import type { PlanEmission } from "../../core/emitter"
+import { createTmuxBackend } from "../backends/tmux-backend"
+import { LogLevel } from "../../utils/logger"
+import type { Logger } from "../../utils/logger"
+import type { TerminalBackendContext } from "../terminal-backend"
 
 const { verifyEnvironmentMock, getExecutorMock, getCommandStringMock } = vi.hoisted(() => {
   return {
@@ -19,7 +19,7 @@ const { executePlanMock } = vi.hoisted(() => ({
   executePlanMock: vi.fn(),
 }))
 
-vi.mock("../../tmux/executor.ts", () => {
+vi.mock("../../tmux/executor", () => {
   return {
     createTmuxExecutor: vi.fn(() => ({
       verifyTmuxEnvironment: verifyEnvironmentMock,
@@ -29,7 +29,7 @@ vi.mock("../../tmux/executor.ts", () => {
   }
 })
 
-vi.mock("../plan-runner.ts", () => {
+vi.mock("../plan-runner", () => {
   return {
     executePlan: executePlanMock,
   }

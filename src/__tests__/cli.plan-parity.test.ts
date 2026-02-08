@@ -1,14 +1,14 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { createCli, type CLI, type CoreBridge } from "../cli.ts"
-import type { Preset, PresetInfo } from "../models/types.ts"
-import type { CommandExecutor } from "../types/command-executor.ts"
-import type { PresetManager } from "../types/preset-manager.ts"
+import { createCli, type CLI, type CoreBridge } from "../cli"
+import type { Preset, PresetInfo } from "../models/types"
+import type { CommandExecutor } from "../types/command-executor"
+import type { PresetManager } from "../types/preset-manager"
 import {
   compilePreset as defaultCompilePreset,
   compilePresetFromValue as defaultCompilePresetFromValue,
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
-} from "../core/index.ts"
+} from "../core/index"
 
 const createRecordingExecutor = (
   dryRun: boolean,

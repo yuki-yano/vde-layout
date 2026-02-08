@@ -1,17 +1,17 @@
-import { createTmuxExecutor } from "../../tmux/executor.ts"
-import type { CommandStep, PlanEmission } from "../../core/emitter.ts"
-import { executePlan } from "../plan-runner.ts"
+import { createTmuxExecutor } from "../../tmux/executor"
+import type { CommandStep, PlanEmission } from "../../core/emitter"
+import { executePlan } from "../plan-runner"
 import {
   resolveSplitOrientation as resolveSplitOrientationFromStep,
   resolveSplitPercentage as resolveSplitPercentageFromStep,
-} from "../split-step.ts"
+} from "../split-step"
 import type {
   ApplyPlanParameters,
   ApplyPlanResult,
   DryRunStep,
   TerminalBackend,
   TerminalBackendContext,
-} from "../terminal-backend.ts"
+} from "../terminal-backend"
 
 export const createTmuxBackend = (context: TerminalBackendContext): TerminalBackend => {
   const tmuxExecutor = createTmuxExecutor({

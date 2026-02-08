@@ -1,5 +1,5 @@
 import { createHash } from "crypto"
-import type { LayoutPlan, PlanNode } from "./planner.ts"
+import type { LayoutPlan, PlanNode } from "./planner"
 
 type EmitPlanInput = {
   readonly plan: LayoutPlan

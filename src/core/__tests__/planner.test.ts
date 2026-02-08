@@ -1,7 +1,7 @@
-import type { CompiledPreset } from "../compile.ts"
+import type { CompiledPreset } from "../compile"
 import { describe, expect, it } from "vitest"
-import { compilePreset, createLayoutPlan } from "../index.ts"
-import { isCoreError } from "../errors.ts"
+import { compilePreset, createLayoutPlan } from "../index"
+import { isCoreError } from "../errors"
 
 describe("createLayoutPlan", () => {
   it("normalizes ratios and assigns deterministic pane IDs and focus", () => {

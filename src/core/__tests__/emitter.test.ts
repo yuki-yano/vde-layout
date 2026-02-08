@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { compilePreset, createLayoutPlan, emitPlan } from "../index.ts"
+import { compilePreset, createLayoutPlan, emitPlan } from "../index"
 
 describe("emitPlan", () => {
   it("generates tmux command steps from a plan", () => {

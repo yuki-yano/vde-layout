@@ -1,6 +1,6 @@
-import type { CommandExecutor } from "../types/command-executor.ts"
-import type { TmuxExecutorContract } from "../types/tmux.ts"
-import { createEnvironmentError, ErrorCodes } from "../utils/errors.ts"
+import type { CommandExecutor } from "../types/command-executor"
+import type { TmuxExecutorContract } from "../types/tmux"
+import { createEnvironmentError, ErrorCodes } from "../utils/errors"
 
 export type MockExecutor = CommandExecutor &
   TmuxExecutorContract & {

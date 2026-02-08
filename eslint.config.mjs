@@ -3,6 +3,17 @@ import eslintConfigPrettier from "eslint-config-prettier"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 
+const RELATIVE_TS_IMPORT_PATTERNS = [
+  "./*.ts",
+  "./**/*.ts",
+  "../*.ts",
+  "../**/*.ts",
+  "../../*.ts",
+  "../../**/*.ts",
+  "../../../*.ts",
+  "../../../**/*.ts",
+]
+
 export default [
   {
     files: ["src/**/*.ts"],
@@ -38,6 +49,17 @@ export default [
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/consistent-type-definitions": ["error", "type"],
       eqeqeq: ["error", "smart"],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: RELATIVE_TS_IMPORT_PATTERNS,
+              message: "Use extensionless relative imports.",
+            },
+          ],
+        },
+      ],
       "func-style": [
         "error",
         "expression",
@@ -52,7 +74,7 @@ export default [
     ignores: [
       "**/*.js",
       "**/*.mjs",
-      "vitest.config.ts",
+      "vitest.config.*",
       "dist",
       "node_modules",
       "coverage",

@@ -1,8 +1,8 @@
 import { execa } from "execa"
-import { createEnvironmentError, ErrorCodes } from "../utils/errors.ts"
-import type { TmuxExecutorContract } from "../types/tmux.ts"
-import type { CommandExecutor } from "../types/command-executor.ts"
-import { createRealExecutor, createDryRunExecutor, createMockExecutor } from "../executor/index.ts"
+import { createEnvironmentError, ErrorCodes } from "../utils/errors"
+import type { TmuxExecutorContract } from "../types/tmux"
+import type { CommandExecutor } from "../types/command-executor"
+import { createRealExecutor, createDryRunExecutor, createMockExecutor } from "../executor/index"
 
 type TmuxExecutorOptions = {
   readonly verbose?: boolean

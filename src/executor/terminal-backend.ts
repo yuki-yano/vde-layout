@@ -1,8 +1,8 @@
-import type { PlanEmission } from "../core/emitter.ts"
-import type { WindowMode } from "../models/types.ts"
-import type { CommandExecutor } from "../types/command-executor.ts"
-import type { Logger } from "../utils/logger.ts"
-import type { ConfirmPaneClosure } from "../types/confirm-pane.ts"
+import type { PlanEmission } from "../core/emitter"
+import type { WindowMode } from "../models/types"
+import type { CommandExecutor } from "../types/command-executor"
+import type { Logger } from "../utils/logger"
+import type { ConfirmPaneClosure } from "../types/confirm-pane"
 
 export type TerminalBackendKind = "tmux" | "wezterm"
 

@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("../executor/backend-factory.ts", () => ({
+vi.mock("../executor/backend-factory", () => ({
   createTerminalBackend: vi.fn(),
 }))
 
-import { createCli, type CoreBridge } from "../cli.ts"
-import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock.ts"
-import { createTerminalBackend } from "../executor/backend-factory.ts"
-import type { TerminalBackend } from "../executor/terminal-backend.ts"
-import type { CommandExecutor } from "../types/command-executor.ts"
+import { createCli, type CoreBridge } from "../cli"
+import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock"
+import { createTerminalBackend } from "../executor/backend-factory"
+import type { TerminalBackend } from "../executor/terminal-backend"
+import type { CommandExecutor } from "../types/command-executor"
 import type {
   CompilePresetInput,
   CompilePresetSuccess,
@@ -16,8 +16,8 @@ import type {
   CompiledPreset,
   LayoutPlan,
   PlanEmission,
-} from "../core/index.ts"
-import { createCoreError } from "../core/errors.ts"
+} from "../core/index"
+import { createCoreError } from "../core/errors"
 
 const createTerminalBackendMock = vi.mocked(createTerminalBackend)
 

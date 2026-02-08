@@ -7,7 +7,7 @@ import {
   formatError,
   isVDELayoutError,
   ErrorCodes,
-} from "../errors.ts"
+} from "../errors"
 
 describe("error helpers", () => {
   it("creates configuration errors with metadata", () => {

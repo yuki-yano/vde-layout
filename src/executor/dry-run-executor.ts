@@ -1,5 +1,5 @@
-import type { CommandExecutor } from "../types/command-executor.ts"
-import { createLogger, LogLevel } from "../utils/logger.ts"
+import type { CommandExecutor } from "../types/command-executor"
+import { createLogger, LogLevel } from "../utils/logger"
 
 type DryRunExecutorOptions = {
   readonly verbose?: boolean
