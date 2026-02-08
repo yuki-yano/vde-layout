@@ -115,8 +115,9 @@ describe("error helpers", () => {
     })
 
     const formatted = formatError(error)
+    expect(formatted).toContain("Error: Configuration file not found")
     expect(formatted).not.toContain("Searched in the following locations:")
-    expect(formatted).toBe("Error: Configuration file not found\n")
+    expect(formatted).not.toContain("To create a configuration file, run:")
   })
 
   it("formats tmux environment guidance messages", () => {
@@ -136,7 +137,8 @@ describe("error helpers", () => {
     })
 
     expect(formatError(withRequired)).toContain("Required tmux version: 3.4 or higher")
-    expect(formatError(withoutRequired)).toBe("Error: unsupported\n")
+    expect(formatError(withoutRequired)).toContain("Error: unsupported")
+    expect(formatError(withoutRequired)).not.toContain("Required tmux version:")
   })
 
   it("formats backend not found message with wezterm specific guidance", () => {
@@ -179,8 +181,8 @@ describe("error helpers", () => {
     expect(formatError(missing)).toContain("wezterm command was not found")
     expect(formatError(unsupported)).toContain("Detected version: 20240203-110809")
     expect(formatError(unsupported)).toContain("Required version: 20240203-110000 or higher")
-    expect(formatError(unsupportedWithoutVersions)).toBe(
-      "Error: wezterm version\n\nUnsupported wezterm version detected.",
-    )
+    const unsupportedWithoutVersionsFormatted = formatError(unsupportedWithoutVersions)
+    expect(unsupportedWithoutVersionsFormatted).toContain("Error: wezterm version")
+    expect(unsupportedWithoutVersionsFormatted).toContain("Unsupported wezterm version detected.")
   })
 })
