@@ -80,6 +80,8 @@ const sampleEmission: PlanEmission = {
       summary: "split root.0 (-h)",
       targetPaneId: "root.0",
       createdPaneId: "root.1",
+      orientation: "horizontal",
+      percentage: 50,
     },
     {
       id: "root.0:focus",

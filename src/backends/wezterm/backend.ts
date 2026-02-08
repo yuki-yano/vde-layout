@@ -127,10 +127,10 @@ const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
       continue
     }
 
-    steps.push({
-      backend: "wezterm",
-      summary: step.summary,
-      command: `wezterm cli # ${(step.command ?? []).join(" ")}`,
+    throw createCoreError("execution", {
+      code: ErrorCodes.INVALID_PLAN,
+      message: `Unsupported step kind in emission: ${String((step as { kind?: unknown }).kind)}`,
+      path: step.id,
     })
   }
 
@@ -782,6 +782,12 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
           runCommand,
         })
         executedSteps += 1
+      } else {
+        throw createCoreError("execution", {
+          code: ErrorCodes.INVALID_PLAN,
+          message: `Unsupported step kind in emission: ${String((step as { kind?: unknown }).kind)}`,
+          path: step.id,
+        })
       }
     }
 

@@ -1,10 +1,12 @@
 import { createTmuxExecutor } from "./executor"
 import type { CommandStep, PlanEmission } from "../../core/emitter"
 import { executePlan } from "../../executor/plan-runner"
+import { createCoreError } from "../../core/errors"
 import {
   resolveSplitOrientation as resolveSplitOrientationFromStep,
   resolveSplitPercentage as resolveSplitPercentageFromStep,
 } from "../../executor/split-step"
+import { ErrorCodes } from "../../utils/errors"
 import type {
   ApplyPlanParameters,
   ApplyPlanResult,
@@ -70,21 +72,16 @@ const buildTmuxCommand = (step: CommandStep): string[] => {
     return ["select-pane", "-t", target]
   }
 
-  return [...(step.command ?? [])]
+  throw createCoreError("execution", {
+    code: ErrorCodes.INVALID_PLAN,
+    message: `Unsupported step kind in emission: ${String((step as { kind?: unknown }).kind)}`,
+    path: step.id,
+  })
 }
 
 const resolveTargetPaneId = (step: CommandStep): string => {
   if (typeof step.targetPaneId === "string" && step.targetPaneId.length > 0) {
     return step.targetPaneId
-  }
-
-  const command = step.command ?? []
-  const targetIndex = command.findIndex((segment) => segment === "-t")
-  if (targetIndex >= 0 && targetIndex + 1 < command.length) {
-    const raw = command[targetIndex + 1]
-    if (typeof raw === "string" && raw.length > 0) {
-      return raw
-    }
   }
 
   return "<unknown>"
