@@ -5,8 +5,8 @@ vi.mock("execa", () => ({
 }))
 
 import { execa } from "execa"
-import { createRealExecutor } from "../real-executor.ts"
-import { ErrorCodes } from "../../utils/errors.ts"
+import { createRealExecutor } from "../real-executor"
+import { ErrorCodes } from "../../utils/errors"
 
 const execaMock = vi.mocked(execa)
 

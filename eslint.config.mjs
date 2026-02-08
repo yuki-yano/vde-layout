@@ -3,6 +3,8 @@ import eslintConfigPrettier from "eslint-config-prettier"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 
+const RELATIVE_TS_IMPORT_PATTERNS = ["./**/*.ts", "../**/*.ts"]
+
 const LEGACY_BACKEND_IMPORT_PATTERNS = [
   "../tmux/**",
   "../../tmux/**",
@@ -44,7 +46,13 @@ const createRestrictedImportRule = (patterns) => {
   return [
     "error",
     {
-      patterns,
+      patterns: [
+        {
+          group: RELATIVE_TS_IMPORT_PATTERNS,
+          message: "Use extensionless relative imports.",
+        },
+        ...patterns,
+      ],
     },
   ]
 }
@@ -127,7 +135,7 @@ export default [
     ignores: [
       "**/*.js",
       "**/*.mjs",
-      "vitest.config.ts",
+      "vitest.config.*",
       "dist",
       "node_modules",
       "coverage",

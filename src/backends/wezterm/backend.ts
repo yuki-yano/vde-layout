@@ -1,13 +1,13 @@
-import type { PlanEmission, CommandStep, EmittedTerminal } from "../../core/emitter.ts"
-import { createCoreError } from "../../core/errors.ts"
-import { ErrorCodes } from "../../utils/errors.ts"
+import type { PlanEmission, CommandStep, EmittedTerminal } from "../../core/emitter"
+import { createCoreError } from "../../core/errors"
+import { ErrorCodes } from "../../utils/errors"
 import type {
   ApplyPlanParameters,
   ApplyPlanResult,
   DryRunStep,
   TerminalBackend,
   TerminalBackendContext,
-} from "../../executor/terminal-backend.ts"
+} from "../../executor/terminal-backend"
 import {
   killWeztermPane,
   listWeztermWindows,
@@ -15,13 +15,13 @@ import {
   verifyWeztermAvailability,
   type RunWeztermErrorContext,
   type WeztermListResult,
-} from "./cli.ts"
-import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../../utils/template-tokens.ts"
-import { waitForDelay } from "../../utils/async.ts"
+} from "./cli"
+import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../../utils/template-tokens"
+import { waitForDelay } from "../../utils/async"
 import {
   resolveSplitOrientation as resolveSplitOrientationFromStep,
   resolveSplitPercentage as resolveSplitPercentageFromStep,
-} from "../../executor/split-step.ts"
+} from "../../executor/split-step"
 
 type PaneMap = Map<string, string>
 

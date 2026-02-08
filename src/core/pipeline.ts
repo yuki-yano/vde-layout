@@ -1,9 +1,9 @@
-import type { CompilePresetInput, CompilePresetSuccess, CompiledPreset } from "./compile.ts"
-import { compilePreset } from "./compile.ts"
-import type { CreateLayoutPlanSuccess, LayoutPlan } from "./planner.ts"
-import { createLayoutPlan } from "./planner.ts"
-import type { PlanEmission } from "./emitter.ts"
-import { emitPlan } from "./emitter.ts"
+import type { CompilePresetInput, CompilePresetSuccess, CompiledPreset } from "./compile"
+import { compilePreset } from "./compile"
+import type { CreateLayoutPlanSuccess, LayoutPlan } from "./planner"
+import { createLayoutPlan } from "./planner"
+import type { PlanEmission } from "./emitter"
+import { emitPlan } from "./emitter"
 
 type CompileCorePipelineSuccess = {
   readonly preset: CompiledPreset

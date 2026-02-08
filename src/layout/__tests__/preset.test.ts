@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { createPresetManager } from "../preset.ts"
+import { createPresetManager } from "../preset"
 import * as fs from "fs/promises"
 import * as path from "path"
 import * as os from "os"
-import type { PresetManager } from "../../types/preset-manager.ts"
+import type { PresetManager } from "../../types/preset-manager"
 
 describe("PresetManager", () => {
   let presetManager: PresetManager

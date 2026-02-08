@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ConfigSchema, PresetSchema, LayoutSchema, PaneSchema, WindowModeSchema } from "./schema.ts"
+import { ConfigSchema, PresetSchema, LayoutSchema, PaneSchema, WindowModeSchema } from "./schema"
 
 // Public types inferred from Zod schemas
 export type Config = z.infer<typeof ConfigSchema>

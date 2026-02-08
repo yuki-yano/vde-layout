@@ -1,5 +1,5 @@
 import { parse } from "yaml"
-import { createCoreError, type CoreError } from "./errors.ts"
+import { createCoreError, type CoreError } from "./errors"
 
 export type CompilePresetInput = {
   readonly document: string

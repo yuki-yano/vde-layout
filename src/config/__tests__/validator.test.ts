@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { validateYAML } from "../validator.ts"
-import { isVDELayoutError, type VDELayoutError } from "../../utils/errors.ts"
+import { validateYAML } from "../validator"
+import { isVDELayoutError, type VDELayoutError } from "../../utils/errors"
 
 const captureValidationError = (fn: () => unknown): VDELayoutError => {
   try {

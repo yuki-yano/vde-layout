@@ -1,4 +1,4 @@
-import type { TerminalBackendKind } from "./terminal-backend.ts"
+import type { TerminalBackendKind } from "./terminal-backend"
 
 type ResolveBackendOptions = {
   readonly cliFlag?: TerminalBackendKind

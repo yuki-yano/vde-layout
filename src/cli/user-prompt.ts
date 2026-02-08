@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises"
 import { stdin as input, stdout as output } from "node:process"
-import type { ConfirmPaneClosure, ConfirmPaneClosureContext } from "../types/confirm-pane.ts"
-import type { Logger } from "../utils/logger.ts"
+import type { ConfirmPaneClosure, ConfirmPaneClosureContext } from "../types/confirm-pane"
+import type { Logger } from "../utils/logger"
 
 export const createPaneKillPrompter = (logger: Logger): ConfirmPaneClosure => {
   return async ({ panesToClose, dryRun }: ConfirmPaneClosureContext): Promise<boolean> => {

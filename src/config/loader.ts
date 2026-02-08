@@ -2,9 +2,9 @@ import fs from "fs-extra"
 import path from "path"
 import os from "os"
 import * as yaml from "yaml"
-import type { Config } from "../models/types.ts"
-import { createConfigError, ErrorCodes } from "../utils/errors.ts"
-import { validateYAML } from "./validator.ts"
+import type { Config } from "../models/types"
+import { createConfigError, ErrorCodes } from "../utils/errors"
+import { validateYAML } from "./validator"
 
 export type ConfigLoaderOptions = {
   readonly configPaths?: string[]
