@@ -217,7 +217,7 @@ const executeTerminalCommands = async ({
       path: focusPaneVirtualId,
     })
   }
-  const focusPaneRealId = ensureNonEmpty(resolvePaneId(paneMap, focusPaneVirtualId), () =>
+  ensureNonEmpty(resolvePaneId(paneMap, focusPaneVirtualId), () =>
     raiseExecutionError(ErrorCodes.INVALID_PANE, {
       message: `Unknown focus pane: ${focusPaneVirtualId}`,
       path: focusPaneVirtualId,
