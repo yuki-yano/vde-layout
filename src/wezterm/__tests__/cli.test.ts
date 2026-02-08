@@ -9,13 +9,17 @@ import { killWeztermPane, listWeztermWindows, runWeztermCli, verifyWeztermAvaila
 
 const execaMock = vi.mocked(execa)
 
+const mockExecaSuccess = (stdout: string): Awaited<ReturnType<typeof execa>> => {
+  return { stdout } as Awaited<ReturnType<typeof execa>>
+}
+
 describe("runWeztermCli", () => {
   beforeEach(() => {
     execaMock.mockReset()
   })
 
   it("executes wezterm cli and returns stdout", async () => {
-    execaMock.mockResolvedValue({ stdout: "ok" } as unknown as { stdout: string })
+    execaMock.mockResolvedValue(mockExecaSuccess("ok"))
 
     const result = await runWeztermCli(["list"], { message: "List windows" })
 
@@ -53,7 +57,7 @@ describe("runWeztermCli", () => {
       { window_id: 5, tab_id: 8, pane_id: 12, is_active: false },
       { window_id: 6, tab_id: 9, pane_id: 13, is_active: true },
     ])
-    execaMock.mockResolvedValueOnce({ stdout: listResponse } as unknown as { stdout: string })
+    execaMock.mockResolvedValueOnce(mockExecaSuccess(listResponse))
 
     const result = await listWeztermWindows()
 
@@ -121,7 +125,7 @@ describe("runWeztermCli", () => {
         },
       ],
     })
-    execaMock.mockResolvedValueOnce({ stdout: listResponse } as unknown as { stdout: string })
+    execaMock.mockResolvedValueOnce(mockExecaSuccess(listResponse))
 
     const result = await listWeztermWindows()
 
@@ -146,7 +150,7 @@ describe("runWeztermCli", () => {
       { window_id: "w1", pane_id: "10", is_active: false },
       { window_id: "w1", pane_id: "11", tab_id: "tab-2", workspace: "dev", is_active: true },
     ])
-    execaMock.mockResolvedValueOnce({ stdout: listResponse } as unknown as { stdout: string })
+    execaMock.mockResolvedValueOnce(mockExecaSuccess(listResponse))
 
     const result = await listWeztermWindows()
 
@@ -172,7 +176,7 @@ describe("runWeztermCli", () => {
   })
 
   it("throws structured error when list output is invalid json", async () => {
-    execaMock.mockResolvedValueOnce({ stdout: "not-json" } as unknown as { stdout: string })
+    execaMock.mockResolvedValueOnce(mockExecaSuccess("not-json"))
 
     await expect(listWeztermWindows()).rejects.toMatchObject({
       code: "TERMINAL_COMMAND_FAILED",
@@ -181,7 +185,7 @@ describe("runWeztermCli", () => {
   })
 
   it("kills a pane via wezterm cli", async () => {
-    execaMock.mockResolvedValueOnce({ stdout: "" } as unknown as { stdout: string })
+    execaMock.mockResolvedValueOnce(mockExecaSuccess(""))
 
     await killWeztermPane("pane-1")
 
@@ -195,9 +199,7 @@ describe("verifyWeztermAvailability", () => {
   })
 
   it("returns normalized version when wezterm is available", async () => {
-    execaMock.mockResolvedValueOnce({
-      stdout: "wezterm 20240908-123456-DEADBEEF",
-    } as unknown as { stdout: string })
+    execaMock.mockResolvedValueOnce(mockExecaSuccess("wezterm 20240908-123456-DEADBEEF"))
 
     const result = await verifyWeztermAvailability()
 
@@ -215,9 +217,7 @@ describe("verifyWeztermAvailability", () => {
   })
 
   it("throws version detection error when version cannot be parsed", async () => {
-    execaMock.mockResolvedValueOnce({
-      stdout: "wezterm unknown-version",
-    } as unknown as { stdout: string })
+    execaMock.mockResolvedValueOnce(mockExecaSuccess("wezterm unknown-version"))
 
     await expect(verifyWeztermAvailability()).rejects.toMatchObject({
       code: "UNSUPPORTED_WEZTERM_VERSION",
@@ -226,9 +226,7 @@ describe("verifyWeztermAvailability", () => {
   })
 
   it("throws unsupported-version error when version is too old", async () => {
-    execaMock.mockResolvedValueOnce({
-      stdout: "wezterm 20210101-000000-deadbeef",
-    } as unknown as { stdout: string })
+    execaMock.mockResolvedValueOnce(mockExecaSuccess("wezterm 20210101-000000-deadbeef"))
 
     await expect(verifyWeztermAvailability()).rejects.toMatchObject({
       code: "UNSUPPORTED_WEZTERM_VERSION",
