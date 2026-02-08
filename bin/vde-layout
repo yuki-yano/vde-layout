@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 try {
-  await import('../dist/index.js');
+  await import("../dist/index.mjs")
 } catch (error) {
-  if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_MODULE_NOT_FOUND') {
-    await import('../src/index.ts');
+  if (error && typeof error === "object" && "code" in error && error.code === "ERR_MODULE_NOT_FOUND") {
+    await import("../dist/index.js")
   } else {
-    throw error;
+    throw error
   }
 }
