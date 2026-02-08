@@ -331,6 +331,66 @@ describe("executePlan", () => {
     })
   })
 
+  it("applies pane title and waits for delay before command execution", async () => {
+    vi.useFakeTimers()
+    try {
+      const emission: PlanEmission = {
+        steps: [
+          {
+            id: "root:focus",
+            kind: "focus",
+            command: ["select-pane", "-t", "root.0"],
+            summary: "select pane root.0",
+            targetPaneId: "root.0",
+          },
+        ],
+        hash: "hash",
+        summary: {
+          focusPaneId: "root.0",
+          stepsCount: 1,
+          initialPaneId: "root.0",
+        },
+        terminals: [
+          {
+            virtualPaneId: "root.0",
+            command: "npm test",
+            cwd: undefined,
+            env: undefined,
+            focus: true,
+            name: "main",
+            title: "Main Pane",
+            delay: 250,
+          },
+        ],
+      }
+
+      const executor = createMockExecutor()
+      const execution = executePlan({ emission, executor, windowMode: "new-window" })
+
+      await vi.advanceTimersByTimeAsync(249)
+      expect(executor.getExecutedCommands()).not.toContainEqual(["send-keys", "-t", "%0", "npm test", "Enter"])
+
+      await vi.advanceTimersByTimeAsync(1)
+      const result = await execution
+      const commands = executor.getExecutedCommands()
+
+      expect(result.executedSteps).toBe(1)
+      expect(commands).toContainEqual(["select-pane", "-t", "%0", "-T", "Main Pane"])
+      expect(commands).toContainEqual(["send-keys", "-t", "%0", "npm test", "Enter"])
+
+      const titleCommandIndex = commands.findIndex(
+        (command) => command[0] === "select-pane" && command[3] === "-T" && command[4] === "Main Pane",
+      )
+      const commandExecutionIndex = commands.findIndex(
+        (command) => command[0] === "send-keys" && command[2] === "%0" && command[3] === "npm test",
+      )
+      expect(titleCommandIndex).toBeGreaterThanOrEqual(0)
+      expect(commandExecutionIndex).toBeGreaterThan(titleCommandIndex)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("handles ephemeral panes with closeOnError=false (default)", async () => {
     const ephemeralEmission: PlanEmission = {
       steps: [

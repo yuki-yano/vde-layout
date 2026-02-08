@@ -21,6 +21,12 @@ type ExecutePlanSuccess = {
   readonly executedSteps: number
 }
 
+const waitForDelay = async (ms: number): Promise<void> => {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
 export const executePlan = async ({
   emission,
   executor,
@@ -258,6 +264,15 @@ const executeTerminalCommands = async ({
       }
     }
 
+    if (typeof terminal.title === "string" && terminal.title.length > 0) {
+      await executeCommand(executor, ["select-pane", "-t", realPaneId, "-T", terminal.title], {
+        code: ErrorCodes.TMUX_COMMAND_FAILED,
+        message: `Failed to set pane title for pane ${terminal.virtualPaneId}`,
+        path: terminal.virtualPaneId,
+        details: { title: terminal.title },
+      })
+    }
+
     if (typeof terminal.command === "string" && terminal.command.length > 0) {
       // Replace template tokens in the command
       const commandUsesFocusToken = terminal.command.includes("{{focus_pane}}")
@@ -297,6 +312,10 @@ const executeTerminalCommands = async ({
           // Close pane only on success (default behavior)
           commandWithTokensReplaced = `${commandWithTokensReplaced}; [ $? -eq 0 ] && exit`
         }
+      }
+
+      if (typeof terminal.delay === "number" && Number.isFinite(terminal.delay) && terminal.delay > 0) {
+        await waitForDelay(terminal.delay)
       }
 
       await executeCommand(executor, ["send-keys", "-t", realPaneId, commandWithTokensReplaced, "Enter"], {

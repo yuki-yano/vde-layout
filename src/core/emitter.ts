@@ -21,6 +21,8 @@ export type EmittedTerminal = {
   readonly command?: string
   readonly cwd?: string
   readonly env?: Readonly<Record<string, string>>
+  readonly delay?: number
+  readonly title?: string
   readonly focus: boolean
   readonly name: string
   readonly ephemeral?: boolean
@@ -111,6 +113,8 @@ const collectTerminals = (node: PlanNode): EmittedTerminal[] => {
         command: node.command,
         cwd: node.cwd,
         env: node.env,
+        delay: node.delay,
+        title: node.title,
         focus: node.focus,
         name: node.name,
         ephemeral: node.ephemeral,

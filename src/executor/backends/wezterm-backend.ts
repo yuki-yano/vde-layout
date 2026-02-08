@@ -639,6 +639,10 @@ const applyTerminalCommands = async ({
         }
       }
 
+      if (typeof terminal.delay === "number" && Number.isFinite(terminal.delay) && terminal.delay > 0) {
+        await delay(terminal.delay)
+      }
+
       await sendTextToPane({
         paneId: realPaneId,
         text: commandWithTokensReplaced,

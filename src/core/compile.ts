@@ -12,6 +12,8 @@ export type CompiledTerminalPane = {
   readonly command?: string
   readonly cwd?: string
   readonly env?: Readonly<Record<string, string>>
+  readonly delay?: number
+  readonly title?: string
   readonly focus?: boolean
   readonly ephemeral?: boolean
   readonly closeOnError?: boolean
@@ -189,6 +191,8 @@ const parseTerminalPane = (node: Record<string, unknown>): CompiledTerminalPane 
   const name = typeof node.name === "string" ? node.name : ""
   const command = typeof node.command === "string" ? node.command : undefined
   const cwd = typeof node.cwd === "string" ? node.cwd : undefined
+  const delay = typeof node.delay === "number" && Number.isFinite(node.delay) && node.delay > 0 ? node.delay : undefined
+  const title = typeof node.title === "string" && node.title.length > 0 ? node.title : undefined
   const focus = node.focus === true ? true : undefined
   const ephemeral = node.ephemeral === true ? true : undefined
   const closeOnError = node.closeOnError === true ? true : undefined
@@ -214,6 +218,8 @@ const parseTerminalPane = (node: Record<string, unknown>): CompiledTerminalPane 
     command,
     cwd,
     env,
+    delay,
+    title,
     focus,
     ephemeral,
     closeOnError,

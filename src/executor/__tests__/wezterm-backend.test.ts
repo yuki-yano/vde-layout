@@ -380,6 +380,50 @@ describe("createWeztermBackend", () => {
     expect(result.focusPaneId).toBe("200")
   })
 
+  it("waits for delay before sending terminal command", async () => {
+    vi.useFakeTimers()
+    try {
+      queueListResponses(
+        makeList([{ windowId: "win", panes: [{ paneId: "5", active: true }] }]),
+        makeList([{ windowId: "win", panes: [{ paneId: "5", active: true }, { paneId: "200" }] }]),
+      )
+      runMock.mockResolvedValueOnce("200 win\n")
+      runMock.mockResolvedValue("")
+
+      const backend = createWeztermBackend(createContext())
+      const emission: PlanEmission = {
+        ...minimalEmission(),
+        terminals: [
+          {
+            virtualPaneId: "root",
+            cwd: undefined,
+            env: undefined,
+            command: "npm start",
+            focus: true,
+            name: "dev",
+            delay: 300,
+          },
+        ],
+      }
+
+      const execution = backend.applyPlan({ emission, windowMode: "new-window" })
+
+      await vi.advanceTimersByTimeAsync(299)
+      expect(runMock).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(1)
+      await execution
+
+      expect(runMock).toHaveBeenNthCalledWith(
+        2,
+        ["send-text", "--pane-id", "200", "--no-paste", "--", "npm start\r"],
+        expect.objectContaining({ message: expect.stringContaining("execute command") }),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("throws when focus pane cannot be resolved even if {{focus_pane}} is not used", async () => {
     queueListResponses(
       makeList([{ windowId: "win", panes: [{ paneId: "5", active: true }] }]),

@@ -47,6 +47,31 @@ layout:
     expect(emission.hash).toMatch(/^[a-f0-9]{64}$/)
   })
 
+  it("preserves delay and title in emitted terminals", () => {
+    const document = `
+name: with-terminal-options
+layout:
+  type: horizontal
+  ratio: [1, 1]
+  panes:
+    - name: main
+      title: Main Pane
+      delay: 300
+      command: npm run dev
+    - name: aux
+`
+
+    const { preset } = compilePreset({ document, source: "tests/terminal-options.yml" })
+    const { plan } = createLayoutPlan({ preset })
+    const emission = emitPlan({ plan })
+    const main = emission.terminals.find((terminal) => terminal.virtualPaneId === "root.0")
+
+    expect(main).toMatchObject({
+      title: "Main Pane",
+      delay: 300,
+    })
+  })
+
   it("generates only a focus step for a single-pane plan", () => {
     const document = `
 name: single
