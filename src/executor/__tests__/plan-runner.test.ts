@@ -48,6 +48,11 @@ const baseEmission: PlanEmission = {
   ],
 }
 
+const [baseSplitStep, baseFocusStep] = baseEmission.steps
+if (baseSplitStep === undefined || baseFocusStep === undefined) {
+  throw new Error("baseEmission must include split and focus steps")
+}
+
 describe("executePlan", () => {
   it("executes all steps with the provided executor", async () => {
     const executor = createMockExecutor()
@@ -74,12 +79,12 @@ describe("executePlan", () => {
       ...baseEmission,
       steps: [
         {
-          ...baseEmission.steps[0],
+          ...baseSplitStep,
           command: ["split-window", "-h", "-t", "root.0", "-p", "99"],
           orientation: "vertical",
           percentage: 33,
         },
-        baseEmission.steps[1],
+        baseFocusStep,
       ],
     }
 
@@ -95,11 +100,11 @@ describe("executePlan", () => {
       ...baseEmission,
       steps: [
         {
-          ...baseEmission.steps[0],
+          ...baseSplitStep,
           command: ["split-window", "-t", "root.0", "-p", "40"],
           orientation: undefined,
         },
-        baseEmission.steps[1],
+        baseFocusStep,
       ],
     }
 
