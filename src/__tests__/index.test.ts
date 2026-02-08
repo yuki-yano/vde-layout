@@ -1,33 +1,20 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
-import * as cliModule from "../cli.ts"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-// Separate main function to make it testable
-export const main = async (): Promise<void> => {
-  const cli = cliModule.createCli()
-  try {
-    await cli.run(process.argv.slice(2))
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error("Error:", error.message)
-
-      if (process.env.VDE_DEBUG === "true") {
-        console.error(error.stack)
-      }
-    } else {
-      console.error("Unexpected error occurred:", String(error))
-    }
-
-    process.exit(1)
-  }
+const loadEntrypoint = async (): Promise<void> => {
+  await import("../index.ts")
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0)
+  })
 }
 
-describe("index.ts", () => {
+describe("index entrypoint", () => {
   let originalArgv: string[]
   let originalEnv: NodeJS.ProcessEnv
 
   beforeEach(() => {
     originalArgv = process.argv
     originalEnv = process.env
+    vi.resetModules()
     vi.clearAllMocks()
   })
 
@@ -37,67 +24,69 @@ describe("index.ts", () => {
     vi.restoreAllMocks()
   })
 
-  it("should create CLI instance and run it with sliced argv", async () => {
-    const mockRun = vi.fn().mockResolvedValue(undefined)
-    vi.spyOn(cliModule, "createCli").mockReturnValue({ run: mockRun })
-
+  it("runs CLI with sliced argv", async () => {
+    const run = vi.fn(async () => undefined)
+    vi.doMock("../cli.ts", () => ({
+      createCli: vi.fn(() => ({ run })),
+    }))
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never)
     process.argv = ["node", "vde-layout", "--help"]
-    await main()
 
-    expect(mockRun).toHaveBeenCalledWith(["--help"])
-    expect(mockRun).toHaveBeenCalledTimes(1)
+    await loadEntrypoint()
+
+    expect(run).toHaveBeenCalledWith(["--help"])
+    expect(exitSpy).not.toHaveBeenCalled()
   })
 
-  it("should handle errors from CLI.run", async () => {
+  it("prints error and exits when CLI run fails", async () => {
+    const run = vi.fn(async () => {
+      throw new Error("Test error message")
+    })
+    vi.doMock("../cli.ts", () => ({
+      createCli: vi.fn(() => ({ run })),
+    }))
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const processExitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
-      throw new Error("Process exited")
-    })
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never)
 
-    const testError = new Error("Test error message")
-    vi.spyOn(cliModule, "createCli").mockReturnValue({
-      run: vi.fn().mockRejectedValue(testError),
-    })
-
-    await expect(main()).rejects.toThrow("Process exited")
+    await loadEntrypoint()
 
     expect(consoleErrorSpy).toHaveBeenCalledWith("Error:", "Test error message")
-    expect(processExitSpy).toHaveBeenCalledWith(1)
+    expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
-  it("should handle errors with stack trace in debug mode", async () => {
+  it("prints stack trace in debug mode", async () => {
+    const error = new Error("Debug error")
+    error.stack = "Error: Debug error\n    at test.js:1:1"
+    const run = vi.fn(async () => {
+      throw error
+    })
+    vi.doMock("../cli.ts", () => ({
+      createCli: vi.fn(() => ({ run })),
+    }))
+    process.env = { ...process.env, VDE_DEBUG: "true" }
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const processExitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
-      throw new Error("Process exited")
-    })
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never)
 
-    process.env.VDE_DEBUG = "true"
-    const testError = new Error("Debug error")
-    testError.stack = "Error: Debug error\n    at test.js:1:1"
-    vi.spyOn(cliModule, "createCli").mockReturnValue({
-      run: vi.fn().mockRejectedValue(testError),
-    })
-
-    await expect(main()).rejects.toThrow("Process exited")
+    await loadEntrypoint()
 
     expect(consoleErrorSpy).toHaveBeenCalledWith("Error:", "Debug error")
     expect(consoleErrorSpy).toHaveBeenCalledWith("Error: Debug error\n    at test.js:1:1")
-    expect(processExitSpy).toHaveBeenCalledWith(1)
+    expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
-  it("should handle non-Error objects", async () => {
+  it("handles non-Error throw values", async () => {
+    const run = vi.fn(async () => {
+      throw "String error"
+    })
+    vi.doMock("../cli.ts", () => ({
+      createCli: vi.fn(() => ({ run })),
+    }))
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const processExitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
-      throw new Error("Process exited")
-    })
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never)
 
-    vi.spyOn(cliModule, "createCli").mockReturnValue({
-      run: vi.fn().mockRejectedValue("String error"),
-    })
+    await loadEntrypoint()
 
-    await expect(main()).rejects.toThrow("Process exited")
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith("Unexpected error occurred:", "String error")
-    expect(processExitSpy).toHaveBeenCalledWith(1)
+    expect(consoleErrorSpy).toHaveBeenCalledWith("An unexpected error occurred:", "String error")
+    expect(exitSpy).toHaveBeenCalledWith(1)
   })
 })

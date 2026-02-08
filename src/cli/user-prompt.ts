@@ -29,7 +29,7 @@ export const createPaneKillPrompter = (logger: Logger): ConfirmPaneClosure => {
       const normalized = answer.trim().toLowerCase()
       return normalized === "y" || normalized === "yes"
     } finally {
-      await rl.close()
+      rl.close()
     }
   }
 }
