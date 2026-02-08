@@ -111,6 +111,7 @@ describe("CLI WezTerm backend integration", () => {
   let cli: ReturnType<typeof createCli>
   let mockPresetManager: MockPresetManager
   let compilePresetMock: ReturnType<typeof vi.fn>
+  let compilePresetFromValueMock: ReturnType<typeof vi.fn>
   let createLayoutPlanMock: ReturnType<typeof vi.fn>
   let emitPlanMock: ReturnType<typeof vi.fn>
   let coreBridge: CoreBridge
@@ -124,14 +125,16 @@ describe("CLI WezTerm backend integration", () => {
     createTerminalBackendMock.mockReset()
     mockPresetManager = createMockPresetManager()
     compilePresetMock = vi.fn((): CompilePresetSuccess => ({ preset: samplePreset }))
+    compilePresetFromValueMock = vi.fn((): CompilePresetSuccess => ({ preset: samplePreset }))
     createLayoutPlanMock = vi.fn((): CreateLayoutPlanSuccess => ({ plan: samplePlan }))
     emitPlanMock = vi.fn(() => sampleEmission)
 
     coreBridge = {
       compilePreset: compilePresetMock as unknown as CoreBridge["compilePreset"],
+      compilePresetFromValue: compilePresetFromValueMock as unknown as CoreBridge["compilePresetFromValue"],
       createLayoutPlan: createLayoutPlanMock as unknown as CoreBridge["createLayoutPlan"],
       emitPlan: emitPlanMock as unknown as CoreBridge["emitPlan"],
-    }
+    } as CoreBridge
 
     const createCommandExecutor = vi.fn(
       ({ dryRun }: { verbose: boolean; dryRun: boolean }): CommandExecutor => ({
@@ -210,6 +213,8 @@ describe("CLI WezTerm backend integration", () => {
     expect(verifyEnvironment).toHaveBeenCalledTimes(1)
     expect(applyPlan).not.toHaveBeenCalled()
     expect(getDryRunSteps).toHaveBeenCalledWith(sampleEmission)
+    expect(compilePresetFromValueMock).toHaveBeenCalledTimes(1)
+    expect(compilePresetMock).not.toHaveBeenCalled()
     expect(consoleOutput.join("\n")).toContain(
       "[wezterm] split root: wezterm cli split-pane --right --percent 50 --pane-id root",
     )

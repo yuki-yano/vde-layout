@@ -1,9 +1,15 @@
 export { compilePreset } from "./compile.ts"
+export { compilePresetFromValue } from "./compile.ts"
 export { createLayoutPlan } from "./planner.ts"
 export { emitPlan } from "./emitter.ts"
 export { compileCorePipeline } from "./pipeline.ts"
 
-export type { CompilePresetInput, CompilePresetSuccess, CompiledPreset } from "./compile.ts"
+export type {
+  CompilePresetInput,
+  CompilePresetFromValueInput,
+  CompilePresetSuccess,
+  CompiledPreset,
+} from "./compile.ts"
 export type { CreateLayoutPlanSuccess, LayoutPlan, PlanNode } from "./planner.ts"
 export type { PlanEmission } from "./emitter.ts"
 export type { CoreError } from "./errors.ts"

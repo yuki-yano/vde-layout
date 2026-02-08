@@ -6,6 +6,11 @@ export type CompilePresetInput = {
   readonly source: string
 }
 
+export type CompilePresetFromValueInput = {
+  readonly value: unknown
+  readonly source: string
+}
+
 export type CompiledTerminalPane = {
   readonly kind: "terminal"
   readonly name: string
@@ -58,6 +63,16 @@ export const compilePreset = ({ document, source }: CompilePresetInput): Compile
       },
     })
   }
+
+  return compilePresetValue({ value: parsed, source })
+}
+
+export const compilePresetFromValue = ({ value, source }: CompilePresetFromValueInput): CompilePresetSuccess => {
+  return compilePresetValue({ value, source })
+}
+
+const compilePresetValue = ({ value, source }: CompilePresetFromValueInput): CompilePresetSuccess => {
+  const parsed = value
 
   if (!isRecord(parsed)) {
     throw compileError("PRESET_INVALID_DOCUMENT", {

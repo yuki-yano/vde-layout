@@ -1,11 +1,10 @@
 import { Command } from "commander"
 import chalk from "chalk"
-import { stringify as toYAML } from "yaml"
 import { createRequire } from "module"
 import { createPresetManager } from "./layout/preset.ts"
 import { resolveWindowMode } from "./cli/window-mode.ts"
 import { createPaneKillPrompter } from "./cli/user-prompt.ts"
-import type { Preset, PresetInfo, WindowMode } from "./models/types"
+import type { PresetInfo, WindowMode } from "./models/types"
 import type { CommandExecutor } from "./types/command-executor.ts"
 import type { PresetManager } from "./types/preset-manager.ts"
 import { createRealExecutor, createDryRunExecutor } from "./executor/index.ts"
@@ -15,10 +14,12 @@ import type { DryRunStep, TerminalBackendKind } from "./executor/terminal-backen
 import { createLogger, LogLevel, type Logger } from "./utils/logger.ts"
 import {
   compilePreset as defaultCompilePreset,
+  compilePresetFromValue as defaultCompilePresetFromValue,
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
 } from "./core/index.ts"
 import type {
+  CompilePresetFromValueInput,
   CompilePresetInput,
   PlanEmission,
   CoreError,
@@ -29,6 +30,9 @@ import { isCoreError } from "./core/index.ts"
 
 export type CoreBridge = {
   readonly compilePreset: (input: CompilePresetInput) => ReturnType<typeof defaultCompilePreset>
+  readonly compilePresetFromValue: (
+    input: CompilePresetFromValueInput,
+  ) => ReturnType<typeof defaultCompilePresetFromValue>
   readonly createLayoutPlan: (
     input: Parameters<typeof defaultCreateLayoutPlan>[0],
   ) => ReturnType<typeof defaultCreateLayoutPlan>
@@ -60,6 +64,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     options.core ??
     ({
       compilePreset: defaultCompilePreset,
+      compilePresetFromValue: defaultCompilePresetFromValue,
       createLayoutPlan: defaultCreateLayoutPlan,
       emitPlan: defaultEmitPlan,
     } as const)
@@ -74,24 +79,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     steps.forEach((step, index) => {
       console.log(` ${index + 1}. [${step.backend}] ${step.summary}: ${step.command}`)
     })
-  }
-
-  const buildPresetDocument = (preset: Preset, presetName?: string): string => {
-    const document: Record<string, unknown> = {
-      name: preset.name ?? presetName ?? "vde-layout",
-      command: preset.command,
-      layout: preset.layout,
-    }
-
-    if (typeof preset.command !== "string" || preset.command.length === 0) {
-      delete document.command
-    }
-
-    if (preset.layout === undefined || preset.layout === null) {
-      delete document.layout
-    }
-
-    return toYAML(document)
   }
 
   const buildPresetSource = (presetName?: string): string => {
@@ -258,8 +245,8 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       let emission: PlanEmission
 
       try {
-        compileResult = core.compilePreset({
-          document: buildPresetDocument(preset, presetName),
+        compileResult = core.compilePresetFromValue({
+          value: preset,
           source: buildPresetSource(presetName),
         })
         planResult = core.createLayoutPlan({ preset: compileResult.preset })

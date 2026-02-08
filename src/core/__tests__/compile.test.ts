@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { compilePreset } from "../compile.ts"
+import { compilePreset, compilePresetFromValue } from "../compile.ts"
 import { isCoreError } from "../errors.ts"
 
 describe("compilePreset", () => {
@@ -173,5 +173,27 @@ layout:
         expect(error.code).toBe("LAYOUT_INVALID_ORIENTATION")
       }
     }
+  })
+
+  it("compiles preset values without YAML serialization", () => {
+    const result = compilePresetFromValue({
+      source: "tests/value-input",
+      value: {
+        name: "typed-input",
+        layout: {
+          type: "horizontal",
+          ratio: [1, 1],
+          panes: [{ name: "main" }, { name: "aux" }],
+        },
+      },
+    })
+
+    expect(result.preset.name).toBe("typed-input")
+    expect(result.preset.metadata.source).toBe("tests/value-input")
+    expect(result.preset.layout).toMatchObject({
+      kind: "split",
+      orientation: "horizontal",
+      ratio: [1, 1],
+    })
   })
 })

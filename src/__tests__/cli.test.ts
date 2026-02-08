@@ -180,6 +180,7 @@ describe("CLI", () => {
   }
 
   let compilePresetMock: ReturnType<typeof vi.fn>
+  let compilePresetFromValueMock: ReturnType<typeof vi.fn>
   let createLayoutPlanMock: ReturnType<typeof vi.fn>
   let emitPlanMock: ReturnType<typeof vi.fn>
   let coreBridge: CoreBridge
@@ -190,6 +191,7 @@ describe("CLI", () => {
     process.env.TMUX = "/tmp/tmux-1000/default,1234,0"
 
     compilePresetMock = vi.fn((): CompilePresetSuccess => ({ preset: samplePreset }))
+    compilePresetFromValueMock = vi.fn((): CompilePresetSuccess => ({ preset: samplePreset }))
     createLayoutPlanMock = vi.fn((): CreateLayoutPlanSuccess => ({ plan: samplePlan }))
     emitPlanMock = vi.fn(() => sampleEmission)
 
@@ -200,9 +202,10 @@ describe("CLI", () => {
 
     coreBridge = {
       compilePreset: compilePresetMock as unknown as CoreBridge["compilePreset"],
+      compilePresetFromValue: compilePresetFromValueMock as unknown as CoreBridge["compilePresetFromValue"],
       createLayoutPlan: createLayoutPlanMock as unknown as CoreBridge["createLayoutPlan"],
       emitPlan: emitPlanMock as unknown as CoreBridge["emitPlan"],
-    }
+    } as CoreBridge
 
     cli = createCli({
       presetManager: mockPresetManager,
@@ -246,7 +249,8 @@ describe("CLI", () => {
   })
 
   const expectCorePipelineCalled = () => {
-    expect(compilePresetMock).toHaveBeenCalled()
+    expect(compilePresetFromValueMock).toHaveBeenCalled()
+    expect(compilePresetMock).not.toHaveBeenCalled()
     expect(createLayoutPlanMock).toHaveBeenCalled()
     expect(emitPlanMock).toHaveBeenCalled()
   }
