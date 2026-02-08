@@ -13,18 +13,12 @@ export const resolveTerminalBackendKind = ({
   presetBackend,
   env,
 }: ResolveBackendOptions): TerminalBackendKind => {
-  if (cliFlag !== undefined) {
-    if (!KNOWN_BACKENDS.includes(cliFlag)) {
-      throw new Error(`Unknown backend "${cliFlag}"`)
+  const selectedBackend = cliFlag ?? presetBackend
+  if (selectedBackend !== undefined) {
+    if (!KNOWN_BACKENDS.includes(selectedBackend)) {
+      throw new Error(`Unknown backend "${selectedBackend}"`)
     }
-    return cliFlag
-  }
-
-  if (presetBackend !== undefined) {
-    if (!KNOWN_BACKENDS.includes(presetBackend)) {
-      throw new Error(`Unknown backend "${presetBackend}"`)
-    }
-    return presetBackend
+    return selectedBackend
   }
 
   if (typeof env.TMUX === "string" && env.TMUX.trim().length > 0) {

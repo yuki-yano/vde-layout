@@ -56,6 +56,12 @@ describe("resolveTerminalBackendKind", () => {
     )
   })
 
+  it("throws when preset backend is invalid", () => {
+    expect(() => resolveTerminalBackendKind({ presetBackend: "screen" as never, env: {} })).toThrow(
+      'Unknown backend "screen"',
+    )
+  })
+
   it("returns tmux when TMUX env is present", () => {
     const backend = resolveTerminalBackendKind({ env: { TMUX: "%1" } })
     expect(backend).toBe("tmux")
