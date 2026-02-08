@@ -9,6 +9,7 @@ import {
   executeSplitStep,
   executeTerminalCommands,
   listWindowPaneIds,
+  normalizePaneId,
   raiseExecutionError,
   registerPane,
   resolveCurrentPaneId,
@@ -80,7 +81,7 @@ export const executePlan = async ({
       })
     }
 
-    initialPaneId = currentPaneId.trim().length === 0 ? "%0" : currentPaneId.trim()
+    initialPaneId = normalizePaneId(currentPaneId)
   } else {
     const newWindowCommand: string[] = ["new-window", "-P", "-F", "#{pane_id}"]
     if (typeof windowName === "string" && windowName.trim().length > 0) {
@@ -92,7 +93,7 @@ export const executePlan = async ({
       message: "Failed to create tmux window",
       path: initialVirtualPaneId,
     })
-    initialPaneId = createdPane.trim().length === 0 ? "%0" : createdPane.trim()
+    initialPaneId = normalizePaneId(createdPane)
   }
 
   registerPane(paneMap, initialVirtualPaneId, initialPaneId)

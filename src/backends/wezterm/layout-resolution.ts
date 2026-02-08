@@ -148,7 +148,7 @@ const filterWindowsByWorkspace = (list: WeztermListResult, workspace?: string): 
   return { windows: scoped }
 }
 
-const collectPaneIdsForWindowInternal = (list: WeztermListResult, windowId: string): Set<string> => {
+export const collectPaneIdsForWindow = (list: WeztermListResult, windowId: string): Set<string> => {
   const targetWindow = list.windows.find((window) => window.windowId === windowId)
   if (!targetWindow) {
     throw createCoreError("execution", {
@@ -176,7 +176,7 @@ const waitForPaneRegistration = async ({
 
     if (typeof windowHint === "string") {
       try {
-        const panes = collectPaneIdsForWindowInternal(snapshot, windowHint)
+        const panes = collectPaneIdsForWindow(snapshot, windowHint)
         if (panes.has(paneId)) {
           return windowHint
         }
@@ -310,8 +310,4 @@ export const resolveInitialPane = async ({
     listWindows,
   })
   return { paneId, windowId: newWindowId }
-}
-
-export const collectPaneIdsForWindow = (list: WeztermListResult, windowId: string): Set<string> => {
-  return collectPaneIdsForWindowInternal(list, windowId)
 }
