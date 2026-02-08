@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { compilePreset, compilePresetFromValue } from "../compile"
-import { isCoreError } from "../errors"
+import { compilePreset, compilePresetFromValue } from "./compile"
+import { isCoreError } from "./errors"
 
 describe("compilePreset", () => {
   it("converts preset YAML into the data model", () => {

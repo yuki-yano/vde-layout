@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { createWeztermBackend } from "../../backends/wezterm/backend"
-import type { TerminalBackendContext } from "../terminal-backend"
-import type { Logger } from "../../utils/logger"
-import { LogLevel } from "../../utils/logger"
-import type { PlanEmission } from "../../core/emitter"
-import type { WeztermListResult } from "../../backends/wezterm/cli"
+import { createWeztermBackend } from "../backends/wezterm/backend"
+import type { TerminalBackendContext } from "./terminal-backend"
+import type { Logger } from "../utils/logger"
+import { LogLevel } from "../utils/logger"
+import type { PlanEmission } from "../core/emitter"
+import type { WeztermListResult } from "../backends/wezterm/cli"
 
 const { verifyMock, listMock, killMock, runMock } = vi.hoisted(() => ({
   verifyMock: vi.fn(),
@@ -14,7 +14,7 @@ const { verifyMock, listMock, killMock, runMock } = vi.hoisted(() => ({
   runMock: vi.fn(),
 }))
 
-vi.mock("../../backends/wezterm/cli.ts", () => ({
+vi.mock("../backends/wezterm/cli.ts", () => ({
   verifyWeztermAvailability: verifyMock,
   listWeztermWindows: listMock,
   killWeztermPane: killMock,

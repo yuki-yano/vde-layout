@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { replaceTemplateTokens, buildNameToRealIdMap, TemplateTokenError } from "../template-tokens"
-import type { EmittedTerminal } from "../../core/emitter"
+import { replaceTemplateTokens, buildNameToRealIdMap, TemplateTokenError } from "./template-tokens"
+import type { EmittedTerminal } from "../core/emitter"
 
 describe("replaceTemplateTokens", () => {
   it("should replace {{this_pane}} with current pane ID", () => {

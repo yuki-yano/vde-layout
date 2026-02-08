@@ -148,7 +148,6 @@ export default [
       "dist",
       "node_modules",
       "coverage",
-      "src/**/__tests__/**/*",
       "src/**/*.test.ts",
     ],
   },

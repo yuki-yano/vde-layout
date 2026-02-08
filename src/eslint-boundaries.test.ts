@@ -6,7 +6,7 @@ type RuleEntry = {
 }
 
 const loadEslintConfig = async (): Promise<ReadonlyArray<RuleEntry>> => {
-  const specifier = new URL("../../eslint.config.mjs", import.meta.url).href
+  const specifier = new URL("../eslint.config.mjs", import.meta.url).href
   const module = (await import(specifier)) as { readonly default?: ReadonlyArray<RuleEntry> }
   return module.default ?? []
 }

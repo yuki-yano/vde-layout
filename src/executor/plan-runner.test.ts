@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest"
-import { executePlan } from "../plan-runner"
-import type { PlanEmission } from "../../core/index"
-import { createMockExecutor } from "../mock-executor"
-import { ErrorCodes } from "../../utils/errors"
+import { executePlan } from "./plan-runner"
+import type { PlanEmission } from "../core/index"
+import { createMockExecutor } from "./mock-executor"
+import { ErrorCodes } from "../utils/errors"
 
 const baseEmission: PlanEmission = {
   steps: [
