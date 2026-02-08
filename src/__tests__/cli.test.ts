@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
 import packageJson from "../../package.json"
-import { createCli, type CLI, type CoreBridge } from "../cli/index.ts"
-import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock.ts"
-import type { CommandExecutor } from "../types/command-executor.ts"
+import { createCli, type CLI, type CoreBridge } from "../cli/index"
+import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock"
+import type { CommandExecutor } from "../types/command-executor"
 import type {
   CompilePresetInput,
   CompilePresetSuccess,
@@ -11,7 +11,7 @@ import type {
   CompiledPreset,
   PlanNode,
   LayoutPlan,
-} from "../core/index.ts"
+} from "../core/index"
 
 const createRecordingExecutor = (
   dryRun: boolean,

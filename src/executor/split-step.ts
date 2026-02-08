@@ -1,4 +1,4 @@
-import type { CommandStep } from "../core/emitter.ts"
+import type { CommandStep } from "../core/emitter"
 
 export type SplitOrientation = "horizontal" | "vertical"
 

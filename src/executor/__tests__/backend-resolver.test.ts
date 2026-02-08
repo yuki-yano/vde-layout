@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest"
 
-import type { TerminalBackend } from "../terminal-backend.ts"
-import { createTerminalBackend } from "../backend-factory.ts"
-import { resolveTerminalBackendKind } from "../backend-resolver.ts"
-import { LogLevel } from "../../utils/logger.ts"
-import type { Logger } from "../../utils/logger.ts"
+import type { TerminalBackend } from "../terminal-backend"
+import { createTerminalBackend } from "../backend-factory"
+import { resolveTerminalBackendKind } from "../backend-resolver"
+import { LogLevel } from "../../utils/logger"
+import type { Logger } from "../../utils/logger"
 
 vi.mock("../../backends/tmux/backend.ts", () => {
   return {

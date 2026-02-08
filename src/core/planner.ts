@@ -1,5 +1,5 @@
-import type { CompiledLayoutNode, CompiledPreset, CompiledSplitPane, CompiledTerminalPane } from "./compile.ts"
-import { createCoreError, type CoreError } from "./errors.ts"
+import type { CompiledLayoutNode, CompiledPreset, CompiledSplitPane, CompiledTerminalPane } from "./compile"
+import { createCoreError, type CoreError } from "./errors"
 
 type CreateLayoutPlanInput = {
   readonly preset: CompiledPreset

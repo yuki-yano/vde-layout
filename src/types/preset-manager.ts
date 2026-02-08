@@ -1,4 +1,4 @@
-import type { Config, Preset, PresetInfo } from "../models/types.ts"
+import type { Config, Preset, PresetInfo } from "../models/types"
 
 export type PresetManager = {
   readonly loadConfig: () => Promise<void>

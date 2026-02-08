@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const loadEntrypoint = async (): Promise<void> => {
-  await import("../index.ts")
+  await import("../index")
   await new Promise<void>((resolve) => {
     setTimeout(resolve, 0)
   })

@@ -1,5 +1,5 @@
-import type { Config, Preset, PresetInfo } from "../../models/types.ts"
-import type { PresetManager } from "../../types/preset-manager.ts"
+import type { Config, Preset, PresetInfo } from "../../models/types"
+import type { PresetManager } from "../../types/preset-manager"
 
 export type MockPresetManager = PresetManager & {
   readonly setPresets: (presets: Record<string, Preset>) => void

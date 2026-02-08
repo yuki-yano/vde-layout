@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { loadPackageVersion } from "./package-version.ts"
+import { loadPackageVersion } from "./package-version"
 
 type RequireLikeError = Error & {
   readonly code?: string

@@ -1,4 +1,4 @@
-import type { WindowMode } from "../models/types.ts"
+import type { WindowMode } from "../models/types"
 
 type WindowModeSource = {
   readonly cli?: WindowMode

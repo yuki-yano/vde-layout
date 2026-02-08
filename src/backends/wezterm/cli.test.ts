@@ -5,7 +5,7 @@ vi.mock("execa", () => ({
 }))
 
 import { execa } from "execa"
-import { killWeztermPane, listWeztermWindows, runWeztermCli, verifyWeztermAvailability } from "./cli.ts"
+import { killWeztermPane, listWeztermWindows, runWeztermCli, verifyWeztermAvailability } from "./cli"
 
 const execaMock = vi.mocked(execa)
 

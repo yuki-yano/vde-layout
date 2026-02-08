@@ -1,4 +1,4 @@
-import type { EmittedTerminal } from "../core/emitter.ts"
+import type { EmittedTerminal } from "../core/emitter"
 
 /**
  * Template token types supported in pane commands:
