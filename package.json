@@ -3,6 +3,7 @@
   "version": "0.1.1",
   "description": "Terminal multiplexer layout management tool for VDE (Vibe Coding Development Environment)",
   "type": "module",
+  "packageManager": "pnpm@10.28.2",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "exports": {
@@ -21,14 +22,14 @@
     "clean": "rm -rf dist",
     "dev": "tsdown --watch",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "test": "bun run build && vitest run",
-    "ci": "bun run format:check && bun run typecheck && bun run lint && bun run test",
+    "test": "pnpm build && vitest run",
+    "ci": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run clean && bun run build"
+    "prepublishOnly": "pnpm clean && pnpm build"
   },
   "keywords": [
     "tmux",
