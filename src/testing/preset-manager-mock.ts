@@ -7,6 +7,7 @@ export type MockPresetManager = PresetManager & {
   readonly wasLoadConfigCalled: () => boolean
   readonly resetLoadConfigCalled: () => void
   readonly getConfigPath: () => string | undefined
+  readonly getConfigPathAtLastLoad: () => string | undefined
   readonly setDefaults: (next: Config["defaults"] | undefined) => void
 }
 
@@ -33,10 +34,12 @@ export const createMockPresetManager = (): MockPresetManager => {
   let loadConfigCalled = false
   let shouldFailOnLoad = false
   let configPath: string | undefined
+  let configPathAtLastLoad: string | undefined
   let defaults: Config["defaults"] | undefined
 
   const loadConfig = async () => {
     loadConfigCalled = true
+    configPathAtLastLoad = configPath
     if (shouldFailOnLoad) {
       throw new Error("Configuration file not found")
     }
@@ -84,6 +87,7 @@ export const createMockPresetManager = (): MockPresetManager => {
   }
 
   const getConfigPath = () => configPath
+  const getConfigPathAtLastLoad = () => configPathAtLastLoad
   const getDefaults = () => defaults
 
   return {
@@ -97,6 +101,7 @@ export const createMockPresetManager = (): MockPresetManager => {
     wasLoadConfigCalled,
     resetLoadConfigCalled,
     getConfigPath,
+    getConfigPathAtLastLoad,
     getDefaults,
     setDefaults,
   }

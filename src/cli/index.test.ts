@@ -334,6 +334,7 @@ describe("CLI", () => {
 
       expectCorePipelineCalled()
       expect(recordingExecutor.commands.some((command) => command.includes("nvim"))).toBe(true)
+      expect(consoleOutput.join("\n")).toContain("Window mode:")
       expect(runExitCode).toBe(0)
     })
 
@@ -382,6 +383,20 @@ describe("CLI", () => {
       await cliWithConfig.run(["dev", "--config", "/tmp/custom.yml", "--dry-run"])
 
       expect(customPresetManager.getConfigPath()).toBe("/tmp/custom.yml")
+      expect(customPresetManager.getConfigPathAtLastLoad()).toBe("/tmp/custom.yml")
+    })
+
+    it("applies --config before list command loads presets", async () => {
+      const customPresetManager = createMockPresetManager()
+      const cliWithConfig = createCli({
+        presetManager: customPresetManager,
+        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => createRecordingExecutor(dryRun),
+        core: coreBridge,
+      })
+
+      await cliWithConfig.run(["--config", "/tmp/list-config.yml", "list"])
+
+      expect(customPresetManager.getConfigPathAtLastLoad()).toBe("/tmp/list-config.yml")
     })
   })
 

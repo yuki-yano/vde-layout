@@ -105,6 +105,22 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     return undefined
   }
 
+  const applyRuntimeOptions = (runtimeOptions: { verbose?: boolean; config?: string }): void => {
+    if (runtimeOptions.verbose === true) {
+      logger = createLogger({ level: LogLevel.INFO })
+    } else {
+      logger = createLogger()
+    }
+
+    if (
+      typeof runtimeOptions.config === "string" &&
+      runtimeOptions.config.length > 0 &&
+      typeof presetManager.setConfigPath === "function"
+    ) {
+      presetManager.setConfigPath(runtimeOptions.config)
+    }
+  }
+
   const handleCoreError = (error: CoreError): number => {
     const header = [`[${error.kind}]`, `[${error.code}]`]
     if (typeof error.path === "string" && error.path.length > 0) {
@@ -294,6 +310,13 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     program.option("--config <path>", "Path to configuration file")
     program.option("--current-window", "Use the current tmux window for layout (kills other panes)", false)
     program.option("--new-window", "Always create a new tmux window for layout", false)
+    program.hook("preAction", (_thisCommand, actionCommand) => {
+      const runtimeOptions =
+        typeof actionCommand.optsWithGlobals === "function"
+          ? actionCommand.optsWithGlobals()
+          : program.opts<{ verbose?: boolean; config?: string }>()
+      applyRuntimeOptions(runtimeOptions)
+    })
 
     program
       .command("list")
@@ -327,6 +350,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
 
   const run = async (args: string[] = process.argv.slice(2)): Promise<number> => {
     lastExitCode = 0
+    logger = createLogger()
 
     try {
       await program.parseAsync(args, { from: "user" })
@@ -337,32 +361,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       return handleError(error)
     }
 
-    try {
-      const opts = program.opts<{
-        verbose?: boolean
-        config?: string
-        V?: boolean
-        currentWindow?: boolean
-        newWindow?: boolean
-      }>()
-
-      if (opts.verbose === true) {
-        logger = createLogger({ level: LogLevel.INFO })
-      } else {
-        logger = createLogger()
-      }
-
-      if (
-        typeof opts.config === "string" &&
-        opts.config.length > 0 &&
-        typeof presetManager.setConfigPath === "function"
-      ) {
-        presetManager.setConfigPath(opts.config)
-      }
-      return lastExitCode
-    } catch (error) {
-      return handleError(error)
-    }
+    return lastExitCode
   }
 
   return { run }
