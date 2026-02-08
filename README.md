@@ -15,8 +15,14 @@ vde-layout is a CLI that reproduces terminal layouts (tmux or WezTerm) from YAML
 npm install -g vde-layout
 # or
 pnpm add -g vde-layout
-# or
-bun add -g vde-layout
+```
+
+## Development
+```bash
+pnpm install
+pnpm run typecheck
+pnpm run lint
+pnpm run test
 ```
 
 ## Quick Start
