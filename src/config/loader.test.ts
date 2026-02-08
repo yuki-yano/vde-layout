@@ -182,13 +182,12 @@ describe("ConfigLoader", () => {
         "utf8",
       )
 
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-      const loaderWithMerge = createConfigLoader()
+      const warnSpy = vi.fn()
+      const loaderWithMerge = createConfigLoader({ onWarning: warnSpy })
       const config = await loaderWithMerge.loadConfig()
 
       expect(config.defaults?.windowMode).toBe("current-window")
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("defaults.windowMode conflict"))
-      warnSpy.mockRestore()
     })
 
     it("logs preset windowMode conflict when overriding", async () => {
@@ -206,13 +205,12 @@ describe("ConfigLoader", () => {
         "utf8",
       )
 
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-      const loaderWithMerge = createConfigLoader()
+      const warnSpy = vi.fn()
+      const loaderWithMerge = createConfigLoader({ onWarning: warnSpy })
       const config = await loaderWithMerge.loadConfig()
 
       expect(config.presets.dev?.windowMode).toBe("current-window")
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Preset "dev" windowMode conflict'))
-      warnSpy.mockRestore()
     })
   })
 

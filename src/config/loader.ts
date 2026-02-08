@@ -8,6 +8,7 @@ import { validateYAML } from "./validator"
 
 export type ConfigLoaderOptions = {
   readonly configPaths?: string[]
+  readonly onWarning?: (message: string) => void
 }
 
 export type ConfigLoader = {
@@ -19,6 +20,7 @@ export type ConfigLoader = {
 
 export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoader => {
   const explicitConfigPaths = options.configPaths
+  const emitWarning: (message: string) => void = options.onWarning ?? ((_message: string): void => {})
 
   const computeCachedSearchPaths = (): string[] => {
     if (explicitConfigPaths && explicitConfigPaths.length > 0) {
@@ -66,16 +68,16 @@ export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoa
     for (const globalPath of globalPaths) {
       const content = await safeReadFile(globalPath)
       const config = validateYAML(content)
-      mergedConfig = mergeConfigs(mergedConfig, config)
+      mergedConfig = mergeConfigs(mergedConfig, config, emitWarning)
     }
 
     if (projectPath !== null && (await fs.pathExists(projectPath))) {
       const content = await safeReadFile(projectPath)
       const config = validateYAML(content)
-      mergedConfig = mergeConfigs(mergedConfig, config)
+      mergedConfig = mergeConfigs(mergedConfig, config, emitWarning)
     }
 
-    return applyDefaults(mergedConfig)
+    return mergedConfig
   }
 
   return {
@@ -170,7 +172,7 @@ const safeReadFile = async (filePath: string): Promise<string> => {
   }
 }
 
-const mergeConfigs = (base: Config, override: Config): Config => {
+const mergeConfigs = (base: Config, override: Config, onWarning: (message: string) => void): Config => {
   const mergedPresets: Config["presets"] = { ...base.presets }
 
   for (const [presetKey, overridePreset] of Object.entries(override.presets)) {
@@ -181,7 +183,7 @@ const mergeConfigs = (base: Config, override: Config): Config => {
       overridePreset.windowMode !== undefined &&
       basePreset.windowMode !== overridePreset.windowMode
     ) {
-      console.warn(
+      onWarning(
         `[vde-layout] Preset "${presetKey}" windowMode conflict: "${basePreset.windowMode}" overridden by "${overridePreset.windowMode}"`,
       )
     }
@@ -196,7 +198,7 @@ const mergeConfigs = (base: Config, override: Config): Config => {
     overrideDefaults?.windowMode !== undefined &&
     baseDefaults.windowMode !== overrideDefaults.windowMode
   ) {
-    console.warn(
+    onWarning(
       `[vde-layout] defaults.windowMode conflict: "${baseDefaults.windowMode}" overridden by "${overrideDefaults.windowMode}"`,
     )
   }
@@ -217,8 +219,4 @@ const mergeConfigs = (base: Config, override: Config): Config => {
         defaults: mergedDefaults,
         presets: mergedPresets,
       }
-}
-
-const applyDefaults = (config: Config): Config => {
-  return config
 }
