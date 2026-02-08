@@ -5,13 +5,15 @@ import { createPresetManager } from "../layout/preset"
 import { loadPackageVersion } from "./package-version"
 import { resolveWindowMode } from "./window-mode"
 import { createPaneKillPrompter } from "./user-prompt"
-import type { PresetInfo, WindowMode } from "../models/types"
+import { buildPresetSource, determineCliWindowMode, renderDryRun } from "./command-helpers"
+import { createCliErrorHandlers } from "./error-handling"
+import type { PresetInfo } from "../models/types"
 import type { CommandExecutor } from "../types/command-executor"
 import type { PresetManager } from "../types/preset-manager"
 import { createRealExecutor, createDryRunExecutor } from "../executor/index"
 import { createTerminalBackend } from "../executor/backend-factory"
 import { resolveTerminalBackendKind } from "../executor/backend-resolver"
-import type { DryRunStep, TerminalBackendKind } from "../executor/terminal-backend"
+import type { TerminalBackendKind } from "../executor/terminal-backend"
 import { createLogger, LogLevel, type Logger } from "../utils/logger"
 import {
   compilePreset as defaultCompilePreset,
@@ -23,11 +25,9 @@ import type {
   CompilePresetFromValueInput,
   CompilePresetInput,
   PlanEmission,
-  CoreError,
   CompilePresetSuccess,
   CreateLayoutPlanSuccess,
 } from "../core/index"
-import { isCoreError } from "../core/index"
 
 export type CoreBridge = {
   readonly compilePreset: (input: CompilePresetInput) => ReturnType<typeof defaultCompilePreset>
@@ -74,36 +74,9 @@ export const createCli = (options: CLIOptions = {}): CLI => {
   const require = createRequire(import.meta.url)
   const version = loadPackageVersion(require)
   let logger: Logger = createLogger()
-
-  const renderDryRun = (steps: ReadonlyArray<DryRunStep>): void => {
-    console.log(chalk.bold("\nPlanned terminal steps (dry-run)"))
-    steps.forEach((step, index) => {
-      console.log(` ${index + 1}. [${step.backend}] ${step.summary}: ${step.command}`)
-    })
-  }
-
-  const buildPresetSource = (presetName?: string): string => {
-    return typeof presetName === "string" && presetName.length > 0 ? `preset://${presetName}` : "preset://default"
-  }
-
-  const determineCliWindowMode = (options: {
-    currentWindow?: boolean
-    newWindow?: boolean
-  }): WindowMode | undefined => {
-    if (options.currentWindow === true && options.newWindow === true) {
-      throw new Error("Cannot use --current-window and --new-window at the same time")
-    }
-
-    if (options.currentWindow === true) {
-      return "current-window"
-    }
-
-    if (options.newWindow === true) {
-      return "new-window"
-    }
-
-    return undefined
-  }
+  const errorHandlers = createCliErrorHandlers({
+    getLogger: () => logger,
+  })
 
   const applyRuntimeOptions = (runtimeOptions: { verbose?: boolean; config?: string }): void => {
     if (runtimeOptions.verbose === true) {
@@ -119,56 +92,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     ) {
       presetManager.setConfigPath(runtimeOptions.config)
     }
-  }
-
-  const handleCoreError = (error: CoreError): number => {
-    const header = [`[${error.kind}]`, `[${error.code}]`]
-    if (typeof error.path === "string" && error.path.length > 0) {
-      header.push(`[${error.path}]`)
-    }
-
-    const lines = [`${header.join(" ")} ${error.message}`.trim()]
-
-    if (typeof error.source === "string" && error.source.length > 0) {
-      lines.push(`source: ${error.source}`)
-    }
-
-    const commandDetail = error.details?.command
-    if (Array.isArray(commandDetail)) {
-      const parts = commandDetail.filter((segment): segment is string => typeof segment === "string")
-      if (parts.length > 0) {
-        lines.push(`command: ${parts.join(" ")}`)
-      }
-    } else if (typeof commandDetail === "string" && commandDetail.length > 0) {
-      lines.push(`command: ${commandDetail}`)
-    }
-
-    const stderrDetail = error.details?.stderr
-    if (typeof stderrDetail === "string" && stderrDetail.length > 0) {
-      lines.push(`stderr: ${stderrDetail}`)
-    } else if (stderrDetail !== undefined) {
-      lines.push(`stderr: ${String(stderrDetail)}`)
-    }
-
-    logger.error(lines.join("\n"))
-    return 1
-  }
-
-  const handleError = (error: unknown): number => {
-    if (error instanceof Error) {
-      logger.error(error.message, error)
-    } else {
-      logger.error("An unexpected error occurred")
-    }
-
-    return 1
-  }
-
-  const handlePipelineFailure = (error: unknown): number => {
-    if (isCoreError(error)) {
-      return handleCoreError(error)
-    }
-    return handleError(error)
   }
 
   const listPresets = async (): Promise<number> => {
@@ -193,7 +116,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
 
       return 0
     } catch (error) {
-      return handleError(error)
+      return errorHandlers.handleError(error)
     }
   }
 
@@ -275,7 +198,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         planResult = core.createLayoutPlan({ preset: compileResult.preset })
         emission = core.emitPlan({ plan: planResult.plan })
       } catch (error) {
-        return handlePipelineFailure(error)
+        return errorHandlers.handlePipelineFailure(error)
       }
 
       if (options.dryRun === true) {
@@ -290,14 +213,14 @@ export const createCli = (options: CLIOptions = {}): CLI => {
           })
           logger.info(`Executed ${executionResult.executedSteps} ${backendKind} steps`)
         } catch (error) {
-          return handlePipelineFailure(error)
+          return errorHandlers.handlePipelineFailure(error)
         }
       }
 
       logger.success(`Applied preset "${preset.name}"`)
       return 0
     } catch (error) {
-      return handleError(error)
+      return errorHandlers.handleError(error)
     }
   }
 
@@ -364,7 +287,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       if (error instanceof CommanderError) {
         return error.exitCode
       }
-      return handleError(error)
+      return errorHandlers.handleError(error)
     }
 
     return lastExitCode
