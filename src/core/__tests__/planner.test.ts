@@ -90,8 +90,15 @@ layout:
       throw new Error("expected split root")
     }
 
+    const collectFocusStates = (node: (typeof root.panes)[number]): ReadonlyArray<boolean | undefined> => {
+      if (node.kind === "terminal") {
+        return [node.focus]
+      }
+      return node.panes.flatMap(collectFocusStates)
+    }
+
     const terminalFocusStates = root.panes
-      .flatMap((pane) => (pane.kind === "terminal" ? [pane.focus] : pane.panes.map((child) => child.focus)))
+      .flatMap(collectFocusStates)
       .filter((value): value is boolean => value !== undefined)
 
     expect(terminalFocusStates.filter(Boolean).length).toBe(1)
