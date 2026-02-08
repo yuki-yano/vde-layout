@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint"
 
 export default [
   {
-    files: ["src/**/*.ts", "scripts/**/*.ts"],
+    files: ["src/**/*.ts"],
   },
   {
     languageOptions: {
@@ -58,8 +58,6 @@ export default [
       "coverage",
       "src/**/__tests__/**/*",
       "src/**/*.test.ts",
-      "scripts/**/__tests__/**/*",
-      "scripts/**/*.test.ts",
     ],
   },
 ]

@@ -13,12 +13,12 @@ type ExecaLikeError = Error & {
   readonly stdout?: string
 }
 
-export type WeztermListPane = {
+type WeztermListPane = {
   readonly paneId: string
   readonly isActive: boolean
 }
 
-export type WeztermListTab = {
+type WeztermListTab = {
   readonly tabId: string
   readonly isActive: boolean
   readonly panes: ReadonlyArray<WeztermListPane>
