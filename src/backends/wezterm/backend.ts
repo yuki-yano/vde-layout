@@ -6,7 +6,7 @@ import type {
   ApplyPlanResult,
   DryRunStep,
   TerminalBackend,
-  TerminalBackendContext,
+  WeztermTerminalBackendContext,
 } from "../../executor/terminal-backend"
 import {
   killWeztermPane,
@@ -188,7 +188,7 @@ const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
 
 const resolveCurrentWindow = async (context: {
   readonly list: WeztermListResult
-  readonly prompt?: TerminalBackendContext["prompt"]
+  readonly prompt?: WeztermTerminalBackendContext["prompt"]
   readonly dryRun: boolean
   readonly logCommand: (args: ReadonlyArray<string>) => void
   readonly preferredPaneId?: string
@@ -369,7 +369,7 @@ const resolveInitialPane = async ({
   preferredPaneId,
 }: {
   readonly windowMode: ApplyPlanParameters["windowMode"]
-  readonly prompt?: TerminalBackendContext["prompt"]
+  readonly prompt?: WeztermTerminalBackendContext["prompt"]
   readonly dryRun: boolean
   readonly listWindows: () => Promise<WeztermListResult>
   readonly runCommand: ExecuteWeztermCommand
@@ -687,7 +687,7 @@ const applySplitStep = async ({
   }
 }
 
-export const createWeztermBackend = (context: TerminalBackendContext): TerminalBackend => {
+export const createWeztermBackend = (context: WeztermTerminalBackendContext): TerminalBackend => {
   const formatCommand = (args: ReadonlyArray<string>): string => {
     return `wezterm cli ${args.join(" ")}`
   }

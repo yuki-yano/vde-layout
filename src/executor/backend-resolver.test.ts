@@ -98,12 +98,6 @@ describe("createTerminalBackend", () => {
 
   it("creates a wezterm backend when requested", () => {
     const context = {
-      executor: {
-        execute: vi.fn(),
-        executeMany: vi.fn(),
-        isDryRun: vi.fn(() => false),
-        logCommand: vi.fn(),
-      },
       logger: createMockLogger(),
       dryRun: false,
       verbose: false,

@@ -5,7 +5,7 @@ import type { PlanEmission } from "../core/emitter"
 import { createTmuxBackend } from "../backends/tmux/backend"
 import { LogLevel } from "../utils/logger"
 import type { Logger } from "../utils/logger"
-import type { TerminalBackendContext } from "./terminal-backend"
+import type { TmuxTerminalBackendContext } from "./terminal-backend"
 
 const { verifyEnvironmentMock, getExecutorMock, getCommandStringMock } = vi.hoisted(() => {
   return {
@@ -92,7 +92,7 @@ describe("createTmuxBackend", () => {
     getCommandStringMock.mockImplementation((args: string[]) => `tmux ${args.join(" ")}`)
   })
 
-  const createContext = (overrides: Partial<TerminalBackendContext> = {}): TerminalBackendContext => ({
+  const createContext = (overrides: Partial<TmuxTerminalBackendContext> = {}): TmuxTerminalBackendContext => ({
     executor: createMockExecutor(),
     logger: createMockLogger(),
     dryRun: false,

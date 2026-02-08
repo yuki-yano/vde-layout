@@ -10,10 +10,10 @@ import type {
   ApplyPlanResult,
   DryRunStep,
   TerminalBackend,
-  TerminalBackendContext,
+  TmuxTerminalBackendContext,
 } from "../../executor/terminal-backend"
 
-export const createTmuxBackend = (context: TerminalBackendContext): TerminalBackend => {
+export const createTmuxBackend = (context: TmuxTerminalBackendContext): TerminalBackend => {
   const tmuxExecutor = createTmuxExecutor({
     executor: context.executor,
     verbose: context.verbose,

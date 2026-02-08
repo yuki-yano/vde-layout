@@ -240,16 +240,22 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         env: process.env,
       })
       logger.info(`Terminal backend: ${backendKind}`)
-
-      const backend = createTerminalBackend(backendKind, {
-        executor,
+      const backendContextBase = {
         logger,
         dryRun: options.dryRun,
         verbose: options.verbose,
         prompt: confirmPaneClosure,
         cwd: process.cwd(),
         paneId: process.env.WEZTERM_PANE,
-      })
+      } as const
+
+      const backend =
+        backendKind === "tmux"
+          ? createTerminalBackend("tmux", {
+              ...backendContextBase,
+              executor,
+            })
+          : createTerminalBackend("wezterm", backendContextBase)
 
       await backend.verifyEnvironment()
 
