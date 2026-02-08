@@ -63,11 +63,14 @@ export const prepareTerminalCommands = ({
     paneMap.set(terminal.virtualPaneId, resolveRealPaneId(terminal.virtualPaneId))
   }
 
-  const focusPaneRealId = resolveRealPaneId(focusPaneVirtualId)
+  const focusPaneRealId = paneMap.get(focusPaneVirtualId) ?? resolveRealPaneId(focusPaneVirtualId)
   const nameToRealIdMap = buildNameToRealIdMap(terminals, paneMap)
 
   const commands: PreparedTerminalCommand[] = terminals.map((terminal) => {
-    const realPaneId = resolveRealPaneId(terminal.virtualPaneId)
+    const realPaneId = paneMap.get(terminal.virtualPaneId)
+    if (realPaneId === undefined) {
+      throw new Error(`Unknown pane: ${terminal.virtualPaneId}`)
+    }
 
     const cwdCommand =
       typeof terminal.cwd === "string" && terminal.cwd.length > 0

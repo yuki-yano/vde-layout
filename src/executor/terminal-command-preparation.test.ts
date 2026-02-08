@@ -62,7 +62,14 @@ describe("prepareTerminalCommands", () => {
       title: "Main Pane",
       command: { text: "nvim", delayMs: 0 },
     })
-    expect(prepared.commands[1]?.command?.text).toBe("echo %0 %1 %0")
+    expect(prepared.commands[1]).toEqual({
+      terminal: terminals[1],
+      realPaneId: "%1",
+      cwdCommand: undefined,
+      envCommands: [],
+      title: undefined,
+      command: { text: "echo %0 %1 %0", delayMs: 0 },
+    })
   })
 
   it("applies ephemeral behavior and delay values", () => {
@@ -103,13 +110,27 @@ describe("prepareTerminalCommands", () => {
       },
     })
 
-    expect(prepared.commands[0]?.command).toEqual({
-      text: "npm test; [ $? -eq 0 ] && exit",
-      delayMs: 250,
+    expect(prepared.commands[0]).toEqual({
+      terminal: terminals[0],
+      realPaneId: "%0",
+      cwdCommand: undefined,
+      envCommands: [],
+      title: undefined,
+      command: {
+        text: "npm test; [ $? -eq 0 ] && exit",
+        delayMs: 250,
+      },
     })
-    expect(prepared.commands[1]?.command).toEqual({
-      text: "npm run build; exit",
-      delayMs: 0,
+    expect(prepared.commands[1]).toEqual({
+      terminal: terminals[1],
+      realPaneId: "%1",
+      cwdCommand: undefined,
+      envCommands: [],
+      title: undefined,
+      command: {
+        text: "npm run build; exit",
+        delayMs: 0,
+      },
     })
   })
 
