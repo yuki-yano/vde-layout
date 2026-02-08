@@ -49,7 +49,7 @@ describe("compileCorePipeline", () => {
   })
 
   it("invokes each stage with injected dependencies", () => {
-    const compileSpy = vi.fn<[CompilePresetInput], CompilePresetSuccess>(({ document, source }) => {
+    const compileSpy = vi.fn(({ document, source }: CompilePresetInput): CompilePresetSuccess => {
       expect(document).toBe(validDocument)
       expect(source).toBe("tests/pipeline.yml")
       return {
@@ -70,8 +70,8 @@ describe("compileCorePipeline", () => {
       }
     })
 
-    const planSpy = vi.fn<[{ preset: CompilePresetSuccess["preset"] }], ReturnType<typeof createLayoutPlan>>(
-      ({ preset }) => {
+    const planSpy = vi.fn(
+      ({ preset }: { preset: CompilePresetSuccess["preset"] }): ReturnType<typeof createLayoutPlan> => {
         expect(preset.name).toBe("mock")
         return {
           plan: {
@@ -91,8 +91,8 @@ describe("compileCorePipeline", () => {
       },
     )
 
-    const emissionSpy = vi.fn<[{ plan: ReturnType<typeof createLayoutPlan>["plan"] }], ReturnType<typeof emitPlan>>(
-      () => ({
+    const emissionSpy = vi.fn(
+      (_input: { plan: ReturnType<typeof createLayoutPlan>["plan"] }): ReturnType<typeof emitPlan> => ({
         steps: [],
         summary: { stepsCount: 0, focusPaneId: "root.0", initialPaneId: "root.0" },
         hash: "abc123",
@@ -119,7 +119,7 @@ describe("compileCorePipeline", () => {
   })
 
   it("propagates plan creation errors", () => {
-    const planSpy = vi.fn<[{ preset: CompilePresetSuccess["preset"] }], ReturnType<typeof createLayoutPlan>>(() => {
+    const planSpy = vi.fn((_input: { preset: CompilePresetSuccess["preset"] }): ReturnType<typeof createLayoutPlan> => {
       throw createCoreError("plan", {
         code: "FOCUS_CONFLICT",
         message: "Multiple panes specify focus=true",
@@ -150,8 +150,8 @@ describe("compileCorePipeline", () => {
   })
 
   it("propagates plan emitter errors", () => {
-    const emissionSpy = vi.fn<[{ plan: ReturnType<typeof createLayoutPlan>["plan"] }], ReturnType<typeof emitPlan>>(
-      () => {
+    const emissionSpy = vi.fn(
+      (_input: { plan: ReturnType<typeof createLayoutPlan>["plan"] }): ReturnType<typeof emitPlan> => {
         throw createCoreError("emit", {
           code: "LAYOUT_INVALID_NODE",
           message: "Layout node is invalid",

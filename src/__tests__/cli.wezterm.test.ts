@@ -184,18 +184,20 @@ describe("CLI WezTerm backend integration", () => {
   it("renders wezterm dry-run output with backend-provided steps", async () => {
     const verifyEnvironment = vi.fn(async () => {})
     const applyPlan = vi.fn()
-    const getDryRunSteps = vi.fn(() => [
-      {
-        backend: "wezterm",
-        summary: "split root",
-        command: "wezterm cli split-pane --right --percent 50 --pane-id root",
-      },
-      {
-        backend: "wezterm",
-        summary: "set cwd root",
-        command: "wezterm cli send-text --pane-id root --no-paste -- 'cd \"/repo\"'",
-      },
-    ])
+    const getDryRunSteps = vi.fn(
+      (): ReturnType<TerminalBackend["getDryRunSteps"]> => [
+        {
+          backend: "wezterm",
+          summary: "split root",
+          command: "wezterm cli split-pane --right --percent 50 --pane-id root",
+        },
+        {
+          backend: "wezterm",
+          summary: "set cwd root",
+          command: "wezterm cli send-text --pane-id root --no-paste -- 'cd \"/repo\"'",
+        },
+      ],
+    )
     let receivedContext: TerminalBackend | undefined
     createTerminalBackendMock.mockImplementation((_kind, context) => {
       receivedContext = {

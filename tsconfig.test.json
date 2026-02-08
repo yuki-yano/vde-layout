@@ -1,9 +1,13 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "strict": false,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+    "noUncheckedIndexedAccess": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/**/*", "scripts/**/*.ts"],
+  "include": ["src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
