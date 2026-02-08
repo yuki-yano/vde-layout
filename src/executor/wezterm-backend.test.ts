@@ -14,7 +14,7 @@ const { verifyMock, listMock, killMock, runMock } = vi.hoisted(() => ({
   runMock: vi.fn(),
 }))
 
-vi.mock("../backends/wezterm/cli.ts", () => ({
+vi.mock("../backends/wezterm/cli", () => ({
   verifyWeztermAvailability: verifyMock,
   listWeztermWindows: listMock,
   killWeztermPane: killMock,
