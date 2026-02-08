@@ -128,7 +128,7 @@ const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
     steps.push({
       backend: "wezterm",
       summary: step.summary,
-      command: `wezterm cli # ${step.command.join(" ")}`,
+      command: `wezterm cli # ${(step.command ?? []).join(" ")}`,
     })
   }
 

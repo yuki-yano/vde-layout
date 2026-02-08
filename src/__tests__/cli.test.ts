@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
 import packageJson from "../../package.json"
-import { createCli, type CLI, type CoreBridge } from "../cli.ts"
+import { createCli, type CLI, type CoreBridge } from "../cli/index.ts"
 import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock.ts"
 import type { CommandExecutor } from "../types/command-executor.ts"
 import type {

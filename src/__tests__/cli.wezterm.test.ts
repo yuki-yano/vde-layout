@@ -4,7 +4,7 @@ vi.mock("../executor/backend-factory.ts", () => ({
   createTerminalBackend: vi.fn(),
 }))
 
-import { createCli, type CoreBridge } from "../cli.ts"
+import { createCli, type CoreBridge } from "../cli/index.ts"
 import { createMockPresetManager, type MockPresetManager } from "./mocks/preset-manager-mock.ts"
 import { createTerminalBackend } from "../executor/backend-factory.ts"
 import type { TerminalBackend } from "../executor/terminal-backend.ts"
