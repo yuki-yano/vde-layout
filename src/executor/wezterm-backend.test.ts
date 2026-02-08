@@ -170,6 +170,62 @@ describe("createWeztermBackend", () => {
     })
   })
 
+  it("renders unknown step kinds in dry-run fallback format", () => {
+    const backend = createWeztermBackend(createContext())
+    const legacyStep = {
+      id: "legacy:step",
+      kind: "legacy-step",
+      summary: "legacy command",
+      command: ["custom", "--arg"],
+    } as unknown as PlanEmission["steps"][number]
+
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [legacyStep],
+      summary: { ...minimalEmission().summary, stepsCount: 1 },
+    }
+
+    const steps = backend.getDryRunSteps(emission)
+    expect(steps[0]).toEqual({
+      backend: "wezterm",
+      summary: "legacy command",
+      command: "wezterm cli # custom --arg",
+    })
+  })
+
+  it("throws TEMPLATE_TOKEN_ERROR in dry-run when pane template tokens are unresolved", () => {
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      terminals: [
+        {
+          virtualPaneId: "root",
+          cwd: undefined,
+          env: undefined,
+          command: "echo {{pane_id:missing-pane}}",
+          focus: true,
+          name: "root",
+        },
+      ],
+    }
+
+    let caughtError: unknown
+    try {
+      backend.getDryRunSteps(emission)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError).toMatchObject({
+      code: "TEMPLATE_TOKEN_ERROR",
+      path: "root",
+      details: expect.objectContaining({ tokenType: "pane_id" }),
+    })
+    if (caughtError instanceof Error) {
+      expect(caughtError.message).toMatch(/Template token resolution failed.*missing-pane/)
+    }
+  })
+
   it("spawns a new tab when a wezterm window exists", async () => {
     queueListResponses(
       makeList([{ windowId: "7", panes: [{ paneId: "10", active: true }] }]),
@@ -279,6 +335,24 @@ describe("createWeztermBackend", () => {
     expect(result.focusPaneId).toBe("42")
   })
 
+  it("continues with active window when paneId cannot be found in workspace scan", async () => {
+    queueListResponses(
+      makeList([{ windowId: "w-main", workspace: "main", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "w-main", workspace: "main", panes: [{ paneId: "10", active: true }, { paneId: "42" }] }]),
+    )
+    runMock.mockResolvedValueOnce("42 w-main\n")
+
+    const backend = createWeztermBackend(createContext({ paneId: "missing-pane-id" }))
+    const result = await backend.applyPlan({ emission: minimalEmission(), windowMode: "new-window" })
+
+    expect(runMock).toHaveBeenNthCalledWith(
+      1,
+      ["spawn", "--window-id", "w-main", "--cwd", "/workspace"],
+      expect.objectContaining({ message: "Failed to spawn wezterm tab" }),
+    )
+    expect(result.focusPaneId).toBe("42")
+  })
+
   it("resolves current window and closes extra panes when confirmed", async () => {
     queueListResponses(
       makeList([
@@ -362,6 +436,68 @@ describe("createWeztermBackend", () => {
     expect(killMock).not.toHaveBeenCalled()
   })
 
+  it("throws when no wezterm window exists in current-window mode", async () => {
+    queueListResponses({ windows: [] })
+    const backend = createWeztermBackend(createContext())
+
+    await expect(
+      backend.applyPlan({ emission: minimalEmission(), windowMode: "current-window" }),
+    ).rejects.toMatchObject({
+      code: "TERMINAL_COMMAND_FAILED",
+      message: "No active wezterm window detected",
+    })
+  })
+
+  it("throws when active window has no tabs in current-window mode", async () => {
+    listMock.mockResolvedValueOnce({
+      windows: [
+        {
+          windowId: "w1",
+          isActive: true,
+          workspace: "dev",
+          tabs: [],
+        },
+      ],
+    })
+
+    const backend = createWeztermBackend(createContext())
+    await expect(
+      backend.applyPlan({ emission: minimalEmission(), windowMode: "current-window" }),
+    ).rejects.toMatchObject({
+      code: "TERMINAL_COMMAND_FAILED",
+      message: "No active wezterm tab detected",
+      path: "w1",
+    })
+  })
+
+  it("throws when active tab has no panes in current-window mode", async () => {
+    listMock.mockResolvedValueOnce({
+      windows: [
+        {
+          windowId: "w1",
+          isActive: true,
+          workspace: "dev",
+          tabs: [
+            {
+              tabId: "w1-tab",
+              isActive: true,
+              panes: [],
+            },
+          ],
+        },
+      ],
+    })
+
+    const backend = createWeztermBackend(createContext())
+    await expect(
+      backend.applyPlan({ emission: minimalEmission(), windowMode: "current-window" }),
+    ).rejects.toMatchObject({
+      code: "TERMINAL_COMMAND_FAILED",
+      message: "No active wezterm pane detected",
+      path: "w1-tab",
+    })
+  })
+
   it("throws when focus step target cannot be resolved from pane map", async () => {
     queueListResponses(
       makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
@@ -387,6 +523,33 @@ describe("createWeztermBackend", () => {
     await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
       code: "INVALID_PANE",
       path: "orphan:focus",
+    })
+  })
+
+  it("throws when focus step omits target metadata", async () => {
+    queueListResponses(
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "100" }] }]),
+    )
+    runMock.mockResolvedValueOnce("100 w1\n")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "root:focus:missing-target",
+          kind: "focus",
+          summary: "focus without target",
+          command: ["select-pane"],
+        },
+      ],
+      summary: { ...minimalEmission().summary, stepsCount: 1 },
+    }
+
+    await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "INVALID_PANE",
+      path: "root:focus:missing-target",
     })
   })
 
@@ -416,6 +579,124 @@ describe("createWeztermBackend", () => {
       code: "INVALID_PANE",
       path: "root:split:missing-target",
     })
+  })
+
+  it("throws when split cannot determine a new pane id", async () => {
+    queueListResponses(
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "100" }] }]),
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "100" }] }]),
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "100" }] }]),
+    )
+    runMock.mockResolvedValueOnce("100 w1\n")
+    runMock.mockResolvedValue("ok")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "root:split:no-new-pane",
+          kind: "split",
+          summary: "split without pane delta",
+          command: ["split-window", "-h", "-t", "root", "-p", "50"],
+          targetPaneId: "root",
+          createdPaneId: "root.1",
+        },
+      ],
+      summary: { ...minimalEmission().summary, stepsCount: 1 },
+    }
+
+    await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "TERMINAL_COMMAND_FAILED",
+      path: "root:split:no-new-pane",
+    })
+  })
+
+  it("throws when split pane snapshot does not include target window", async () => {
+    queueListResponses(
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "100" }] }]),
+      makeList([{ windowId: "w2", panes: [{ paneId: "100", active: true }] }]),
+    )
+    runMock.mockResolvedValueOnce("100 w1\n")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "root:split:window-not-found",
+          kind: "split",
+          summary: "split in missing window",
+          command: ["split-window", "-h", "-t", "root", "-p", "50"],
+          targetPaneId: "root",
+          createdPaneId: "root.1",
+        },
+      ],
+      summary: { ...minimalEmission().summary, stepsCount: 1 },
+    }
+
+    await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "TERMINAL_COMMAND_FAILED",
+      details: expect.objectContaining({ windowId: "w1" }),
+    })
+  })
+
+  it("throws when spawn output does not contain pane id for existing window", async () => {
+    queueListResponses(makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]))
+    runMock.mockResolvedValueOnce("   ")
+
+    const backend = createWeztermBackend(createContext())
+    await expect(backend.applyPlan({ emission: minimalEmission(), windowMode: "new-window" })).rejects.toMatchObject({
+      code: "TERMINAL_COMMAND_FAILED",
+      message: "wezterm spawn did not return a pane id",
+    })
+  })
+
+  it("throws when spawn output does not contain pane id for new window fallback", async () => {
+    queueListResponses({ windows: [] })
+    runMock.mockResolvedValueOnce("")
+
+    const backend = createWeztermBackend(createContext())
+    await expect(backend.applyPlan({ emission: minimalEmission(), windowMode: "new-window" })).rejects.toMatchObject({
+      code: "TERMINAL_COMMAND_FAILED",
+      message: "wezterm spawn did not return a pane id",
+    })
+  })
+
+  it("falls back to global pane search when window hint is temporarily unavailable", async () => {
+    queueListResponses(
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "w2", panes: [{ paneId: "42", active: true }] }]),
+    )
+    runMock.mockResolvedValueOnce("42 w1\n")
+
+    const backend = createWeztermBackend(createContext())
+    const result = await backend.applyPlan({ emission: minimalEmission(), windowMode: "new-window" })
+
+    expect(result.focusPaneId).toBe("42")
+  })
+
+  it("retries pane registration until pane appears", async () => {
+    vi.useFakeTimers()
+    try {
+      queueListResponses(
+        makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+        makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }] }]),
+        makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true }, { paneId: "42" }] }]),
+      )
+      runMock.mockResolvedValueOnce("42 w1\n")
+
+      const backend = createWeztermBackend(createContext())
+      const applyPromise = backend.applyPlan({ emission: minimalEmission(), windowMode: "new-window" })
+      await vi.advanceTimersByTimeAsync(1000)
+
+      const result = await applyPromise
+      expect(result.focusPaneId).toBe("42")
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("executes split steps and registers new panes", async () => {
@@ -620,6 +901,35 @@ describe("createWeztermBackend", () => {
     await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
       code: "INVALID_PANE",
       path: "root.unknown",
+    })
+  })
+
+  it("throws TEMPLATE_TOKEN_ERROR when runtime terminal command has unknown pane token", async () => {
+    queueListResponses(
+      makeList([{ windowId: "win", panes: [{ paneId: "5", active: true }] }]),
+      makeList([{ windowId: "win", panes: [{ paneId: "5", active: true }, { paneId: "200" }] }]),
+    )
+    runMock.mockResolvedValueOnce("200 win\n")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      terminals: [
+        {
+          virtualPaneId: "root",
+          cwd: undefined,
+          env: undefined,
+          command: "echo {{pane_id:missing-pane}}",
+          focus: true,
+          name: "root",
+        },
+      ],
+    }
+
+    await expect(backend.applyPlan({ emission, windowMode: "new-window" })).rejects.toMatchObject({
+      code: "TEMPLATE_TOKEN_ERROR",
+      path: "root",
+      details: expect.objectContaining({ tokenType: "pane_id" }),
     })
   })
 

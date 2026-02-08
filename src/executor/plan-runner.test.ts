@@ -735,4 +735,196 @@ describe("executePlan", () => {
       }
     }
   })
+
+  it("throws INVALID_PLAN when initial pane metadata is missing", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      summary: {
+        ...baseEmission.summary,
+        initialPaneId: "",
+      },
+    }
+
+    const executor = createMockExecutor()
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_PLAN,
+      path: "plan.initialPaneId",
+    })
+  })
+
+  it("throws INVALID_PANE when split target pane cannot be resolved", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          id: "root:split:unknown-target",
+          kind: "split",
+          command: ["split-window", "-h", "-t", "root.unknown", "-p", "50"],
+          summary: "split unknown target",
+          targetPaneId: "root.unknown",
+          createdPaneId: "root.1",
+        },
+      ],
+      terminals: [],
+      summary: {
+        ...baseEmission.summary,
+        stepsCount: 1,
+      },
+    }
+
+    const executor = createMockExecutor()
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_PANE,
+      path: "root:split:unknown-target",
+    })
+  })
+
+  it("throws INVALID_PANE when split does not produce a new pane", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          id: "root:split:no-new-pane",
+          kind: "split",
+          command: ["split-window", "-h", "-t", "root.0", "-p", "50"],
+          summary: "split without pane delta",
+          targetPaneId: "root.0",
+          createdPaneId: "root.1",
+        },
+      ],
+      terminals: [],
+      summary: {
+        ...baseEmission.summary,
+        stepsCount: 1,
+      },
+    }
+
+    const executor = {
+      execute: vi.fn(async (command: string | string[]) => {
+        const args = typeof command === "string" ? command.split(" ").slice(1) : command
+        if (args[0] === "new-window") {
+          return "%0"
+        }
+        if (args[0] === "list-panes") {
+          return "%0"
+        }
+        return ""
+      }),
+      executeMany: vi.fn(async () => {}),
+      isDryRun: () => true,
+      logCommand: vi.fn(),
+    }
+
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_PANE,
+      path: "root:split:no-new-pane",
+    })
+  })
+
+  it("throws MISSING_TARGET when focus step omits target metadata", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          id: "root:focus:missing-target",
+          kind: "focus",
+          command: ["select-pane"],
+          summary: "focus without target",
+        },
+      ],
+      terminals: [],
+      summary: {
+        ...baseEmission.summary,
+        stepsCount: 1,
+      },
+    }
+
+    const executor = createMockExecutor()
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.MISSING_TARGET,
+      path: "root:focus:missing-target",
+    })
+  })
+
+  it("throws INVALID_PANE when focus step points to an unknown pane", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          id: "root:focus:unknown-target",
+          kind: "focus",
+          command: ["select-pane", "-t", "root.9"],
+          summary: "focus unknown target",
+          targetPaneId: "root.9",
+        },
+      ],
+      terminals: [],
+      summary: {
+        ...baseEmission.summary,
+        stepsCount: 1,
+      },
+    }
+
+    const executor = createMockExecutor()
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_PANE,
+      path: "root:focus:unknown-target",
+    })
+  })
+
+  it("throws INVALID_PANE when terminal pane mapping is missing", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [],
+      terminals: [
+        {
+          virtualPaneId: "root.unknown",
+          command: "echo hello",
+          cwd: undefined,
+          env: undefined,
+          focus: true,
+          name: "missing",
+        },
+      ],
+      summary: {
+        ...baseEmission.summary,
+        stepsCount: 0,
+        focusPaneId: "root.0",
+      },
+    }
+
+    const executor = createMockExecutor()
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_PANE,
+      path: "root.unknown",
+    })
+  })
+
+  it("throws TEMPLATE_TOKEN_ERROR when template tokens cannot be resolved", async () => {
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [],
+      terminals: [
+        {
+          virtualPaneId: "root.0",
+          command: "echo {{pane_id:missing-pane}}",
+          cwd: undefined,
+          env: undefined,
+          focus: true,
+          name: "main",
+        },
+      ],
+      summary: {
+        ...baseEmission.summary,
+        stepsCount: 0,
+      },
+    }
+
+    const executor = createMockExecutor()
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.TEMPLATE_TOKEN_ERROR,
+      path: "root.0",
+      details: expect.objectContaining({ tokenType: "pane_id" }),
+    })
+  })
 })
