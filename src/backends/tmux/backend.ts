@@ -5,6 +5,7 @@ import {
   resolveSplitOrientation as resolveSplitOrientationFromStep,
   resolveSplitPercentage as resolveSplitPercentageFromStep,
 } from "../../executor/split-step"
+import { resolveRequiredStepTargetPaneId } from "../../executor/step-target"
 import { createUnsupportedStepKindError } from "../../executor/unsupported-step-kind"
 import type {
   ApplyPlanParameters,
@@ -60,24 +61,16 @@ export const createTmuxBackend = (context: TmuxTerminalBackendContext): Terminal
 
 const buildTmuxCommand = (step: CommandStep): string[] => {
   if (step.kind === "split") {
-    const target = resolveTargetPaneId(step)
+    const target = resolveRequiredStepTargetPaneId(step)
     const direction = resolveSplitOrientationFromStep(step) === "horizontal" ? "-h" : "-v"
     const percent = resolveSplitPercentageFromStep(step)
     return ["split-window", direction, "-t", target, "-p", percent]
   }
 
   if (step.kind === "focus") {
-    const target = resolveTargetPaneId(step)
+    const target = resolveRequiredStepTargetPaneId(step)
     return ["select-pane", "-t", target]
   }
 
   throw createUnsupportedStepKindError(step)
-}
-
-const resolveTargetPaneId = (step: CommandStep): string => {
-  if (typeof step.targetPaneId === "string" && step.targetPaneId.length > 0) {
-    return step.targetPaneId
-  }
-
-  return "<unknown>"
 }

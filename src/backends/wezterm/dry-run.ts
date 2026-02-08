@@ -1,6 +1,7 @@
 import type { PlanEmission } from "../../core/emitter"
 import { createCoreError } from "../../core/errors"
 import { resolveSplitOrientation, resolveSplitPercentage } from "../../executor/split-step"
+import { resolveRequiredStepTargetPaneId } from "../../executor/step-target"
 import { prepareTerminalCommands } from "../../executor/terminal-command-preparation"
 import type { DryRunStep } from "../../executor/terminal-backend"
 import { ErrorCodes } from "../../utils/errors"
@@ -22,7 +23,7 @@ export const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
 
   for (const step of emission.steps) {
     if (step.kind === "split") {
-      const target = step.targetPaneId ?? "<unknown>"
+      const target = resolveRequiredStepTargetPaneId(step)
       const args = buildSplitArguments({
         targetPaneId: target,
         percent: resolveSplitPercentage(step),
@@ -37,7 +38,7 @@ export const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
     }
 
     if (step.kind === "focus") {
-      const target = step.targetPaneId ?? "<unknown>"
+      const target = resolveRequiredStepTargetPaneId(step)
       steps.push({
         backend: "wezterm",
         summary: step.summary,
