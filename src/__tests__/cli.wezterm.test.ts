@@ -131,7 +131,7 @@ describe("CLI WezTerm backend integration", () => {
 
     coreBridge = {
       compilePreset: compilePresetMock as unknown as CoreBridge["compilePreset"],
-      compilePresetFromValue: compilePresetFromValueMock as never,
+      compilePresetFromValue: compilePresetFromValueMock as unknown as CoreBridge["compilePresetFromValue"],
       createLayoutPlan: createLayoutPlanMock as unknown as CoreBridge["createLayoutPlan"],
       emitPlan: emitPlanMock as unknown as CoreBridge["emitPlan"],
     } as CoreBridge
