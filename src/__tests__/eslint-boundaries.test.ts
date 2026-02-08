@@ -56,10 +56,18 @@ describe("eslint import boundaries", () => {
     expect(patterns).toContain("../cli/*")
   })
 
+  it("defines architectural restrictions for backends layer", () => {
+    const patterns = extractRestrictedPatterns("src/backends/**/*.ts")
+    expect(patterns).toContain("../../cli.ts")
+    expect(patterns).toContain("../../cli/*")
+    expect(patterns).toContain("../../config/*")
+  })
+
   it("forbids legacy backend import paths globally", () => {
     const patterns = extractRestrictedPatterns("src/**/*.ts")
-    expect(patterns).toContain("../tmux/*")
-    expect(patterns).toContain("../wezterm/*")
-    expect(patterns).toContain("./backends/*")
+    expect(patterns).toContain("../tmux/**")
+    expect(patterns).toContain("../wezterm/**")
+    expect(patterns).toContain("./backends/**")
+    expect(patterns).toContain("../executor/backends/**")
   })
 })

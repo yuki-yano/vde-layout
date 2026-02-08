@@ -4,13 +4,13 @@ import globals from "globals"
 import tseslint from "typescript-eslint"
 
 const LEGACY_BACKEND_IMPORT_PATTERNS = [
-  "../tmux/*",
-  "../../tmux/*",
-  "../wezterm/*",
-  "../../wezterm/*",
-  "./backends/*",
-  "../executor/backends/*",
-  "../../executor/backends/*",
+  "../tmux/**",
+  "../../tmux/**",
+  "../wezterm/**",
+  "../../wezterm/**",
+  "./backends/**",
+  "../executor/backends/**",
+  "../../executor/backends/**",
 ]
 
 const CORE_LAYER_IMPORT_PATTERNS = [
@@ -42,6 +42,38 @@ const BACKENDS_LAYER_IMPORT_PATTERNS = [
   "../../cli.ts",
   "../../cli/*",
   "../../config/*",
+]
+
+const createRestrictedImportRule = (patterns) => {
+  return [
+    "error",
+    {
+      patterns,
+    },
+  ]
+}
+
+const boundaryRules = [
+  {
+    files: ["src/**/*.ts"],
+    patterns: LEGACY_BACKEND_IMPORT_PATTERNS,
+  },
+  {
+    files: ["src/core/**/*.ts"],
+    patterns: CORE_LAYER_IMPORT_PATTERNS,
+  },
+  {
+    files: ["src/executor/**/*.ts"],
+    patterns: EXECUTOR_LAYER_IMPORT_PATTERNS,
+  },
+  {
+    files: ["src/config/**/*.ts"],
+    patterns: CONFIG_LAYER_IMPORT_PATTERNS,
+  },
+  {
+    files: ["src/backends/**/*.ts"],
+    patterns: BACKENDS_LAYER_IMPORT_PATTERNS,
+  },
 ]
 
 export default [
@@ -89,61 +121,12 @@ export default [
       "no-restricted-syntax": ["error"],
     },
   },
-  {
-    files: ["src/**/*.ts"],
+  ...boundaryRules.map(({ files, patterns }) => ({
+    files,
     rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: LEGACY_BACKEND_IMPORT_PATTERNS,
-        },
-      ],
+      "no-restricted-imports": createRestrictedImportRule(patterns),
     },
-  },
-  {
-    files: ["src/core/**/*.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: CORE_LAYER_IMPORT_PATTERNS,
-        },
-      ],
-    },
-  },
-  {
-    files: ["src/executor/**/*.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: EXECUTOR_LAYER_IMPORT_PATTERNS,
-        },
-      ],
-    },
-  },
-  {
-    files: ["src/config/**/*.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: CONFIG_LAYER_IMPORT_PATTERNS,
-        },
-      ],
-    },
-  },
-  {
-    files: ["src/backends/**/*.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: BACKENDS_LAYER_IMPORT_PATTERNS,
-        },
-      ],
-    },
-  },
+  })),
   {
     ignores: [
       "**/*.js",
