@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 export const WindowModeSchema = z.enum(["new-window", "current-window"])
+export const TerminalBackendSchema = z.enum(["tmux", "wezterm"])
 
 // Terminal pane schema
 const TerminalPaneSchema = z
@@ -52,6 +53,7 @@ export const PresetSchema = z.object({
   layout: LayoutSchema.optional(),
   command: z.string().optional(),
   windowMode: WindowModeSchema.optional(),
+  backend: TerminalBackendSchema.optional(),
 })
 
 // Config schema definition

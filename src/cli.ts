@@ -232,6 +232,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
 
       const backendKind = resolveTerminalBackendKind({
         cliFlag: options.backend as TerminalBackendKind | undefined,
+        presetBackend: preset.backend,
         env: process.env,
       })
       logger.info(`Terminal backend: ${backendKind}`)
