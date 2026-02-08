@@ -5,6 +5,7 @@ import type { CommandExecutor } from "../types/command-executor.ts"
 import type { PresetManager } from "../types/preset-manager.ts"
 import {
   compilePreset as defaultCompilePreset,
+  compilePresetFromValue as defaultCompilePresetFromValue,
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
 } from "../core/index.ts"
@@ -156,6 +157,7 @@ describe("CLI plan parity", () => {
 
     const coreBridge: CoreBridge = {
       compilePreset: defaultCompilePreset,
+      compilePresetFromValue: defaultCompilePresetFromValue,
       createLayoutPlan: defaultCreateLayoutPlan,
       emitPlan: (input) => {
         const emission = defaultEmitPlan(input)
