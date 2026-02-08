@@ -151,6 +151,33 @@ describe("createTmuxBackend", () => {
     })
   })
 
+  it("throws MISSING_TARGET when dry-run split step omits target metadata", () => {
+    const backend = createTmuxBackend(createContext())
+    const baseEmission = createEmission()
+    const [splitStep, focusStep] = baseEmission.steps
+    if (splitStep === undefined || focusStep === undefined) {
+      throw new Error("expected split and focus steps")
+    }
+
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          ...splitStep,
+          targetPaneId: undefined,
+        },
+        focusStep,
+      ],
+    }
+
+    expect(() => backend.getDryRunSteps(emission)).toThrowError(
+      expect.objectContaining({
+        code: ErrorCodes.MISSING_TARGET,
+        path: splitStep.id,
+      }),
+    )
+  })
+
   it("uses structured split metadata for dry-run output when available", () => {
     const baseEmission = createEmission()
     const [splitStep, focusStep] = baseEmission.steps

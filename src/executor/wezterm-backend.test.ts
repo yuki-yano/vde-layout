@@ -172,6 +172,31 @@ describe("createWeztermBackend", () => {
     })
   })
 
+  it("throws MISSING_TARGET when dry-run split step omits target metadata", () => {
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "root:split:missing-target",
+          kind: "split",
+          summary: "split without target",
+          createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
+        },
+      ],
+      summary: { stepsCount: 1, focusPaneId: "root", initialPaneId: "root" },
+    }
+
+    expect(() => backend.getDryRunSteps(emission)).toThrowError(
+      expect.objectContaining({
+        code: ErrorCodes.MISSING_TARGET,
+        path: "root:split:missing-target",
+      }),
+    )
+  })
+
   it("throws INVALID_PLAN when dry-run receives an unknown step kind", () => {
     const backend = createWeztermBackend(createContext())
     const legacyStep = {
