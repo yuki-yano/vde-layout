@@ -1,5 +1,4 @@
 import { Command, CommanderError } from "commander"
-import chalk from "chalk"
 import { createRequire } from "module"
 import { createPresetManager } from "../layout/preset"
 import { loadPackageVersion } from "./package-version"
@@ -7,14 +6,14 @@ import { resolveWindowMode } from "./window-mode"
 import { createPaneKillPrompter } from "./user-prompt"
 import { buildPresetSource, determineCliWindowMode, renderDryRun } from "./command-helpers"
 import { createCliErrorHandlers } from "./error-handling"
-import type { PresetInfo } from "../models/types"
+import { applyRuntimeOptions, listPresets } from "./runtime-and-list"
 import type { CommandExecutor } from "../types/command-executor"
 import type { PresetManager } from "../types/preset-manager"
 import { createRealExecutor, createDryRunExecutor } from "../executor/index"
 import { createTerminalBackend } from "../executor/backend-factory"
 import { resolveTerminalBackendKind } from "../executor/backend-resolver"
 import type { TerminalBackendKind } from "../executor/terminal-backend"
-import { createLogger, LogLevel, type Logger } from "../utils/logger"
+import { createLogger, type Logger } from "../utils/logger"
 import {
   compilePreset as defaultCompilePreset,
   compilePresetFromValue as defaultCompilePresetFromValue,
@@ -77,48 +76,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
   const errorHandlers = createCliErrorHandlers({
     getLogger: () => logger,
   })
-
-  const applyRuntimeOptions = (runtimeOptions: { verbose?: boolean; config?: string }): void => {
-    if (runtimeOptions.verbose === true) {
-      logger = createLogger({ level: LogLevel.INFO })
-    } else {
-      logger = createLogger()
-    }
-
-    if (
-      typeof runtimeOptions.config === "string" &&
-      runtimeOptions.config.length > 0 &&
-      typeof presetManager.setConfigPath === "function"
-    ) {
-      presetManager.setConfigPath(runtimeOptions.config)
-    }
-  }
-
-  const listPresets = async (): Promise<number> => {
-    try {
-      await presetManager.loadConfig()
-      const presets = presetManager.listPresets()
-
-      if (presets.length === 0) {
-        logger.warn("No presets defined")
-        return 0
-      }
-
-      console.log(chalk.bold("Available presets:\n"))
-
-      const maxKeyLength = Math.max(...presets.map((p) => p.key.length))
-
-      presets.forEach((preset: PresetInfo) => {
-        const paddedKey = preset.key.padEnd(maxKeyLength + 2)
-        const description = preset.description ?? ""
-        console.log(`  ${chalk.cyan(paddedKey)} ${description}`)
-      })
-
-      return 0
-    } catch (error) {
-      return errorHandlers.handleError(error)
-    }
-  }
 
   const executePreset = async (
     presetName: string | undefined,
@@ -244,14 +201,22 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         typeof actionCommand.optsWithGlobals === "function"
           ? actionCommand.optsWithGlobals()
           : program.opts<{ verbose?: boolean; config?: string }>()
-      applyRuntimeOptions(runtimeOptions)
+      logger = applyRuntimeOptions({
+        runtimeOptions,
+        createLogger,
+        presetManager,
+      })
     })
 
     program
       .command("list")
       .description("List available presets")
       .action(async () => {
-        lastExitCode = await listPresets()
+        lastExitCode = await listPresets({
+          presetManager,
+          logger,
+          onError: errorHandlers.handleError,
+        })
       })
 
     program
