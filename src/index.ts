@@ -9,7 +9,10 @@ const main = async (): Promise<void> => {
   const cli = createCli()
   try {
     // Pass arguments excluding the first two elements (node, script path) from process.argv
-    await cli.run(process.argv.slice(2))
+    const exitCode = await cli.run(process.argv.slice(2))
+    if (typeof exitCode === "number" && exitCode !== 0) {
+      process.exit(exitCode)
+    }
   } catch (error) {
     // Format and display error message appropriately
     if (error instanceof Error) {

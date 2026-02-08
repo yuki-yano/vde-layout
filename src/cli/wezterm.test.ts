@@ -115,9 +115,7 @@ describe("CLI WezTerm backend integration", () => {
   let createLayoutPlanMock: ReturnType<typeof vi.fn>
   let emitPlanMock: ReturnType<typeof vi.fn>
   let coreBridge: CoreBridge
-  let exitCode: number | undefined
-  let processExitCalled = false
-  let originalExit: typeof process.exit
+  let runExitCode: number
   let consoleOutput: string[] = []
   let errorOutput: string[] = []
 
@@ -151,17 +149,7 @@ describe("CLI WezTerm backend integration", () => {
       core: coreBridge,
     })
 
-    originalExit = process.exit
-    exitCode = undefined
-    processExitCalled = false
-    process.exit = ((code?: number) => {
-      exitCode = code
-      processExitCalled = true
-      if (code === 0) {
-        return
-      }
-      throw new Error(`Process exited with code ${code}`)
-    }) as never
+    runExitCode = 0
 
     consoleOutput = []
     errorOutput = []
@@ -177,7 +165,6 @@ describe("CLI WezTerm backend integration", () => {
   })
 
   afterEach(() => {
-    process.exit = originalExit
     vi.restoreAllMocks()
   })
 
@@ -209,7 +196,7 @@ describe("CLI WezTerm backend integration", () => {
       return receivedContext!
     })
 
-    await cli.run(["dev", "--backend", "wezterm", "--dry-run"])
+    runExitCode = await cli.run(["dev", "--backend", "wezterm", "--dry-run"])
 
     expect(createTerminalBackendMock).toHaveBeenCalledWith("wezterm", expect.objectContaining({ dryRun: true }))
     expect(verifyEnvironment).toHaveBeenCalledTimes(1)
@@ -223,8 +210,7 @@ describe("CLI WezTerm backend integration", () => {
     expect(consoleOutput.join("\n")).toContain(
       "[wezterm] set cwd root: wezterm cli send-text --pane-id root --no-paste -- 'cd \"/repo\"'",
     )
-    expect(processExitCalled).toBe(true)
-    expect(exitCode).toBe(0)
+    expect(runExitCode).toBe(0)
   })
 
   it("uses preset backend when --backend is omitted", async () => {
@@ -245,11 +231,10 @@ describe("CLI WezTerm backend integration", () => {
       getDryRunSteps,
     })
 
-    await cli.run(["--dry-run"])
+    runExitCode = await cli.run(["--dry-run"])
 
     expect(createTerminalBackendMock).toHaveBeenCalledWith("wezterm", expect.objectContaining({ dryRun: true }))
-    expect(processExitCalled).toBe(true)
-    expect(exitCode).toBe(0)
+    expect(runExitCode).toBe(0)
   })
 
   it("propagates wezterm backend failures with detailed error output", async () => {
@@ -271,13 +256,12 @@ describe("CLI WezTerm backend integration", () => {
       getDryRunSteps,
     })
 
-    await expect(cli.run(["dev", "--backend", "wezterm"])).rejects.toThrow("Process exited with code 1")
+    runExitCode = await cli.run(["dev", "--backend", "wezterm"])
 
     expect(verifyEnvironment).toHaveBeenCalledTimes(1)
     expect(applyPlan).toHaveBeenCalledTimes(1)
     expect(errorOutput.join("\n")).toContain("WezTerm command failed")
     expect(errorOutput.join("\n")).toContain("wezterm cli send-text")
-    expect(processExitCalled).toBe(true)
-    expect(exitCode).toBe(1)
+    expect(runExitCode).toBe(1)
   })
 })

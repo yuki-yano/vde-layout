@@ -1,4 +1,4 @@
-import { Command } from "commander"
+import { Command, CommanderError } from "commander"
 import chalk from "chalk"
 import { createRequire } from "module"
 import { createPresetManager } from "../layout/preset"
@@ -47,7 +47,7 @@ export type CLIOptions = {
 }
 
 export type CLI = {
-  run(args?: string[]): Promise<void>
+  run(args?: string[]): Promise<number>
 }
 
 export const createCli = (options: CLIOptions = {}): CLI => {
@@ -105,7 +105,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     return undefined
   }
 
-  const handleCoreError = (error: CoreError): never => {
+  const handleCoreError = (error: CoreError): number => {
     const header = [`[${error.kind}]`, `[${error.code}]`]
     if (typeof error.path === "string" && error.path.length > 0) {
       header.push(`[${error.path}]`)
@@ -135,34 +135,34 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     }
 
     logger.error(lines.join("\n"))
-    process.exit(1)
+    return 1
   }
 
-  const handleError = (error: unknown): never => {
+  const handleError = (error: unknown): number => {
     if (error instanceof Error) {
       logger.error(error.message, error)
     } else {
       logger.error("An unexpected error occurred")
     }
 
-    process.exit(1)
+    return 1
   }
 
-  const handlePipelineFailure = (error: unknown): never => {
+  const handlePipelineFailure = (error: unknown): number => {
     if (isCoreError(error)) {
       return handleCoreError(error)
     }
     return handleError(error)
   }
 
-  const listPresets = async (): Promise<never> => {
+  const listPresets = async (): Promise<number> => {
     try {
       await presetManager.loadConfig()
       const presets = presetManager.listPresets()
 
       if (presets.length === 0) {
         logger.warn("No presets defined")
-        process.exit(0)
+        return 0
       }
 
       console.log(chalk.bold("Available presets:\n"))
@@ -175,7 +175,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         console.log(`  ${chalk.cyan(paddedKey)} ${description}`)
       })
 
-      process.exit(0)
+      return 0
     } catch (error) {
       return handleError(error)
     }
@@ -190,7 +190,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       newWindow: boolean
       backend?: string
     },
-  ): Promise<never> => {
+  ): Promise<number> => {
     try {
       await presetManager.loadConfig()
 
@@ -273,13 +273,15 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       }
 
       logger.success(`Applied preset "${preset.name}"`)
-      process.exit(0)
+      return 0
     } catch (error) {
       return handleError(error)
     }
   }
 
   const setupProgram = (): void => {
+    program.exitOverride()
+
     program
       .name("vde-layout")
       .description("VDE (Vibrant Development Environment) Layout Manager - tmux pane layout management tool")
@@ -297,7 +299,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       .command("list")
       .description("List available presets")
       .action(async () => {
-        await listPresets()
+        lastExitCode = await listPresets()
       })
 
     program
@@ -310,7 +312,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
           newWindow?: boolean
           backend?: string
         }>()
-        await executePreset(presetName, {
+        lastExitCode = await executePreset(presetName, {
           verbose: opts.verbose === true,
           dryRun: opts.dryRun === true,
           currentWindow: opts.currentWindow === true,
@@ -320,13 +322,32 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       })
   }
 
+  let lastExitCode = 0
   setupProgram()
 
-  const run = async (args: string[] = process.argv.slice(2)): Promise<void> => {
+  const run = async (args: string[] = process.argv.slice(2)): Promise<number> => {
+    lastExitCode = 0
     const requestedVersion = args.some((arg) => arg === "--version" || arg === "-v")
     const requestedHelp = args.includes("--help") || args.includes("-h")
+
+    if (args.includes("-h")) {
+      args = args.map((arg) => (arg === "-h" ? "--help" : arg))
+    }
+
     try {
       await program.parseAsync(args, { from: "user" })
+    } catch (error) {
+      if (error instanceof CommanderError) {
+        return error.exitCode
+      }
+      return handleError(error)
+    }
+
+    if (requestedVersion || requestedHelp) {
+      return 0
+    }
+
+    try {
       const opts = program.opts<{
         verbose?: boolean
         config?: string
@@ -334,10 +355,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
         currentWindow?: boolean
         newWindow?: boolean
       }>()
-
-      if (requestedVersion || requestedHelp) {
-        return
-      }
 
       if (opts.verbose === true) {
         logger = createLogger({ level: LogLevel.INFO })
@@ -352,11 +369,9 @@ export const createCli = (options: CLIOptions = {}): CLI => {
       ) {
         presetManager.setConfigPath(opts.config)
       }
+      return lastExitCode
     } catch (error) {
-      if (error instanceof Error && error.message.includes("Process exited")) {
-        throw error
-      }
-      handleError(error)
+      return handleError(error)
     }
   }
 

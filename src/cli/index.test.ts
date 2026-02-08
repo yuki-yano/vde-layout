@@ -80,12 +80,10 @@ describe("CLI", () => {
   let cli: CLI
   let mockPresetManager: MockPresetManager
   let recordingExecutor: ReturnType<typeof createRecordingExecutor>
-  let originalExit: typeof process.exit
   let originalTMUX: string | undefined
-  let exitCode: number | undefined
+  let runExitCode: number
   let consoleOutput: string[] = []
   let errorOutput: string[] = []
-  let processExitCalled = false
 
   const samplePreset: CompiledPreset = {
     name: "development",
@@ -213,17 +211,7 @@ describe("CLI", () => {
       core: coreBridge,
     })
 
-    originalExit = process.exit
-    exitCode = undefined
-    processExitCalled = false
-    process.exit = ((code?: number) => {
-      exitCode = code
-      processExitCalled = true
-      if (code === 0) {
-        return
-      }
-      throw new Error(`Process exited with code ${code}`)
-    }) as never
+    runExitCode = 0
 
     consoleOutput = []
     errorOutput = []
@@ -239,7 +227,6 @@ describe("CLI", () => {
   })
 
   afterEach(() => {
-    process.exit = originalExit
     if (originalTMUX !== undefined) {
       process.env.TMUX = originalTMUX
     } else {
@@ -257,64 +244,49 @@ describe("CLI", () => {
 
   describe("basic commands", () => {
     it("should display version", async () => {
-      await cli.run(["--version"])
-      expect(processExitCalled || consoleOutput.some((line) => line.includes(packageVersion))).toBe(true)
+      runExitCode = await cli.run(["--version"])
+      expect(runExitCode).toBe(0)
     })
 
     it("should display version with -v", async () => {
-      await cli.run(["-v"])
-      expect(processExitCalled || consoleOutput.some((line) => line.includes(packageVersion))).toBe(true)
+      runExitCode = await cli.run(["-v"])
+      expect(runExitCode).toBe(0)
     })
 
     it("should show help with --help", async () => {
-      try {
-        await cli.run(["--help"])
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("unknown option")) {
-          expect(exitCode).toBe(1)
-          return
-        }
-      }
-      expect(processExitCalled || consoleOutput.some((line) => line.includes("Usage:"))).toBe(true)
+      runExitCode = await cli.run(["--help"])
+      expect(runExitCode).toBe(0)
     })
 
     it("should show help with -h", async () => {
-      try {
-        await cli.run(["-h"])
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("unknown option")) {
-          expect(exitCode).toBe(1)
-          return
-        }
-      }
-      expect(processExitCalled || consoleOutput.some((line) => line.includes("Usage:"))).toBe(true)
+      runExitCode = await cli.run(["-h"])
+      expect(runExitCode).toBe(0)
     })
   })
 
   describe("list command", () => {
     it("should list available presets", async () => {
-      await cli.run(["list"])
+      runExitCode = await cli.run(["list"])
 
-      expect(processExitCalled).toBe(true)
       expect(consoleOutput.join("\n")).toContain("Available presets")
       expect(consoleOutput.join("\n")).toContain("default")
       expect(consoleOutput.join("\n")).toContain("dev")
-      expect(exitCode).toBe(0)
+      expect(runExitCode).toBe(0)
     })
 
     it("should handle config loading error", async () => {
       mockPresetManager.setShouldFailOnLoad(true)
 
-      await expect(cli.run(["list"])).rejects.toThrow("Process exited")
+      runExitCode = await cli.run(["list"])
 
       expect(errorOutput.join("\n")).toContain("Error:")
-      expect(exitCode).toBe(1)
+      expect(runExitCode).toBe(1)
     })
   })
 
   describe("preset execution", () => {
     it("should execute named preset", async () => {
-      await cli.run(["dev"])
+      runExitCode = await cli.run(["dev"])
 
       expectCorePipelineCalled()
       expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", 'cd "\/repo"', "Enter"])
@@ -322,76 +294,75 @@ describe("CLI", () => {
       expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", "nvim", "Enter"])
       expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%1", "npm run dev", "Enter"])
       expect(consoleOutput.join("\n")).toContain('Applied preset "Development"')
-      expect(exitCode).toBe(0)
+      expect(runExitCode).toBe(0)
     })
 
     it("should execute default preset when no name provided", async () => {
-      await cli.run([])
+      runExitCode = await cli.run([])
 
       expectCorePipelineCalled()
       expect(recordingExecutor.commands.some((command) => command.includes("nvim"))).toBe(true)
-      expect(exitCode).toBe(0)
+      expect(runExitCode).toBe(0)
     })
 
     it("should handle config loading error", async () => {
       mockPresetManager.setShouldFailOnLoad(true)
 
-      await expect(cli.run(["dev"])).rejects.toThrow("Process exited")
+      runExitCode = await cli.run(["dev"])
 
       expect(errorOutput.join("\n")).toContain("Error:")
-      expect(exitCode).toBe(1)
+      expect(runExitCode).toBe(1)
     })
 
     it("should handle preset not found error", async () => {
-      await expect(cli.run(["nonexistent"])).rejects.toThrow("Process exited")
+      runExitCode = await cli.run(["nonexistent"])
 
       expect(errorOutput.join("\n")).toContain('Preset "nonexistent" not found')
-      expect(exitCode).toBe(1)
+      expect(runExitCode).toBe(1)
     })
   })
 
   describe("options", () => {
     it("should accept verbose option", async () => {
-      await cli.run(["dev", "--verbose"])
+      runExitCode = await cli.run(["dev", "--verbose"])
 
       expectCorePipelineCalled()
       expect(recordingExecutor.commands.some((command) => command.includes("nvim"))).toBe(true)
-      expect(exitCode).toBe(0)
+      expect(runExitCode).toBe(0)
     })
 
     it("should accept dry-run option", async () => {
-      await cli.run(["dev", "--dry-run"])
+      runExitCode = await cli.run(["dev", "--dry-run"])
 
       expectCorePipelineCalled()
       expect(recordingExecutor.commands).toHaveLength(0)
       expect(consoleOutput.join("\n")).toContain("[DRY RUN]")
       expect(consoleOutput.join("\n")).toContain("Planned terminal steps")
-      expect(exitCode).toBe(0)
+      expect(runExitCode).toBe(0)
     })
 
     it("should fail when outside tmux without explicit dry-run", async () => {
       delete process.env.TMUX
 
-      await expect(cli.run(["dev"])).rejects.toThrow("Process exited")
+      runExitCode = await cli.run(["dev"])
 
-      expect(processExitCalled).toBe(true)
-      expect(exitCode).toBe(1)
+      expect(runExitCode).toBe(1)
       expect(errorOutput.join("\n")).toContain("Must be run inside a tmux session")
     })
 
     it("should accept both verbose and dry-run options", async () => {
-      await cli.run(["dev", "--verbose", "--dry-run"])
+      runExitCode = await cli.run(["dev", "--verbose", "--dry-run"])
 
       expectCorePipelineCalled()
       expect(recordingExecutor.commands).toHaveLength(0)
-      expect(exitCode).toBe(0)
+      expect(runExitCode).toBe(0)
     })
 
     it("should reject when both window override options are provided", async () => {
-      await expect(cli.run(["dev", "--current-window", "--new-window"])).rejects.toThrow("Process exited")
+      runExitCode = await cli.run(["dev", "--current-window", "--new-window"])
 
       expect(errorOutput.join("\n")).toContain("Cannot use --current-window and --new-window")
-      expect(exitCode).toBe(1)
+      expect(runExitCode).toBe(1)
     })
 
     it("should allow specifying configuration file via --config", async () => {
@@ -410,11 +381,11 @@ describe("CLI", () => {
 
   describe("error handling", () => {
     it("should handle unexpected errors gracefully", async () => {
-      await expect(cli.run(["unknown-preset"])).rejects.toThrow("Process exited")
+      runExitCode = await cli.run(["unknown-preset"])
 
       const output = errorOutput.join("\n")
       expect(output).toContain("Error:")
-      expect(exitCode).toBe(1)
+      expect(runExitCode).toBe(1)
     })
 
     it("should report structured errors when plan execution fails", async () => {
@@ -467,14 +438,14 @@ describe("CLI", () => {
         core: coreBridge,
       })
 
-      await expect(failingCli.run(["dev"])).rejects.toThrow("Process exited")
+      runExitCode = await failingCli.run(["dev"])
 
       const errorLog = errorOutput.join("\n")
       expect(errorLog).toContain("[execution] [TMUX_COMMAND_FAILED]")
       expect(errorLog).toContain("[root:split:1]")
       expect(errorLog).toContain("tmux failed")
       expect(errorLog).toContain("stderr: boom")
-      expect(exitCode).toBe(1)
+      expect(runExitCode).toBe(1)
     })
   })
 })
