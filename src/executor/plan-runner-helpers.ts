@@ -3,6 +3,7 @@ import { createCoreError } from "../core/errors"
 import type { CommandExecutor } from "../types/command-executor"
 import { waitForDelay } from "../utils/async"
 import { ErrorCodes } from "../utils/errors"
+import { resolvePaneMapping } from "../utils/pane-map"
 import { resolveSplitOrientation, resolveSplitPercentage } from "./split-step"
 import { prepareTerminalCommands } from "./terminal-command-preparation"
 
@@ -279,7 +280,7 @@ const buildFocusCommand = (targetRealId: string): string[] => {
   return ["select-pane", "-t", targetRealId]
 }
 
-const normalizePaneId = (raw: string): string => {
+export const normalizePaneId = (raw: string): string => {
   const trimmed = raw.trim()
   return trimmed.length === 0 ? "%0" : trimmed
 }
@@ -289,31 +290,7 @@ export const registerPane = (paneMap: Map<string, string>, virtualId: string, re
 }
 
 export const resolvePaneId = (paneMap: Map<string, string>, virtualId: string): string | undefined => {
-  const direct = paneMap.get(virtualId)
-  if (typeof direct === "string" && direct.length > 0) {
-    return direct
-  }
-
-  let ancestor = virtualId
-  while (ancestor.includes(".")) {
-    ancestor = ancestor.slice(0, ancestor.lastIndexOf("."))
-    const candidate = paneMap.get(ancestor)
-    if (typeof candidate === "string" && candidate.length > 0) {
-      paneMap.set(virtualId, candidate)
-      return candidate
-    }
-  }
-
-  for (const [key, value] of paneMap.entries()) {
-    if (key.startsWith(`${virtualId}.`)) {
-      if (typeof value === "string" && value.length > 0) {
-        paneMap.set(virtualId, value)
-        return value
-      }
-    }
-  }
-
-  return undefined
+  return resolvePaneMapping(paneMap, virtualId)
 }
 
 export const ensureNonEmpty = <T extends string>(value: T | undefined, buildError: () => never): T => {
