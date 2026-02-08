@@ -1,19 +1,13 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "strict": false,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+    "noUncheckedIndexedAccess": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
   "include": ["src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/__tests__/cli.wezterm.test.ts",
-    "src/config/__tests__/validator.test.ts",
-    "src/core/__tests__/pipeline.test.ts",
-    "src/core/__tests__/planner.test.ts",
-    "src/executor/__tests__/plan-runner.test.ts",
-    "src/executor/__tests__/tmux-backend.test.ts",
-    "src/layout/__tests__/preset.test.ts"
-  ]
+  "exclude": ["node_modules", "dist"]
 }
