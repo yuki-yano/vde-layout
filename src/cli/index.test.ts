@@ -317,8 +317,8 @@ describe("CLI", () => {
       await cli.run(["dev"])
 
       expectCorePipelineCalled()
-      expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", 'cd "\/repo"', "Enter"])
-      expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", 'export NODE_ENV="test"', "Enter"])
+      expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", "cd -- '/repo'", "Enter"])
+      expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", "export NODE_ENV='test'", "Enter"])
       expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%0", "nvim", "Enter"])
       expect(recordingExecutor.commands).toContainEqual(["send-keys", "-t", "%1", "npm run dev", "Enter"])
       expect(consoleOutput.join("\n")).toContain('Applied preset "Development"')
