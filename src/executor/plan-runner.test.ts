@@ -13,6 +13,8 @@ const baseEmission: PlanEmission = {
       summary: "split root.0 (-h)",
       targetPaneId: "root.0",
       createdPaneId: "root.1",
+      orientation: "horizontal",
+      percentage: 50,
     },
     {
       id: "root.0:focus",
@@ -103,6 +105,7 @@ describe("executePlan", () => {
           ...baseSplitStep,
           command: ["split-window", "-t", "root.0", "-p", "40"],
           orientation: undefined,
+          percentage: 40,
         },
         baseFocusStep,
       ],
@@ -208,6 +211,8 @@ describe("executePlan", () => {
           summary: "split root.0 (-h)",
           targetPaneId: "root.0",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
         {
           id: "root.1:split:1",
@@ -216,6 +221,8 @@ describe("executePlan", () => {
           summary: "split root.1.0 (-v)",
           targetPaneId: "root.1.0",
           createdPaneId: "root.1.1",
+          orientation: "vertical",
+          percentage: 50,
         },
         {
           id: "root.1.1:focus",
@@ -279,6 +286,8 @@ describe("executePlan", () => {
           summary: "split root.0 (-h)",
           targetPaneId: "root.0",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
         {
           id: "root.1:focus",
@@ -529,6 +538,8 @@ describe("executePlan", () => {
           summary: "split root.0 (-h)",
           targetPaneId: "root.0",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
         {
           id: "root.0:focus",
@@ -585,6 +596,8 @@ describe("executePlan", () => {
           summary: "split root from descendant map",
           targetPaneId: "root",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
       ],
       hash: "hash",
@@ -619,6 +632,8 @@ describe("executePlan", () => {
           command: ["split-window", "-h", "-p", "50"],
           summary: "invalid split",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
       ],
       summary: {
@@ -763,6 +778,8 @@ describe("executePlan", () => {
           summary: "split unknown target",
           targetPaneId: "root.unknown",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
       ],
       terminals: [],
@@ -790,6 +807,8 @@ describe("executePlan", () => {
           summary: "split without pane delta",
           targetPaneId: "root.0",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
       ],
       terminals: [],
@@ -925,6 +944,31 @@ describe("executePlan", () => {
       code: ErrorCodes.TEMPLATE_TOKEN_ERROR,
       path: "root.0",
       details: expect.objectContaining({ tokenType: "pane_id" }),
+    })
+  })
+
+  it("throws INVALID_PLAN when an unknown step kind is present", async () => {
+    const legacyStep = {
+      id: "legacy:step",
+      kind: "legacy-step",
+      summary: "legacy command",
+      command: ["legacy", "--arg"],
+    } as unknown as PlanEmission["steps"][number]
+
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [legacyStep],
+      terminals: [],
+      summary: {
+        ...baseEmission.summary,
+        stepsCount: 1,
+      },
+    }
+
+    const executor = createMockExecutor()
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_PLAN,
+      path: "legacy:step",
     })
   })
 })

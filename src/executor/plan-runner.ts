@@ -7,6 +7,7 @@ import type { ConfirmPaneClosure } from "../types/confirm-pane"
 import { waitForDelay } from "../utils/async"
 import { resolveSplitOrientation, resolveSplitPercentage } from "./split-step"
 import { prepareTerminalCommands } from "./terminal-command-preparation"
+import { createUnsupportedStepKindError } from "./unsupported-step-kind"
 
 type ExecutePlanInput = {
   readonly emission: PlanEmission
@@ -97,10 +98,13 @@ export const executePlan = async ({
   for (const step of emission.steps) {
     if (step.kind === "split") {
       await executeSplitStep({ step, executor, paneMap })
+      executedSteps += 1
     } else if (step.kind === "focus") {
       await executeFocusStep({ step, executor, paneMap })
+      executedSteps += 1
+    } else {
+      throw createUnsupportedStepKindError(step)
     }
-    executedSteps += 1
   }
 
   await executeTerminalCommands({

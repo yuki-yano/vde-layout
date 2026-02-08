@@ -22,6 +22,7 @@ import {
   resolveSplitPercentage as resolveSplitPercentageFromStep,
 } from "../../executor/split-step"
 import { prepareTerminalCommands } from "../../executor/terminal-command-preparation"
+import { createUnsupportedStepKindError } from "../../executor/unsupported-step-kind"
 
 type PaneMap = Map<string, string>
 
@@ -127,11 +128,7 @@ const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
       continue
     }
 
-    steps.push({
-      backend: "wezterm",
-      summary: step.summary,
-      command: `wezterm cli # ${(step.command ?? []).join(" ")}`,
-    })
+    throw createUnsupportedStepKindError(step)
   }
 
   const prepared = prepareTerminalCommands({
@@ -782,6 +779,8 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
           runCommand,
         })
         executedSteps += 1
+      } else {
+        throw createUnsupportedStepKindError(step)
       }
     }
 

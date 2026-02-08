@@ -6,6 +6,7 @@ import type { Logger } from "../utils/logger"
 import { LogLevel } from "../utils/logger"
 import type { PlanEmission } from "../core/emitter"
 import type { WeztermListResult } from "../backends/wezterm/cli"
+import { ErrorCodes } from "../utils/errors"
 
 const { verifyMock, listMock, killMock, runMock } = vi.hoisted(() => ({
   verifyMock: vi.fn(),
@@ -146,7 +147,7 @@ describe("createWeztermBackend", () => {
     })
   })
 
-  it("defaults legacy split commands without direction flag to bottom in dry-run", () => {
+  it("defaults split orientation to bottom when metadata is missing", () => {
     const backend = createWeztermBackend(createContext())
     const emission: PlanEmission = {
       ...minimalEmission(),
@@ -158,6 +159,7 @@ describe("createWeztermBackend", () => {
           command: ["split-window", "-t", "root", "-p", "40"],
           targetPaneId: "root",
           createdPaneId: "root.1",
+          percentage: 40,
         },
       ],
       summary: { stepsCount: 1, focusPaneId: "root", initialPaneId: "root" },
@@ -170,7 +172,7 @@ describe("createWeztermBackend", () => {
     })
   })
 
-  it("renders unknown step kinds in dry-run fallback format", () => {
+  it("throws INVALID_PLAN when dry-run receives an unknown step kind", () => {
     const backend = createWeztermBackend(createContext())
     const legacyStep = {
       id: "legacy:step",
@@ -185,11 +187,16 @@ describe("createWeztermBackend", () => {
       summary: { ...minimalEmission().summary, stepsCount: 1 },
     }
 
-    const steps = backend.getDryRunSteps(emission)
-    expect(steps[0]).toEqual({
-      backend: "wezterm",
-      summary: "legacy command",
-      command: "wezterm cli # custom --arg",
+    let caughtError: unknown
+    try {
+      backend.getDryRunSteps(emission)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError).toMatchObject({
+      code: ErrorCodes.INVALID_PLAN,
+      path: "legacy:step",
     })
   })
 
@@ -570,6 +577,8 @@ describe("createWeztermBackend", () => {
           summary: "split without target",
           command: ["split-window", "-h", "-p", "50"],
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
       ],
       summary: { ...minimalEmission().summary, stepsCount: 1 },
@@ -602,6 +611,8 @@ describe("createWeztermBackend", () => {
           command: ["split-window", "-h", "-t", "root", "-p", "50"],
           targetPaneId: "root",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
       ],
       summary: { ...minimalEmission().summary, stepsCount: 1 },
@@ -632,6 +643,8 @@ describe("createWeztermBackend", () => {
           command: ["split-window", "-h", "-t", "root", "-p", "50"],
           targetPaneId: "root",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 50,
         },
       ],
       summary: { ...minimalEmission().summary, stepsCount: 1 },
@@ -719,6 +732,8 @@ describe("createWeztermBackend", () => {
           command: ["split-window", "-h", "-t", "root", "-p", "60"],
           targetPaneId: "root",
           createdPaneId: "root.1",
+          orientation: "horizontal",
+          percentage: 60,
         },
         {
           id: "root:focus",
@@ -944,6 +959,8 @@ describe("createWeztermBackend", () => {
           command: ["split-window", "-h", "-t", "root", "-p", "60"],
           targetPaneId: "root",
           createdPaneId: "root:1",
+          orientation: "horizontal",
+          percentage: 60,
         },
         {
           id: "root:focus",

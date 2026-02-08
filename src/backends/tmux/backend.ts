@@ -5,6 +5,7 @@ import {
   resolveSplitOrientation as resolveSplitOrientationFromStep,
   resolveSplitPercentage as resolveSplitPercentageFromStep,
 } from "../../executor/split-step"
+import { createUnsupportedStepKindError } from "../../executor/unsupported-step-kind"
 import type {
   ApplyPlanParameters,
   ApplyPlanResult,
@@ -70,21 +71,12 @@ const buildTmuxCommand = (step: CommandStep): string[] => {
     return ["select-pane", "-t", target]
   }
 
-  return [...(step.command ?? [])]
+  throw createUnsupportedStepKindError(step)
 }
 
 const resolveTargetPaneId = (step: CommandStep): string => {
   if (typeof step.targetPaneId === "string" && step.targetPaneId.length > 0) {
     return step.targetPaneId
-  }
-
-  const command = step.command ?? []
-  const targetIndex = command.findIndex((segment) => segment === "-t")
-  if (targetIndex >= 0 && targetIndex + 1 < command.length) {
-    const raw = command[targetIndex + 1]
-    if (typeof raw === "string" && raw.length > 0) {
-      return raw
-    }
   }
 
   return "<unknown>"

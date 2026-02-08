@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { CommandExecutor } from "../types/command-executor"
 import type { PlanEmission } from "../core/emitter"
 import { createTmuxBackend } from "../backends/tmux/backend"
+import { ErrorCodes } from "../utils/errors"
 import { LogLevel } from "../utils/logger"
 import type { Logger } from "../utils/logger"
 import type { TmuxTerminalBackendContext } from "./terminal-backend"
@@ -65,6 +66,8 @@ const createEmission = (): PlanEmission => ({
       command: ["split-window", "-h"],
       targetPaneId: "root",
       createdPaneId: "root.1",
+      orientation: "horizontal",
+      percentage: 50,
     },
     {
       id: "root:focus",
@@ -178,7 +181,7 @@ describe("createTmuxBackend", () => {
     })
   })
 
-  it("defaults legacy split commands without direction flag to vertical in dry-run", () => {
+  it("defaults split orientation to vertical when metadata is missing", () => {
     const baseEmission = createEmission()
     const [splitStep, focusStep] = baseEmission.steps
     if (splitStep === undefined || focusStep === undefined) {
@@ -192,6 +195,7 @@ describe("createTmuxBackend", () => {
           ...splitStep,
           command: ["split-window", "-t", "root", "-p", "40"],
           orientation: undefined,
+          percentage: 40,
         },
         focusStep,
       ],
@@ -204,6 +208,37 @@ describe("createTmuxBackend", () => {
       backend: "tmux",
       summary: "split",
       command: "tmux split-window -v -t root -p 40",
+    })
+  })
+
+  it("throws INVALID_PLAN when dry-run receives an unknown step kind", () => {
+    const backend = createTmuxBackend(createContext())
+    const legacyStep = {
+      id: "legacy:step",
+      kind: "legacy-step",
+      summary: "legacy",
+      command: ["legacy", "--arg"],
+    } as unknown as PlanEmission["steps"][number]
+
+    const emission: PlanEmission = {
+      ...createEmission(),
+      steps: [legacyStep],
+      summary: {
+        ...createEmission().summary,
+        stepsCount: 1,
+      },
+    }
+
+    let caughtError: unknown
+    try {
+      backend.getDryRunSteps(emission)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError).toMatchObject({
+      code: ErrorCodes.INVALID_PLAN,
+      path: "legacy:step",
     })
   })
 })
