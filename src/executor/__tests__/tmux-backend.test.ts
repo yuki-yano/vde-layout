@@ -149,16 +149,22 @@ describe("createTmuxBackend", () => {
   })
 
   it("uses structured split metadata for dry-run output when available", () => {
+    const baseEmission = createEmission()
+    const [splitStep, focusStep] = baseEmission.steps
+    if (splitStep === undefined || focusStep === undefined) {
+      throw new Error("expected split and focus steps")
+    }
+
     const emission: PlanEmission = {
-      ...createEmission(),
+      ...baseEmission,
       steps: [
         {
-          ...createEmission().steps[0],
+          ...splitStep,
           command: ["split-window", "-h", "-t", "root", "-p", "99"],
           orientation: "vertical",
           percentage: 33,
         },
-        createEmission().steps[1],
+        focusStep,
       ],
     }
 
@@ -173,15 +179,21 @@ describe("createTmuxBackend", () => {
   })
 
   it("defaults legacy split commands without direction flag to vertical in dry-run", () => {
+    const baseEmission = createEmission()
+    const [splitStep, focusStep] = baseEmission.steps
+    if (splitStep === undefined || focusStep === undefined) {
+      throw new Error("expected split and focus steps")
+    }
+
     const emission: PlanEmission = {
-      ...createEmission(),
+      ...baseEmission,
       steps: [
         {
-          ...createEmission().steps[0],
+          ...splitStep,
           command: ["split-window", "-t", "root", "-p", "40"],
           orientation: undefined,
         },
-        createEmission().steps[1],
+        focusStep,
       ],
     }
 

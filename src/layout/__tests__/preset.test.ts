@@ -4,6 +4,14 @@ import * as fs from "fs/promises"
 import * as path from "path"
 import * as os from "os"
 import type { PresetManager } from "../../types/preset-manager"
+import type { Preset } from "../../models/types"
+
+const getRequiredLayout = (preset: Preset): NonNullable<Preset["layout"]> => {
+  if (preset.layout === undefined) {
+    throw new Error("expected preset layout")
+  }
+  return preset.layout
+}
 
 describe("PresetManager", () => {
   let presetManager: PresetManager
@@ -127,10 +135,11 @@ presets:
       await presetManager.loadConfig()
 
       const preset = presetManager.getPreset("default")
+      const layout = getRequiredLayout(preset)
       expect(preset).toBeDefined()
       expect(preset.name).toBe("default")
-      expect(preset.layout.panes).toHaveLength(2)
-      expect(preset.layout.panes[0]).toMatchObject({
+      expect(layout.panes).toHaveLength(2)
+      expect(layout.panes[0]).toMatchObject({
         command: "vim",
         name: "editor",
       })
@@ -305,9 +314,10 @@ presets:
       await presetManager.loadConfig()
 
       const preset = presetManager.getPreset("simple")
-      expect(preset.layout.type).toBe("horizontal")
-      expect(preset.layout.panes).toHaveLength(2)
-      expect(preset.layout.panes[0]).toMatchObject({
+      const layout = getRequiredLayout(preset)
+      expect(layout.type).toBe("horizontal")
+      expect(layout.panes).toHaveLength(2)
+      expect(layout.panes[0]).toMatchObject({
         command: "vim",
         cwd: "/home/user",
         env: { NODE_ENV: "development" },
@@ -335,9 +345,10 @@ presets:
       await presetManager.loadConfig()
 
       const preset = presetManager.getPreset("split")
-      expect(preset.layout.type).toBe("vertical")
-      expect(preset.layout.ratio).toEqual([70, 30])
-      expect(preset.layout.panes).toHaveLength(2)
+      const layout = getRequiredLayout(preset)
+      expect(layout.type).toBe("vertical")
+      expect(layout.ratio).toEqual([70, 30])
+      expect(layout.panes).toHaveLength(2)
     })
 
     it("should handle nested split layouts", async () => {
@@ -364,11 +375,12 @@ presets:
       await presetManager.loadConfig()
 
       const preset = presetManager.getPreset("complex")
-      expect(preset.layout.type).toBe("horizontal")
-      expect(preset.layout.ratio).toEqual([50, 50])
-      expect(preset.layout.panes).toHaveLength(2)
+      const layout = getRequiredLayout(preset)
+      expect(layout.type).toBe("horizontal")
+      expect(layout.ratio).toEqual([50, 50])
+      expect(layout.panes).toHaveLength(2)
 
-      const secondPane = preset.layout.panes[1]
+      const secondPane = layout.panes[1]
       expect(secondPane).toHaveProperty("type", "vertical")
       expect(secondPane).toHaveProperty("ratio", [60, 40])
     })

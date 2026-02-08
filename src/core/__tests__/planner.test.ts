@@ -35,7 +35,7 @@ layout:
     expect(root.panes.map((pane) => pane.id)).toEqual(["root.0", "root.1"])
 
     const nested = root.panes[1]
-    if (nested.kind !== "split") {
+    if (nested === undefined || nested.kind !== "split") {
       throw new Error("expected nested split")
     }
 

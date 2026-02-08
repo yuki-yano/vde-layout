@@ -79,7 +79,7 @@ presets:
       const result = validateYAML(yaml)
       expect(result.presets.complex).toBeDefined()
       expect(result.presets.complex!.name).toBe("complex")
-      expect(result.presets.complex!.layout.type).toBe("horizontal")
+      expect(result.presets.complex!.layout!.type).toBe("horizontal")
     })
 
     it("should validate config with multiple presets", () => {
@@ -131,7 +131,7 @@ presets:
 `
       const result = validateYAML(yaml)
       expect(result.presets.full).toBeDefined()
-      const pane = result.presets.full!.layout.panes[0]!
+      const pane = result.presets.full!.layout!.panes[0]!
       expect(pane).toMatchObject({
         command: "vim",
         cwd: "/tmp",
@@ -251,7 +251,7 @@ presets:
 `
       const result = validateYAML(yaml)
       expect(result.presets.valid).toBeDefined()
-      expect(result.presets.valid!.layout.panes[0]).toEqual({ name: "pane1" })
+      expect(result.presets.valid!.layout!.panes[0]).toEqual({ name: "pane1" })
     })
 
     it("should throw ValidationError for missing panes in layout", () => {
@@ -304,7 +304,7 @@ presets:
       const result = validateYAML(yaml)
       expect(result).toBeDefined()
       expect(result.presets.valid).toBeDefined()
-      expect(result.presets.valid!.layout.ratio).toEqual([1, 2]) // Preserves original values
+      expect(result.presets.valid!.layout!.ratio).toEqual([1, 2]) // Preserves original values
     })
 
     it("should throw ValidationError for invalid direction", () => {
@@ -412,7 +412,7 @@ presets:
 `
       const result = validateYAML(yaml)
       expect(result.presets.decimal).toBeDefined()
-      const decimalLayout = result.presets.decimal!.layout
+      const decimalLayout = result.presets.decimal!.layout!
       expect(decimalLayout.ratio).toEqual([33.33, 33.34, 33.33])
     })
   })
