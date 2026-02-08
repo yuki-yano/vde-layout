@@ -29,7 +29,7 @@ export const executePlan = async ({
 }: ExecutePlanInput): Promise<ExecutePlanSuccess> => {
   const initialVirtualPaneId = emission.summary.initialPaneId
   if (typeof initialVirtualPaneId !== "string" || initialVirtualPaneId.length === 0) {
-    raiseExecutionError("INVALID_PLAN", {
+    raiseExecutionError(ErrorCodes.INVALID_PLAN, {
       message: "Plan emission is missing initial pane metadata",
       path: "plan.initialPaneId",
     })
@@ -132,14 +132,14 @@ const executeSplitStep = async ({
   readonly paneMap: Map<string, string>
 }): Promise<void> => {
   const targetVirtualId = ensureNonEmpty(step.targetPaneId, () =>
-    raiseExecutionError("MISSING_TARGET", {
+    raiseExecutionError(ErrorCodes.MISSING_TARGET, {
       message: "Split step missing target pane metadata",
       path: step.id,
     }),
   )
 
   const targetRealId = ensureNonEmpty(resolvePaneId(paneMap, targetVirtualId), () =>
-    raiseExecutionError("UNKNOWN_PANE", {
+    raiseExecutionError(ErrorCodes.INVALID_PANE, {
       message: `Unknown target pane: ${targetVirtualId}`,
       path: step.id,
     }),
@@ -156,7 +156,7 @@ const executeSplitStep = async ({
 
   const panesAfter = await listPaneIds(executor, step)
   const newPaneId = ensureNonEmpty(findNewPaneId(panesBefore, panesAfter), () =>
-    raiseExecutionError("UNKNOWN_PANE", {
+    raiseExecutionError(ErrorCodes.INVALID_PANE, {
       message: "Unable to determine newly created pane",
       path: step.id,
     }),
@@ -178,14 +178,14 @@ const executeFocusStep = async ({
   readonly paneMap: Map<string, string>
 }): Promise<void> => {
   const targetVirtualId = ensureNonEmpty(step.targetPaneId, () =>
-    raiseExecutionError("MISSING_TARGET", {
+    raiseExecutionError(ErrorCodes.MISSING_TARGET, {
       message: "Focus step missing target pane metadata",
       path: step.id,
     }),
   )
 
   const targetRealId = ensureNonEmpty(resolvePaneId(paneMap, targetVirtualId), () =>
-    raiseExecutionError("UNKNOWN_PANE", {
+    raiseExecutionError(ErrorCodes.INVALID_PANE, {
       message: `Unknown focus pane: ${targetVirtualId}`,
       path: step.id,
     }),
@@ -212,15 +212,21 @@ const executeTerminalCommands = async ({
   readonly focusPaneVirtualId: string
 }): Promise<void> => {
   if (!paneMap.has(focusPaneVirtualId)) {
-    raiseExecutionError("UNKNOWN_PANE", {
+    raiseExecutionError(ErrorCodes.INVALID_PANE, {
       message: `Unknown focus pane: ${focusPaneVirtualId}`,
       path: focusPaneVirtualId,
     })
   }
+  ensureNonEmpty(resolvePaneId(paneMap, focusPaneVirtualId), () =>
+    raiseExecutionError(ErrorCodes.INVALID_PANE, {
+      message: `Unknown focus pane: ${focusPaneVirtualId}`,
+      path: focusPaneVirtualId,
+    }),
+  )
 
   const resolveRealPaneId = (virtualPaneId: string): string => {
     return ensureNonEmpty(resolvePaneId(paneMap, virtualPaneId), () =>
-      raiseExecutionError("UNKNOWN_PANE", {
+      raiseExecutionError(ErrorCodes.INVALID_PANE, {
         message: `Unknown terminal pane: ${virtualPaneId}`,
         path: virtualPaneId,
       }),
@@ -233,7 +239,7 @@ const executeTerminalCommands = async ({
     resolveRealPaneId,
     onTemplateTokenError: ({ terminal, error }): never => {
       throw createCoreError("execution", {
-        code: "TEMPLATE_TOKEN_ERROR",
+        code: ErrorCodes.TEMPLATE_TOKEN_ERROR,
         message: `Template token resolution failed for pane ${terminal.virtualPaneId}: ${error.message}`,
         path: terminal.virtualPaneId,
         details: {
