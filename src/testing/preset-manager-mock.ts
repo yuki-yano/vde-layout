@@ -1,5 +1,5 @@
 import type { Config, Preset, PresetInfo } from "../models/types"
-import type { PresetManager } from "../types/preset-manager"
+import type { PresetManager } from "../contracts/preset-manager"
 
 export type MockPresetManager = PresetManager & {
   readonly setPresets: (presets: Record<string, Preset>) => void

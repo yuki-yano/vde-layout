@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import type { PresetManager } from "../types/preset-manager"
+import type { PresetManager } from "../contracts/preset-manager"
 import { LogLevel, type Logger } from "../utils/logger"
 import { applyRuntimeOptions, listPresets } from "./runtime-and-list"
 

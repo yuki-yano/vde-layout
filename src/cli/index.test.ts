@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
 import packageJson from "../../package.json"
 import { createCli, type CLI, type CoreBridge } from "./index"
 import { createMockPresetManager, type MockPresetManager } from "../testing/preset-manager-mock"
-import type { CommandExecutor } from "../types/command-executor"
+import type { CommandExecutor } from "../contracts/command-executor"
 import type {
   CompilePresetInput,
   CompilePresetSuccess,

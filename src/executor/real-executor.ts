@@ -1,6 +1,6 @@
 import { execa } from "execa"
 import { createTmuxError, ErrorCodes } from "../utils/errors"
-import type { CommandExecutor } from "../types/command-executor"
+import type { CommandExecutor } from "../contracts/command-executor"
 import { createLogger, LogLevel } from "../utils/logger"
 
 type RealExecutorOptions = {

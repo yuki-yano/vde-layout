@@ -1,7 +1,7 @@
 import { execa } from "execa"
 import { createEnvironmentError, ErrorCodes } from "../../utils/errors"
-import type { TmuxExecutorContract } from "../../types/tmux"
-import type { CommandExecutor } from "../../types/command-executor"
+import type { TmuxExecutorContract } from "../../contracts/tmux"
+import type { CommandExecutor } from "../../contracts/command-executor"
 import { createRealExecutor, createDryRunExecutor, createMockExecutor } from "../../executor/index"
 
 type TmuxExecutorOptions = {
