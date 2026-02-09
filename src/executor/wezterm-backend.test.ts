@@ -147,7 +147,7 @@ describe("createWeztermBackend", () => {
     })
   })
 
-  it("defaults split orientation to bottom when metadata is missing", () => {
+  it("throws INVALID_PLAN when split orientation metadata is missing", () => {
     const backend = createWeztermBackend(createContext())
     const emission: PlanEmission = {
       ...minimalEmission(),
@@ -165,11 +165,12 @@ describe("createWeztermBackend", () => {
       summary: { stepsCount: 1, focusPaneId: "root", initialPaneId: "root" },
     }
 
-    expect(backend.getDryRunSteps(emission)[0]).toEqual({
-      backend: "wezterm",
-      summary: "split root",
-      command: "wezterm cli split-pane --bottom --percent 40 --pane-id root",
-    })
+    expect(() => backend.getDryRunSteps(emission)).toThrowError(
+      expect.objectContaining({
+        code: ErrorCodes.INVALID_PLAN,
+        path: "root:split:1",
+      }),
+    )
   })
 
   it("throws MISSING_TARGET when dry-run split step omits target metadata", () => {
