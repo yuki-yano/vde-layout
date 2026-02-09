@@ -196,4 +196,27 @@ layout:
       ratio: [1, 1],
     })
   })
+
+  it("rejects split-like layout without panes even when name exists", () => {
+    expect.assertions(2)
+    try {
+      compilePresetFromValue({
+        source: "tests/value-input-invalid-layout",
+        value: {
+          name: "invalid-layout",
+          layout: {
+            type: "horizontal",
+            ratio: [1],
+            name: "misclassified-terminal",
+          },
+        },
+      })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
+        expect(error.code).toBe("LAYOUT_PANES_MISSING")
+      }
+    }
+  })
 })
