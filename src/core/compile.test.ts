@@ -219,4 +219,50 @@ layout:
       }
     }
   })
+
+  it("rejects split-like layout with empty panes array", () => {
+    expect.assertions(2)
+    try {
+      compilePresetFromValue({
+        source: "tests/value-input-empty-panes",
+        value: {
+          name: "invalid-layout-empty-panes",
+          layout: {
+            type: "horizontal",
+            ratio: [1],
+            panes: [],
+          },
+        },
+      })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
+        expect(error.code).toBe("LAYOUT_PANES_MISSING")
+      }
+    }
+  })
+
+  it("rejects split-like layout with empty ratio array", () => {
+    expect.assertions(2)
+    try {
+      compilePresetFromValue({
+        source: "tests/value-input-empty-ratio",
+        value: {
+          name: "invalid-layout-empty-ratio",
+          layout: {
+            type: "horizontal",
+            ratio: [],
+            panes: [{ name: "main" }],
+          },
+        },
+      })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
+        expect(error.code).toBe("LAYOUT_RATIO_MISSING")
+      }
+    }
+  })
 })

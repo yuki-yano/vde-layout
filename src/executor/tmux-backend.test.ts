@@ -237,6 +237,35 @@ describe("createTmuxBackend", () => {
     )
   })
 
+  it("throws INVALID_PLAN when split percentage metadata is missing", () => {
+    const baseEmission = createEmission()
+    const [splitStep, focusStep] = baseEmission.steps
+    if (splitStep === undefined || focusStep === undefined) {
+      throw new Error("expected split and focus steps")
+    }
+
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          ...splitStep,
+          command: ["split-window", "-t", "root", "-p", "40"],
+          orientation: "horizontal",
+          percentage: undefined,
+        },
+        focusStep,
+      ],
+    }
+
+    const backend = createTmuxBackend(createContext())
+    expect(() => backend.getDryRunSteps(emission)).toThrowError(
+      expect.objectContaining({
+        code: ErrorCodes.INVALID_PLAN,
+        path: "root:split:1",
+      }),
+    )
+  })
+
   it("throws INVALID_PLAN when dry-run receives an unknown step kind", () => {
     const backend = createTmuxBackend(createContext())
     const legacyStep = {

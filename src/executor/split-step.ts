@@ -3,48 +3,47 @@ import { createCoreError } from "../core/errors"
 import { ErrorCodes } from "../utils/errors"
 
 type SplitOrientation = "horizontal" | "vertical"
+type SplitCommandStep = CommandStep & { readonly kind: "split" }
 
-export const resolveSplitOrientation = (step: CommandStep): SplitOrientation => {
+const asSplitStep = (step: CommandStep, field: "orientation" | "percentage"): SplitCommandStep => {
   if (step.kind !== "split") {
     throw createCoreError("execution", {
       code: ErrorCodes.INVALID_PLAN,
-      message: "Non-split step cannot resolve split orientation",
+      message: `Non-split step cannot resolve split ${field}`,
       path: step.id,
       details: { kind: step.kind },
     })
   }
+  return step as SplitCommandStep
+}
 
-  if (step.orientation === "horizontal" || step.orientation === "vertical") {
-    return step.orientation
+export const resolveSplitOrientation = (step: CommandStep): SplitOrientation => {
+  const splitStep = asSplitStep(step, "orientation")
+
+  if (splitStep.orientation === "horizontal" || splitStep.orientation === "vertical") {
+    return splitStep.orientation
   }
 
   throw createCoreError("execution", {
     code: ErrorCodes.INVALID_PLAN,
     message: "Split step missing orientation metadata",
-    path: step.id,
-    details: { orientation: step.orientation },
+    path: splitStep.id,
+    details: { orientation: splitStep.orientation },
   })
 }
 
 export const resolveSplitPercentage = (step: CommandStep): string => {
-  if (step.kind !== "split") {
-    throw createCoreError("execution", {
-      code: ErrorCodes.INVALID_PLAN,
-      message: "Non-split step cannot resolve split percentage",
-      path: step.id,
-      details: { kind: step.kind },
-    })
-  }
+  const splitStep = asSplitStep(step, "percentage")
 
-  if (typeof step.percentage === "number" && Number.isFinite(step.percentage)) {
-    return String(clampSplitPercentage(step.percentage))
+  if (typeof splitStep.percentage === "number" && Number.isFinite(splitStep.percentage)) {
+    return String(clampSplitPercentage(splitStep.percentage))
   }
 
   throw createCoreError("execution", {
     code: ErrorCodes.INVALID_PLAN,
     message: "Split step missing percentage metadata",
-    path: step.id,
-    details: { percentage: step.percentage },
+    path: splitStep.id,
+    details: { percentage: splitStep.percentage },
   })
 }
 

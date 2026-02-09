@@ -117,6 +117,27 @@ describe("executePlan", () => {
     })
   })
 
+  it("throws INVALID_PLAN when split percentage metadata is missing", async () => {
+    const executor = createMockExecutor()
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          ...baseSplitStep,
+          command: ["split-window", "-t", "root.0", "-p", "40"],
+          orientation: "horizontal",
+          percentage: undefined,
+        },
+        baseFocusStep,
+      ],
+    }
+
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_PLAN,
+      path: "root:split:1",
+    })
+  })
+
   it("reuses current window and closes other panes when current-window mode is selected", async () => {
     const executor = createMockExecutor()
     executor.setMockPaneIds(["%2", "%3"])
