@@ -293,7 +293,7 @@ export const resolvePaneId = (paneMap: Map<string, string>, virtualId: string): 
   return resolvePaneMapping(paneMap, virtualId)
 }
 
-export const ensureNonEmpty = <T extends string>(value: T | undefined, buildError: () => never): T => {
+const ensureNonEmpty = <T extends string>(value: T | undefined, buildError: () => never): T => {
   if (value === undefined || value.length === 0) {
     return buildError()
   }

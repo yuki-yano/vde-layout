@@ -18,7 +18,7 @@ import {
 import type { CoreBridge } from "./core-bridge"
 export type { CoreBridge } from "./core-bridge"
 
-export type CLIOptions = {
+type CLIOptions = {
   readonly presetManager?: PresetManager
   readonly createCommandExecutor?: (options: { verbose: boolean; dryRun: boolean }) => CommandExecutor
   readonly core?: CoreBridge

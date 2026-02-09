@@ -10,7 +10,7 @@ import type { CoreBridge } from "./core-bridge"
 import { createPaneKillPrompter } from "./user-prompt"
 import { resolveWindowMode } from "./window-mode"
 
-export type ExecutePresetCliOptions = {
+type ExecutePresetCliOptions = {
   readonly verbose: boolean
   readonly dryRun: boolean
   readonly currentWindow: boolean
@@ -160,7 +160,7 @@ const resolveWindowName = ({
   return presetDisplayName ?? presetName ?? "vde-layout"
 }
 
-export const resolveWindowModeForPreset = ({
+const resolveWindowModeForPreset = ({
   presetManager,
   options,
   presetWindowMode,

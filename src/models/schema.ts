@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 export const WindowModeSchema = z.enum(["new-window", "current-window"])
-export const TerminalBackendSchema = z.enum(["tmux", "wezterm"])
+const TerminalBackendSchema = z.enum(["tmux", "wezterm"])
 
 // Terminal pane schema
 const TerminalPaneSchema = z

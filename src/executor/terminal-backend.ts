@@ -29,7 +29,7 @@ export type TerminalBackend = {
   readonly getDryRunSteps: (emission: PlanEmission) => DryRunStep[]
 }
 
-export type TerminalBackendBaseContext = {
+type TerminalBackendBaseContext = {
   readonly logger: Logger
   readonly dryRun: boolean
   readonly verbose: boolean

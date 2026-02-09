@@ -1,7 +1,7 @@
 import type { EmittedTerminal } from "../core/emitter"
 import { buildNameToRealIdMap, replaceTemplateTokens, TemplateTokenError } from "../utils/template-tokens"
 
-export type TemplateTokenErrorContext = {
+type TemplateTokenErrorContext = {
   readonly terminal: EmittedTerminal
   readonly error: TemplateTokenError
 }
@@ -13,7 +13,7 @@ type PrepareTerminalCommandsInput = {
   readonly onTemplateTokenError: (context: TemplateTokenErrorContext) => never
 }
 
-export type PreparedTerminalCommand = {
+type PreparedTerminalCommand = {
   readonly terminal: EmittedTerminal
   readonly realPaneId: string
   readonly cwdCommand?: string
@@ -28,7 +28,7 @@ export type PreparedTerminalCommand = {
   }
 }
 
-export type PreparedTerminalCommands = {
+type PreparedTerminalCommands = {
   readonly focusPaneRealId: string
   readonly commands: ReadonlyArray<PreparedTerminalCommand>
 }
