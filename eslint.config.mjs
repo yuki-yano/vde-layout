@@ -13,6 +13,8 @@ const LEGACY_BACKEND_IMPORT_PATTERNS = [
   "./backends/**",
   "../executor/backends/**",
   "../../executor/backends/**",
+  "../types/**",
+  "../../types/**",
 ]
 
 const CORE_LAYER_IMPORT_PATTERNS = [

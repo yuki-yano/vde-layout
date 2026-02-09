@@ -1,6 +1,6 @@
 import type { CommandStep, EmittedTerminal } from "../core/emitter"
 import { createCoreError } from "../core/errors"
-import type { CommandExecutor } from "../types/command-executor"
+import type { CommandExecutor } from "../contracts/command-executor"
 import { waitForDelay } from "../utils/async"
 import { ErrorCodes } from "../utils/errors"
 import { resolvePaneMapping } from "../utils/pane-map"

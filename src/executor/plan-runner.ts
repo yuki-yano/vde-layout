@@ -1,6 +1,6 @@
 import type { PlanEmission } from "../core/emitter"
-import type { ConfirmPaneClosure } from "../types/confirm-pane"
-import type { CommandExecutor } from "../types/command-executor"
+import type { ConfirmPaneClosure } from "../contracts/confirm-pane"
+import type { CommandExecutor } from "../contracts/command-executor"
 import { ErrorCodes } from "../utils/errors"
 import type { WindowMode } from "../models/types"
 import {

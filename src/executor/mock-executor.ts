@@ -1,5 +1,5 @@
-import type { CommandExecutor } from "../types/command-executor"
-import type { TmuxExecutorContract } from "../types/tmux"
+import type { CommandExecutor } from "../contracts/command-executor"
+import type { TmuxExecutorContract } from "../contracts/tmux"
 import { createEnvironmentError, ErrorCodes } from "../utils/errors"
 
 export type MockExecutor = CommandExecutor &

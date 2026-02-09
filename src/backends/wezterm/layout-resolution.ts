@@ -1,6 +1,6 @@
 import { createCoreError } from "../../core/errors"
 import type { WindowMode } from "../../models/types"
-import type { ConfirmPaneClosure } from "../../types/confirm-pane"
+import type { ConfirmPaneClosure } from "../../contracts/confirm-pane"
 import { waitForDelay } from "../../utils/async"
 import { ErrorCodes } from "../../utils/errors"
 import { killWeztermPane, type WeztermListResult } from "./cli"

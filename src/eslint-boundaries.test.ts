@@ -83,11 +83,13 @@ describe("eslint import boundaries", () => {
     expect(patterns).toContain("../../config/**")
   })
 
-  it("forbids legacy backend import paths globally", async () => {
+  it("forbids legacy import paths globally", async () => {
     const patterns = await extractRestrictedPatterns("src/**/*.ts")
     expect(patterns).toContain("../tmux/**")
     expect(patterns).toContain("../wezterm/**")
     expect(patterns).toContain("./backends/**")
     expect(patterns).toContain("../executor/backends/**")
+    expect(patterns).toContain("../types/**")
+    expect(patterns).toContain("../../types/**")
   })
 })
