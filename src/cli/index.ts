@@ -2,17 +2,12 @@ import { Command, CommanderError } from "commander"
 import { createRequire } from "module"
 import { createPresetManager } from "../layout/preset"
 import { loadPackageVersion } from "./package-version"
-import { resolveWindowMode } from "./window-mode"
-import { createPaneKillPrompter } from "./user-prompt"
-import { buildPresetSource, determineCliWindowMode, renderDryRun } from "./command-helpers"
 import { createCliErrorHandlers } from "./error-handling"
 import { applyRuntimeOptions, listPresets } from "./runtime-and-list"
+import { executePreset } from "./preset-execution"
 import type { CommandExecutor } from "../types/command-executor"
 import type { PresetManager } from "../types/preset-manager"
 import { createRealExecutor, createDryRunExecutor } from "../executor/index"
-import { createTerminalBackend } from "../executor/backend-factory"
-import { resolveTerminalBackendKind } from "../executor/backend-resolver"
-import type { TerminalBackendKind } from "../executor/terminal-backend"
 import { createLogger, type Logger } from "../utils/logger"
 import {
   compilePreset as defaultCompilePreset,
@@ -20,24 +15,8 @@ import {
   createLayoutPlan as defaultCreateLayoutPlan,
   emitPlan as defaultEmitPlan,
 } from "../core/index"
-import type {
-  CompilePresetFromValueInput,
-  CompilePresetInput,
-  PlanEmission,
-  CompilePresetSuccess,
-  CreateLayoutPlanSuccess,
-} from "../core/index"
-
-export type CoreBridge = {
-  readonly compilePreset: (input: CompilePresetInput) => ReturnType<typeof defaultCompilePreset>
-  readonly compilePresetFromValue: (
-    input: CompilePresetFromValueInput,
-  ) => ReturnType<typeof defaultCompilePresetFromValue>
-  readonly createLayoutPlan: (
-    input: Parameters<typeof defaultCreateLayoutPlan>[0],
-  ) => ReturnType<typeof defaultCreateLayoutPlan>
-  readonly emitPlan: (input: Parameters<typeof defaultEmitPlan>[0]) => ReturnType<typeof defaultEmitPlan>
-}
+import type { CoreBridge } from "./core-bridge"
+export type { CoreBridge } from "./core-bridge"
 
 export type CLIOptions = {
   readonly presetManager?: PresetManager
@@ -76,110 +55,6 @@ export const createCli = (options: CLIOptions = {}): CLI => {
   const errorHandlers = createCliErrorHandlers({
     getLogger: () => logger,
   })
-
-  const executePreset = async (
-    presetName: string | undefined,
-    options: {
-      verbose: boolean
-      dryRun: boolean
-      currentWindow: boolean
-      newWindow: boolean
-      backend?: string
-    },
-  ): Promise<number> => {
-    try {
-      await presetManager.loadConfig()
-
-      const preset =
-        typeof presetName === "string" && presetName.length > 0
-          ? presetManager.getPreset(presetName)
-          : presetManager.getDefaultPreset()
-
-      const cliWindowMode = determineCliWindowMode({
-        currentWindow: options.currentWindow,
-        newWindow: options.newWindow,
-      })
-      const defaults = presetManager.getDefaults()
-      const windowModeResolution = resolveWindowMode({
-        cli: cliWindowMode,
-        preset: preset.windowMode,
-        defaults: defaults?.windowMode,
-      })
-      const windowMode = windowModeResolution.mode
-      logger.info(`Window mode: ${windowMode} (source: ${windowModeResolution.source})`)
-      const confirmPaneClosure = createPaneKillPrompter(logger)
-
-      const executor = createCommandExecutor({
-        verbose: options.verbose,
-        dryRun: options.dryRun,
-      })
-
-      const backendKind = resolveTerminalBackendKind({
-        cliFlag: options.backend as TerminalBackendKind | undefined,
-        presetBackend: preset.backend,
-        env: process.env,
-      })
-      logger.info(`Terminal backend: ${backendKind}`)
-      const backendContextBase = {
-        logger,
-        dryRun: options.dryRun,
-        verbose: options.verbose,
-        prompt: confirmPaneClosure,
-        cwd: process.cwd(),
-        paneId: process.env.WEZTERM_PANE,
-      } as const
-
-      const backend =
-        backendKind === "tmux"
-          ? createTerminalBackend("tmux", {
-              ...backendContextBase,
-              executor,
-            })
-          : createTerminalBackend("wezterm", backendContextBase)
-
-      await backend.verifyEnvironment()
-
-      if (options.dryRun === true) {
-        console.log("[DRY RUN] No actual commands will be executed")
-      }
-
-      let compileResult: CompilePresetSuccess
-      let planResult: CreateLayoutPlanSuccess
-      let emission: PlanEmission
-
-      try {
-        compileResult = core.compilePresetFromValue({
-          value: preset,
-          source: buildPresetSource(presetName),
-        })
-        planResult = core.createLayoutPlan({ preset: compileResult.preset })
-        emission = core.emitPlan({ plan: planResult.plan })
-      } catch (error) {
-        return errorHandlers.handlePipelineFailure(error)
-      }
-
-      if (options.dryRun === true) {
-        const dryRunSteps = backend.getDryRunSteps(emission)
-        renderDryRun(dryRunSteps)
-      } else {
-        try {
-          const executionResult = await backend.applyPlan({
-            emission,
-            windowMode,
-            windowName: preset.name ?? presetName ?? "vde-layout",
-          })
-          logger.info(`Executed ${executionResult.executedSteps} ${backendKind} steps`)
-        } catch (error) {
-          return errorHandlers.handlePipelineFailure(error)
-        }
-      }
-
-      logger.success(`Applied preset "${preset.name}"`)
-      return 0
-    } catch (error) {
-      return errorHandlers.handleError(error)
-    }
-  }
 
   const setupProgram = (): void => {
     program.exitOverride()
@@ -229,12 +104,21 @@ export const createCli = (options: CLIOptions = {}): CLI => {
           newWindow?: boolean
           backend?: string
         }>()
-        lastExitCode = await executePreset(presetName, {
-          verbose: opts.verbose === true,
-          dryRun: opts.dryRun === true,
-          currentWindow: opts.currentWindow === true,
-          newWindow: opts.newWindow === true,
-          backend: opts.backend,
+        lastExitCode = await executePreset({
+          presetName,
+          options: {
+            verbose: opts.verbose === true,
+            dryRun: opts.dryRun === true,
+            currentWindow: opts.currentWindow === true,
+            newWindow: opts.newWindow === true,
+            backend: opts.backend,
+          },
+          presetManager,
+          createCommandExecutor,
+          core,
+          logger,
+          handleError: errorHandlers.handleError,
+          handlePipelineFailure: errorHandlers.handlePipelineFailure,
         })
       })
   }
