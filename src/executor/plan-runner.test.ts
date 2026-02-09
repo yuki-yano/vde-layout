@@ -96,7 +96,7 @@ describe("executePlan", () => {
     expect(splitCommand).toEqual(["split-window", "-v", "-t", "%0", "-p", "33"])
   })
 
-  it("defaults legacy split commands without direction flag to vertical", async () => {
+  it("throws INVALID_PLAN when split orientation metadata is missing", async () => {
     const executor = createMockExecutor()
     const emission: PlanEmission = {
       ...baseEmission,
@@ -111,10 +111,10 @@ describe("executePlan", () => {
       ],
     }
 
-    await executePlan({ emission, executor, windowMode: "new-window" })
-
-    const splitCommand = executor.getExecutedCommands().find((command) => command[0] === "split-window")
-    expect(splitCommand).toEqual(["split-window", "-v", "-t", "%0", "-p", "40"])
+    await expect(executePlan({ emission, executor, windowMode: "new-window" })).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_PLAN,
+      path: "root:split:1",
+    })
   })
 
   it("reuses current window and closes other panes when current-window mode is selected", async () => {

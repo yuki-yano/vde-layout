@@ -208,7 +208,7 @@ describe("createTmuxBackend", () => {
     })
   })
 
-  it("defaults split orientation to vertical when metadata is missing", () => {
+  it("throws INVALID_PLAN when split orientation metadata is missing", () => {
     const baseEmission = createEmission()
     const [splitStep, focusStep] = baseEmission.steps
     if (splitStep === undefined || focusStep === undefined) {
@@ -229,13 +229,12 @@ describe("createTmuxBackend", () => {
     }
 
     const backend = createTmuxBackend(createContext())
-    const steps = backend.getDryRunSteps(emission)
-
-    expect(steps[0]).toEqual({
-      backend: "tmux",
-      summary: "split",
-      command: "tmux split-window -v -t root -p 40",
-    })
+    expect(() => backend.getDryRunSteps(emission)).toThrowError(
+      expect.objectContaining({
+        code: ErrorCodes.INVALID_PLAN,
+        path: "root:split:1",
+      }),
+    )
   })
 
   it("throws INVALID_PLAN when dry-run receives an unknown step kind", () => {

@@ -1,19 +1,51 @@
 import type { CommandStep } from "../core/emitter"
+import { createCoreError } from "../core/errors"
+import { ErrorCodes } from "../utils/errors"
 
 type SplitOrientation = "horizontal" | "vertical"
 
 export const resolveSplitOrientation = (step: CommandStep): SplitOrientation => {
-  if (step.kind === "split" && (step.orientation === "horizontal" || step.orientation === "vertical")) {
+  if (step.kind !== "split") {
+    throw createCoreError("execution", {
+      code: ErrorCodes.INVALID_PLAN,
+      message: "Non-split step cannot resolve split orientation",
+      path: step.id,
+      details: { kind: step.kind },
+    })
+  }
+
+  if (step.orientation === "horizontal" || step.orientation === "vertical") {
     return step.orientation
   }
-  return "vertical"
+
+  throw createCoreError("execution", {
+    code: ErrorCodes.INVALID_PLAN,
+    message: "Split step missing orientation metadata",
+    path: step.id,
+    details: { orientation: step.orientation },
+  })
 }
 
 export const resolveSplitPercentage = (step: CommandStep): string => {
-  if (step.kind === "split" && typeof step.percentage === "number" && Number.isFinite(step.percentage)) {
+  if (step.kind !== "split") {
+    throw createCoreError("execution", {
+      code: ErrorCodes.INVALID_PLAN,
+      message: "Non-split step cannot resolve split percentage",
+      path: step.id,
+      details: { kind: step.kind },
+    })
+  }
+
+  if (typeof step.percentage === "number" && Number.isFinite(step.percentage)) {
     return String(clampSplitPercentage(step.percentage))
   }
-  return "50"
+
+  throw createCoreError("execution", {
+    code: ErrorCodes.INVALID_PLAN,
+    message: "Split step missing percentage metadata",
+    path: step.id,
+    details: { percentage: step.percentage },
+  })
 }
 
 const clampSplitPercentage = (value: number): number => {
