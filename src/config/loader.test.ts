@@ -22,8 +22,9 @@ describe("ConfigLoader", () => {
       loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
-      expect(searchPaths).toHaveLength(1)
-      expect(searchPaths[0]).toBe("/home/user/.config/vde/layout.yml")
+      expect(searchPaths).toHaveLength(2)
+      expect(searchPaths[0]).toBe("/home/user/.config/vde/layout/config.yml")
+      expect(searchPaths[1]).toBe("/home/user/.config/vde/layout.yml")
     })
 
     it("builds paths from environment variables", () => {
@@ -34,9 +35,10 @@ describe("ConfigLoader", () => {
       loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
-      expect(searchPaths).toHaveLength(2)
+      expect(searchPaths).toHaveLength(3)
       expect(searchPaths[0]).toBe("/mock/vde/config/layout.yml")
-      expect(searchPaths[1]).toBe("/mock/.config/vde/layout.yml")
+      expect(searchPaths[1]).toBe("/mock/.config/vde/layout/config.yml")
+      expect(searchPaths[2]).toBe("/mock/.config/vde/layout.yml")
     })
 
     it("overrides paths with custom options", () => {
@@ -67,7 +69,7 @@ describe("ConfigLoader", () => {
       loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
-      expect(searchPaths[0]).toBe("/xdg/config/vde/layout.yml")
+      expect(searchPaths[0]).toBe("/xdg/config/vde/layout/config.yml")
     })
 
     it("falls back to HOME directory", () => {
@@ -78,6 +80,7 @@ describe("ConfigLoader", () => {
       loader = createConfigLoader()
       const searchPaths = loader.getSearchPaths()
 
+      expect(searchPaths).toContain("/home/user/.config/vde/layout/config.yml")
       expect(searchPaths).toContain("/home/user/.config/vde/layout.yml")
     })
 
@@ -92,6 +95,83 @@ describe("ConfigLoader", () => {
       // Duplicates are removed, leaving only one
       const uniquePaths = new Set(searchPaths)
       expect(uniquePaths.size).toBe(searchPaths.length)
+    })
+  })
+
+  describe("XDG directory split config support", () => {
+    let tempDir: string
+    let cwdSpy: ReturnType<typeof vi.spyOn>
+
+    beforeEach(async () => {
+      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "vde-xdg-config-test-"))
+      cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tempDir)
+      process.env.XDG_CONFIG_HOME = tempDir
+      delete process.env.VDE_CONFIG_PATH
+    })
+
+    afterEach(async () => {
+      cwdSpy.mockRestore()
+      await fs.remove(tempDir)
+    })
+
+    it("prefers vde/layout/config.yml over legacy layout.yml", async () => {
+      const nestedConfigPath = path.join(tempDir, "vde", "layout", "config.yml")
+      const legacyConfigPath = path.join(tempDir, "vde", "layout.yml")
+
+      await fs.ensureDir(path.dirname(nestedConfigPath))
+      await fs.writeFile(
+        nestedConfigPath,
+        "presets:\n  modern:\n    name: modern\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: left\n        - name: right\n",
+        "utf8",
+      )
+
+      await fs.ensureDir(path.dirname(legacyConfigPath))
+      await fs.writeFile(
+        legacyConfigPath,
+        "presets:\n  legacy:\n    name: legacy\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: old-left\n        - name: old-right\n",
+        "utf8",
+      )
+
+      const loaderWithBoth = createConfigLoader()
+      const config = await loaderWithBoth.loadConfig()
+
+      expect(config.presets.modern?.name).toBe("modern")
+      expect(config.presets.legacy).toBeUndefined()
+      await expect(loaderWithBoth.findConfigFile()).resolves.toBe(nestedConfigPath)
+    })
+
+    it("falls back to legacy layout.yml when nested config.yml is absent", async () => {
+      const legacyConfigPath = path.join(tempDir, "vde", "layout.yml")
+      await fs.ensureDir(path.dirname(legacyConfigPath))
+      await fs.writeFile(
+        legacyConfigPath,
+        "presets:\n  legacy:\n    name: legacy\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: left\n        - name: right\n",
+        "utf8",
+      )
+
+      const loaderWithLegacy = createConfigLoader()
+      const config = await loaderWithLegacy.loadConfig()
+
+      expect(config.presets.legacy?.name).toBe("legacy")
+      await expect(loaderWithLegacy.findConfigFile()).resolves.toBe(legacyConfigPath)
+    })
+
+    it("loads shared config when VDE_CONFIG_PATH overlaps with XDG base directory", async () => {
+      process.env.VDE_CONFIG_PATH = path.join(tempDir, "vde")
+
+      const sharedConfigPath = path.join(tempDir, "vde", "layout.yml")
+      await fs.ensureDir(path.dirname(sharedConfigPath))
+      await fs.writeFile(
+        sharedConfigPath,
+        "presets:\n  shared:\n    name: shared\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: left\n        - name: right\n",
+        "utf8",
+      )
+
+      const loaderWithDedup = createConfigLoader()
+      const config = await loaderWithDedup.loadConfig()
+
+      expect(config.presets.shared?.name).toBe("shared")
+      await expect(loaderWithDedup.findConfigFile()).resolves.toBe(sharedConfigPath)
     })
   })
 

@@ -18,6 +18,8 @@ export type ConfigLoader = {
   readonly getSearchPaths: () => string[]
 }
 
+type SearchPathGroup = readonly string[]
+
 export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoader => {
   const explicitConfigPaths = options.configPaths
   const emitWarning: (message: string) => void = options.onWarning ?? ((message: string): void => console.warn(message))
@@ -33,7 +35,8 @@ export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoa
       candidates.push(projectCandidate)
     }
 
-    candidates.push(...buildDefaultSearchPaths())
+    const defaultSearchPathGroups = buildDefaultSearchPathGroups()
+    candidates.push(...flattenSearchPathGroups(defaultSearchPathGroups))
 
     return [...new Set(candidates)]
   }
@@ -52,16 +55,16 @@ export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoa
     }
 
     const searchPaths = computeCachedSearchPaths()
-    const existingPaths = await filterExistingPaths(searchPaths)
+    const defaultSearchPathGroups = buildDefaultSearchPathGroups()
+    const globalPaths = await resolveFirstExistingPaths(defaultSearchPathGroups)
+    const projectPath = findProjectConfigCandidate()
+    const projectConfigExists = projectPath !== null ? await fs.pathExists(projectPath) : false
 
-    if (existingPaths.length === 0) {
+    if (globalPaths.length === 0 && !projectConfigExists) {
       throw createConfigError("Configuration file not found", ErrorCodes.CONFIG_NOT_FOUND, {
         searchPaths,
       })
     }
-
-    const projectPath = findProjectConfigCandidate()
-    const globalPaths = existingPaths.filter((filePath) => filePath !== projectPath)
 
     let mergedConfig: Config = { presets: {} }
 
@@ -71,7 +74,7 @@ export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoa
       mergedConfig = mergeConfigs(mergedConfig, config, emitWarning)
     }
 
-    if (projectPath !== null && (await fs.pathExists(projectPath))) {
+    if (projectPath !== null && projectConfigExists) {
       const content = await safeReadFile(projectPath)
       const config = validateYAML(content)
       mergedConfig = mergeConfigs(mergedConfig, config, emitWarning)
@@ -101,19 +104,45 @@ export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoa
   }
 }
 
-const buildDefaultSearchPaths = (): string[] => {
-  const paths: string[] = []
+const buildDefaultSearchPathGroups = (): ReadonlyArray<SearchPathGroup> => {
+  const pathGroups: string[][] = []
 
   const vdeConfigPath = process.env.VDE_CONFIG_PATH
   if (vdeConfigPath !== undefined) {
-    paths.push(path.join(vdeConfigPath, "layout.yml"))
+    pathGroups.push([path.join(vdeConfigPath, "layout.yml")])
   }
 
   const homeDir = process.env.HOME ?? os.homedir()
   const xdgConfigHome = process.env.XDG_CONFIG_HOME ?? path.join(homeDir, ".config")
-  paths.push(path.join(xdgConfigHome, "vde", "layout.yml"))
+  pathGroups.push([
+    path.join(xdgConfigHome, "vde", "layout", "config.yml"),
+    path.join(xdgConfigHome, "vde", "layout.yml"),
+  ])
 
+  return pathGroups.map((group): SearchPathGroup => [...new Set(group)])
+}
+
+const flattenSearchPathGroups = (pathGroups: ReadonlyArray<SearchPathGroup>): string[] => {
+  const paths: string[] = []
+  for (const group of pathGroups) {
+    paths.push(...group)
+  }
   return [...new Set(paths)]
+}
+
+const resolveFirstExistingPaths = async (pathGroups: ReadonlyArray<SearchPathGroup>): Promise<string[]> => {
+  const existingPaths = await Promise.all(pathGroups.map(async (group) => findFirstExisting(group)))
+  const seenPaths = new Set<string>()
+  const resolvedPaths: string[] = []
+
+  for (const existingPath of existingPaths) {
+    if (existingPath !== null && !seenPaths.has(existingPath)) {
+      seenPaths.add(existingPath)
+      resolvedPaths.push(existingPath)
+    }
+  }
+
+  return resolvedPaths
 }
 
 const findProjectConfigCandidate = (): string | null => {
@@ -148,16 +177,6 @@ const findFirstExisting = async (paths: ReadonlyArray<string>): Promise<string |
     }
   }
   return null
-}
-
-const filterExistingPaths = async (paths: ReadonlyArray<string>): Promise<string[]> => {
-  const existing: string[] = []
-  for (const candidate of paths) {
-    if (await fs.pathExists(candidate)) {
-      existing.push(candidate)
-    }
-  }
-  return existing
 }
 
 const safeReadFile = async (filePath: string): Promise<string> => {
