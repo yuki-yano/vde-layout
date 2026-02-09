@@ -388,10 +388,15 @@ const convertLayoutIssueToCompileError = ({
 }
 
 const isMissingArrayIssue = (issue: z.ZodIssue, field: "panes" | "ratio"): boolean => {
-  if (issue.path[0] !== field) {
+  if (issue.path.length !== 1 || issue.path[0] !== field) {
     return false
   }
-  return issue.code === "invalid_type" || issue.code === "too_small"
+
+  if (issue.code === "invalid_type") {
+    return true
+  }
+
+  return issue.code === "too_small" && issue.type === "array"
 }
 
 const getRatioLengthDetails = (layout: unknown): Readonly<Record<string, unknown>> | undefined => {
