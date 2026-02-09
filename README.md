@@ -30,7 +30,7 @@ pnpm run ci
 ```
 
 ## Quick Start
-1. Create a YAML file at `~/.config/vde/layout.yml` (or any supported location; see "Configuration Search Order").
+1. Create a YAML file at `~/.config/vde/layout/config.yml` (legacy `~/.config/vde/layout.yml` is also supported; see "Configuration Search Order").
 2. Paste a preset definition:
    ```yaml
    presets:
@@ -73,7 +73,7 @@ pnpm run ci
 - `vde-layout dev --backend wezterm` - Use the WezTerm backend (defaults to `tmux` when omitted).
 - `vde-layout dev --current-window` - Reuse the current tmux window (or active WezTerm tab) after confirming that other panes can be closed.
 - `vde-layout dev --new-window` - Force creation of a new tmux window or WezTerm tab even when presets or defaults request reuse.
-- `vde-layout --config /path/to/layout.yml` - Load presets from a specific file.
+- `vde-layout --config /path/to/config.yml` - Load presets from a specific file.
 - `vde-layout --help` - Show usage.
 - `vde-layout --version` / `vde-layout -v` - Print package version.
 
@@ -90,10 +90,10 @@ vde-layout resolves backends in the following order: CLI flag (`--backend`), pre
 ## Configuration Search Order
 When no `--config` flag is provided, vde-layout searches for configuration files in the following order:
 1. `$VDE_CONFIG_PATH/layout.yml` (if `VDE_CONFIG_PATH` is set).
-2. `$XDG_CONFIG_HOME/vde/layout.yml` or `~/.config/vde/layout.yml` when `XDG_CONFIG_HOME` is unset.
+2. `$XDG_CONFIG_HOME/vde/layout/config.yml`, then fallback to `$XDG_CONFIG_HOME/vde/layout.yml` (or `~/.config/...` when `XDG_CONFIG_HOME` is unset).
 3. `<project-root>/.vde/layout.yml` (discovered by walking up from the current directory).
 
-All existing files are merged, with project-specific definitions taking precedence over shared ones.
+vde-layout loads one existing file per location scope and merges them, with project-specific definitions taking precedence over shared ones.
 
 ## Preset Structure
 Each preset is an object under the `presets` key:
