@@ -329,18 +329,18 @@ const convertLayoutIssueToCompileError = ({
   readonly basePath: string
   readonly layout: unknown
 }): CoreError => {
-  if (issue.path[0] === "panes" && issue.code === "invalid_type") {
+  if (isMissingArrayIssue(issue, "panes")) {
     return compileError("LAYOUT_PANES_MISSING", {
       source,
-      message: "panes array is missing",
+      message: "panes array is missing or empty",
       path: `${basePath}.panes`,
     })
   }
 
-  if (issue.path[0] === "ratio" && issue.code === "invalid_type") {
+  if (isMissingArrayIssue(issue, "ratio")) {
     return compileError("LAYOUT_RATIO_MISSING", {
       source,
-      message: "ratio array is missing",
+      message: "ratio array is missing or empty",
       path: `${basePath}.ratio`,
     })
   }
@@ -385,6 +385,14 @@ const convertLayoutIssueToCompileError = ({
       node: getValueAtPath(layout, issue.path),
     },
   })
+}
+
+const isMissingArrayIssue = (issue: z.ZodIssue, field: "panes" | "ratio"): boolean => {
+  if (issue.path.length !== 1 || issue.path[0] !== field) {
+    return false
+  }
+
+  return issue.code === "invalid_type" || (issue.code === "too_small" && issue.type === "array")
 }
 
 const getRatioLengthDetails = (layout: unknown): Readonly<Record<string, unknown>> | undefined => {

@@ -173,6 +173,32 @@ describe("createWeztermBackend", () => {
     )
   })
 
+  it("throws INVALID_PLAN when split percentage metadata is missing", () => {
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "root:split:1",
+          kind: "split",
+          summary: "split root",
+          command: ["split-window", "-t", "root", "-p", "40"],
+          targetPaneId: "root",
+          createdPaneId: "root.1",
+          orientation: "horizontal",
+        },
+      ],
+      summary: { stepsCount: 1, focusPaneId: "root", initialPaneId: "root" },
+    }
+
+    expect(() => backend.getDryRunSteps(emission)).toThrowError(
+      expect.objectContaining({
+        code: ErrorCodes.INVALID_PLAN,
+        path: "root:split:1",
+      }),
+    )
+  })
+
   it("throws MISSING_TARGET when dry-run split step omits target metadata", () => {
     const backend = createWeztermBackend(createContext())
     const emission: PlanEmission = {
