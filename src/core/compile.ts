@@ -392,11 +392,7 @@ const isMissingArrayIssue = (issue: z.ZodIssue, field: "panes" | "ratio"): boole
     return false
   }
 
-  if (issue.code === "invalid_type") {
-    return true
-  }
-
-  return issue.code === "too_small" && issue.type === "array"
+  return issue.code === "invalid_type" || (issue.code === "too_small" && issue.type === "array")
 }
 
 const getRatioLengthDetails = (layout: unknown): Readonly<Record<string, unknown>> | undefined => {
