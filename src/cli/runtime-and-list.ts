@@ -1,7 +1,7 @@
 import chalk from "chalk"
 
 import type { PresetInfo } from "../models/types"
-import type { PresetManager } from "../contracts/preset-manager"
+import type { PresetManager } from "../contracts"
 import { LogLevel, type Logger } from "../utils/logger"
 
 type RuntimeOptions = {

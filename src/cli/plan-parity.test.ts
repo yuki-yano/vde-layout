@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
 import { createCli, type CLI, type CoreBridge } from "./index"
 import type { Preset, PresetInfo } from "../models/types"
-import type { CommandExecutor } from "../contracts/command-executor"
-import type { PresetManager } from "../contracts/preset-manager"
+import type { CommandExecutor } from "../contracts"
+import type { PresetManager } from "../contracts"
 import {
   compilePreset as defaultCompilePreset,
   compilePresetFromValue as defaultCompilePresetFromValue,

@@ -5,8 +5,8 @@ import { LogLevel, type Logger } from "../utils/logger"
 import type { PlanEmission } from "../core/index"
 import { executePreset } from "./preset-execution"
 import type { CoreBridge } from "./index"
-import type { PresetManager } from "../contracts/preset-manager"
-import type { CommandExecutor } from "../contracts/command-executor"
+import type { PresetManager } from "../contracts"
+import type { CommandExecutor } from "../contracts"
 import type { TerminalBackend } from "../executor/terminal-backend"
 
 const createTerminalBackendMock = vi.hoisted(() => vi.fn())

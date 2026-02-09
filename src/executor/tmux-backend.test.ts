@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { CommandExecutor } from "../contracts/command-executor"
+import type { CommandExecutor } from "../contracts"
 import type { PlanEmission } from "../core/emitter"
 import { createTmuxBackend } from "../backends/tmux/backend"
 import { ErrorCodes } from "../utils/errors"

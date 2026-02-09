@@ -8,7 +8,7 @@ import { createCli, type CoreBridge } from "./index"
 import { createMockPresetManager, type MockPresetManager } from "../testing/preset-manager-mock"
 import { createTerminalBackend } from "../executor/backend-factory"
 import type { TerminalBackend } from "../executor/terminal-backend"
-import type { CommandExecutor } from "../contracts/command-executor"
+import type { CommandExecutor } from "../contracts"
 import type {
   CompilePresetInput,
   CompilePresetSuccess,

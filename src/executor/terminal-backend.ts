@@ -1,8 +1,8 @@
 import type { PlanEmission } from "../core/emitter"
 import type { WindowMode } from "../models/types"
-import type { CommandExecutor } from "../contracts/command-executor"
+import type { CommandExecutor } from "../contracts"
 import type { Logger } from "../utils/logger"
-import type { ConfirmPaneClosure } from "../contracts/confirm-pane"
+import type { ConfirmPaneClosure } from "../contracts"
 
 export type TerminalBackendKind = "tmux" | "wezterm"
 
