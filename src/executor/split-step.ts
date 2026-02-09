@@ -1,6 +1,6 @@
 import type { CommandStep } from "../core/emitter"
 
-export type SplitOrientation = "horizontal" | "vertical"
+type SplitOrientation = "horizontal" | "vertical"
 
 export const resolveSplitOrientation = (step: CommandStep): SplitOrientation => {
   if (step.kind === "split" && (step.orientation === "horizontal" || step.orientation === "vertical")) {
@@ -16,6 +16,6 @@ export const resolveSplitPercentage = (step: CommandStep): string => {
   return "50"
 }
 
-export const clampSplitPercentage = (value: number): number => {
+const clampSplitPercentage = (value: number): number => {
   return Math.min(99, Math.max(1, Math.round(value)))
 }

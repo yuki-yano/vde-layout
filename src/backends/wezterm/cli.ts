@@ -3,7 +3,7 @@ import { createEnvironmentError, ErrorCodes } from "../../utils/errors"
 import { createCoreError } from "../../core/errors"
 import { parseWeztermListResult, type WeztermListResult } from "./list-parser"
 
-export type { WeztermListResult, WeztermListWindow } from "./list-parser"
+export type { WeztermListResult } from "./list-parser"
 
 const WEZTERM_BINARY = "wezterm"
 const MINIMUM_VERSION = "20220624-141144-bd1b7c5d"

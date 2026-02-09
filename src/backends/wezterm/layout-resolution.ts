@@ -9,7 +9,7 @@ import type { ExecuteWeztermCommand, ListWeztermWindows } from "./shared"
 const PANE_REGISTRATION_RETRIES = 5
 const PANE_REGISTRATION_DELAY_MS = 100
 
-export type InitialPaneResolution = {
+type InitialPaneResolution = {
   readonly paneId: string
   readonly windowId: string
 }
