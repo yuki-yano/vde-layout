@@ -1,4 +1,6 @@
 import { parse } from "yaml"
+import { z } from "zod"
+import { LayoutSchema } from "../models/schema"
 import { createCoreError, type CoreError } from "./errors"
 
 export type CompilePresetInput = {
@@ -83,8 +85,12 @@ const compilePresetValue = ({ value, source }: CompilePresetFromValueInput): Com
   }
 
   const name = typeof parsed.name === "string" && parsed.name.trim().length > 0 ? parsed.name : "Unnamed preset"
+  const validatedLayout = validateLayoutDefinition(parsed.layout, {
+    source,
+    path: "preset.layout",
+  })
 
-  const layout = parseLayoutNode(parsed.layout, {
+  const layout = parseLayoutNode(validatedLayout, {
     source,
     path: "preset.layout",
   })
@@ -98,6 +104,42 @@ const compilePresetValue = ({ value, source }: CompilePresetFromValueInput): Com
       metadata: { source },
     },
   }
+}
+
+const validateLayoutDefinition = (
+  layout: unknown,
+  context: { readonly source: string; readonly path: string },
+): unknown => {
+  if (layout === undefined || layout === null) {
+    return layout
+  }
+
+  if (!isRecord(layout) || !looksSplitLikeNode(layout)) {
+    return layout
+  }
+
+  const normalizedLayout = sanitizeLayoutForSchemaValidation(layout)
+  const validated = LayoutSchema.safeParse(normalizedLayout)
+  if (validated.success) {
+    return layout
+  }
+
+  const issue = validated.error.issues[0]
+  if (!issue) {
+    throw compileError("LAYOUT_INVALID_NODE", {
+      source: context.source,
+      message: "Layout node is invalid",
+      path: context.path,
+      details: { layout },
+    })
+  }
+
+  throw convertLayoutIssueToCompileError({
+    issue,
+    source: context.source,
+    basePath: context.path,
+    layout,
+  })
 }
 
 const parseLayoutNode = (
@@ -117,7 +159,7 @@ const parseLayoutNode = (
     })
   }
 
-  if (typeof node.type === "string" && Array.isArray(node.panes)) {
+  if ("type" in node || "ratio" in node || "panes" in node) {
     return parseSplitPane(node, context)
   }
 
@@ -138,61 +180,28 @@ const parseSplitPane = (
   context: { readonly source: string; readonly path: string },
 ): CompiledSplitPane => {
   const orientation = node.type
-  if (orientation !== "horizontal" && orientation !== "vertical") {
-    throw compileError("LAYOUT_INVALID_ORIENTATION", {
+  const panesInput = node.panes
+  const ratioInput = node.ratio
+  if (
+    (orientation !== "horizontal" && orientation !== "vertical") ||
+    !Array.isArray(panesInput) ||
+    !Array.isArray(ratioInput)
+  ) {
+    throw compileError("LAYOUT_INVALID_NODE", {
       source: context.source,
-      message: "layout.type must be horizontal or vertical",
-      path: `${context.path}.type`,
-      details: { type: orientation },
-    })
-  }
-
-  if (!Array.isArray(node.panes) || node.panes.length === 0) {
-    throw compileError("LAYOUT_PANES_MISSING", {
-      source: context.source,
-      message: "panes array is missing",
-      path: `${context.path}.panes`,
-    })
-  }
-
-  if (!Array.isArray(node.ratio) || node.ratio.length === 0) {
-    throw compileError("LAYOUT_RATIO_MISSING", {
-      source: context.source,
-      message: "ratio array is missing",
-      path: `${context.path}.ratio`,
-    })
-  }
-
-  if (node.ratio.length !== node.panes.length) {
-    throw compileError("LAYOUT_RATIO_MISMATCH", {
-      source: context.source,
-      message: "ratio and panes arrays must have the same length",
+      message: "Layout node is invalid",
       path: context.path,
-      details: {
-        ratioLength: node.ratio.length,
-        panesLength: node.panes.length,
-      },
+      details: { node },
     })
   }
 
-  const ratio = node.ratio.map((value, index) => {
-    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-      throw compileError("RATIO_INVALID_VALUE", {
-        source: context.source,
-        message: "ratio value must be a positive number",
-        path: `${context.path}.ratio[${index}]`,
-        details: { value },
-      })
-    }
-    return value
-  })
-
-  const panes = node.panes.map((child, index) =>
+  const panes = panesInput.map((child, index) =>
     parseLayoutNode(child, {
       source: context.source,
       path: `${context.path}.panes[${index}]`,
     }),
   )
+  const ratio = ratioInput.map((value): number => Number(value))
 
   return {
     kind: "split",
@@ -274,6 +283,159 @@ const collectOptions = (
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null
+}
+
+const looksSplitLikeNode = (value: Record<string, unknown>): boolean => {
+  return "type" in value || "ratio" in value || "panes" in value
+}
+
+const sanitizeLayoutForSchemaValidation = (node: unknown): unknown => {
+  if (!isRecord(node)) {
+    return node
+  }
+
+  if (looksSplitLikeNode(node)) {
+    const panes = Array.isArray(node.panes)
+      ? node.panes.map((child) => sanitizeLayoutForSchemaValidation(child))
+      : node.panes
+    return {
+      type: node.type,
+      ratio: node.ratio,
+      panes,
+    }
+  }
+
+  return {
+    name: node.name,
+    command: node.command,
+    cwd: node.cwd,
+    env: normalizeEnv(node.env),
+    delay: node.delay,
+    title: node.title,
+    focus: node.focus,
+    ephemeral: node.ephemeral,
+    closeOnError: node.closeOnError,
+  }
+}
+
+const convertLayoutIssueToCompileError = ({
+  issue,
+  source,
+  basePath,
+  layout,
+}: {
+  readonly issue: z.ZodIssue
+  readonly source: string
+  readonly basePath: string
+  readonly layout: unknown
+}): CoreError => {
+  if (issue.path[0] === "panes" && issue.code === "invalid_type") {
+    return compileError("LAYOUT_PANES_MISSING", {
+      source,
+      message: "panes array is missing",
+      path: `${basePath}.panes`,
+    })
+  }
+
+  if (issue.path[0] === "ratio" && issue.code === "invalid_type") {
+    return compileError("LAYOUT_RATIO_MISSING", {
+      source,
+      message: "ratio array is missing",
+      path: `${basePath}.ratio`,
+    })
+  }
+
+  if (issue.path.includes("type")) {
+    return compileError("LAYOUT_INVALID_ORIENTATION", {
+      source,
+      message: "layout.type must be horizontal or vertical",
+      path: `${basePath}.type`,
+      details: {
+        type: getValueAtPath(layout, issue.path),
+      },
+    })
+  }
+
+  if (issue.message.includes("Number of elements in ratio array does not match number of elements in panes array")) {
+    return compileError("LAYOUT_RATIO_MISMATCH", {
+      source,
+      message: "ratio and panes arrays must have the same length",
+      path: basePath,
+      details: getRatioLengthDetails(layout),
+    })
+  }
+
+  if (issue.path.includes("ratio")) {
+    return compileError("RATIO_INVALID_VALUE", {
+      source,
+      message: "ratio value must be a positive number",
+      path: formatPath(basePath, issue.path),
+      details: {
+        value: getValueAtPath(layout, issue.path),
+      },
+    })
+  }
+
+  return compileError("LAYOUT_INVALID_NODE", {
+    source,
+    message: "Layout node is invalid",
+    path: formatPath(basePath, issue.path),
+    details: {
+      issue: issue.message,
+      node: getValueAtPath(layout, issue.path),
+    },
+  })
+}
+
+const getRatioLengthDetails = (layout: unknown): Readonly<Record<string, unknown>> | undefined => {
+  if (!isRecord(layout)) {
+    return undefined
+  }
+
+  const ratio = layout.ratio
+  const panes = layout.panes
+  if (!Array.isArray(ratio) || !Array.isArray(panes)) {
+    return undefined
+  }
+
+  return {
+    ratioLength: ratio.length,
+    panesLength: panes.length,
+  }
+}
+
+const formatPath = (basePath: string, path: ReadonlyArray<string | number>): string => {
+  if (path.length === 0) {
+    return basePath
+  }
+
+  return path.reduce<string>((accumulator, segment) => {
+    if (typeof segment === "number") {
+      return `${accumulator}[${segment}]`
+    }
+    return `${accumulator}.${segment}`
+  }, basePath)
+}
+
+const getValueAtPath = (value: unknown, path: ReadonlyArray<string | number>): unknown => {
+  let current: unknown = value
+
+  for (const segment of path) {
+    if (typeof segment === "number") {
+      if (!Array.isArray(current)) {
+        return undefined
+      }
+      current = current[segment]
+      continue
+    }
+
+    if (!isRecord(current)) {
+      return undefined
+    }
+    current = current[segment]
+  }
+
+  return current
 }
 
 const compileError = (
