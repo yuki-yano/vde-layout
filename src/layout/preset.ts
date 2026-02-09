@@ -1,7 +1,7 @@
 import { createConfigLoader, type ConfigLoaderOptions } from "../config/loader"
 import { createConfigError, ErrorCodes } from "../utils/errors"
 import type { Config, Preset, PresetInfo } from "../models/types"
-import type { PresetManager } from "../contracts/preset-manager"
+import type { PresetManager } from "../contracts"
 
 type PresetState = {
   setConfigPath: (filePath: string) => void

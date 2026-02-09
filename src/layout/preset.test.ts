@@ -3,7 +3,7 @@ import { createPresetManager } from "./preset"
 import * as fs from "fs/promises"
 import * as path from "path"
 import * as os from "os"
-import type { PresetManager } from "../contracts/preset-manager"
+import type { PresetManager } from "../contracts"
 import type { Preset } from "../models/types"
 
 const getRequiredLayout = (preset: Preset): NonNullable<Preset["layout"]> => {

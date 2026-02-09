@@ -1,4 +1,4 @@
-import type { CommandExecutor } from "../contracts/command-executor"
+import type { CommandExecutor } from "../contracts"
 import { createLogger, LogLevel } from "../utils/logger"
 
 type DryRunExecutorOptions = {

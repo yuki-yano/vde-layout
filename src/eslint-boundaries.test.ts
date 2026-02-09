@@ -91,5 +91,7 @@ describe("eslint import boundaries", () => {
     expect(patterns).toContain("../executor/backends/**")
     expect(patterns).toContain("../types/**")
     expect(patterns).toContain("../../types/**")
+    expect(patterns).toContain("../contracts/*")
+    expect(patterns).toContain("../../contracts/*")
   })
 })
