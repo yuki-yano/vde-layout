@@ -37,7 +37,7 @@ export const createMockPresetManager = (): MockPresetManager => {
   let configPathAtLastLoad: string | undefined
   let defaults: Config["defaults"] | undefined
 
-  const loadConfig = async () => {
+  const loadConfig = async (): Promise<void> => {
     loadConfigCalled = true
     configPathAtLastLoad = configPath
     if (shouldFailOnLoad) {
@@ -45,7 +45,7 @@ export const createMockPresetManager = (): MockPresetManager => {
     }
   }
 
-  const setConfigPath = (path: string) => {
+  const setConfigPath = (path: string): void => {
     configPath = path
   }
 
@@ -69,26 +69,26 @@ export const createMockPresetManager = (): MockPresetManager => {
     }))
   }
 
-  const setPresets = (next: Record<string, Preset>) => {
+  const setPresets = (next: Record<string, Preset>): void => {
     presets = next
   }
 
-  const setDefaults = (next: Config["defaults"] | undefined) => {
+  const setDefaults = (next: Config["defaults"] | undefined): void => {
     defaults = next
   }
 
-  const setShouldFailOnLoad = (shouldFail: boolean) => {
+  const setShouldFailOnLoad = (shouldFail: boolean): void => {
     shouldFailOnLoad = shouldFail
   }
 
-  const wasLoadConfigCalled = () => loadConfigCalled
-  const resetLoadConfigCalled = () => {
+  const wasLoadConfigCalled = (): boolean => loadConfigCalled
+  const resetLoadConfigCalled = (): void => {
     loadConfigCalled = false
   }
 
-  const getConfigPath = () => configPath
-  const getConfigPathAtLastLoad = () => configPathAtLastLoad
-  const getDefaults = () => defaults
+  const getConfigPath = (): string | undefined => configPath
+  const getConfigPathAtLastLoad = (): string | undefined => configPathAtLastLoad
+  const getDefaults = (): Config["defaults"] | undefined => defaults
 
   return {
     loadConfig,
