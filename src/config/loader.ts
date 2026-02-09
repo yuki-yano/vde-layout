@@ -131,13 +131,17 @@ const flattenSearchPathGroups = (pathGroups: ReadonlyArray<SearchPathGroup>): st
 }
 
 const resolveFirstExistingPaths = async (pathGroups: ReadonlyArray<SearchPathGroup>): Promise<string[]> => {
+  const existingPaths = await Promise.all(pathGroups.map(async (group) => findFirstExisting(group)))
+  const seenPaths = new Set<string>()
   const resolvedPaths: string[] = []
-  for (const group of pathGroups) {
-    const existingPath = await findFirstExisting(group)
-    if (existingPath !== null) {
+
+  for (const existingPath of existingPaths) {
+    if (existingPath !== null && !seenPaths.has(existingPath)) {
+      seenPaths.add(existingPath)
       resolvedPaths.push(existingPath)
     }
   }
+
   return resolvedPaths
 }
 

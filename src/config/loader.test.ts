@@ -155,6 +155,24 @@ describe("ConfigLoader", () => {
       expect(config.presets.legacy?.name).toBe("legacy")
       await expect(loaderWithLegacy.findConfigFile()).resolves.toBe(legacyConfigPath)
     })
+
+    it("loads shared config when VDE_CONFIG_PATH overlaps with XDG base directory", async () => {
+      process.env.VDE_CONFIG_PATH = path.join(tempDir, "vde")
+
+      const sharedConfigPath = path.join(tempDir, "vde", "layout.yml")
+      await fs.ensureDir(path.dirname(sharedConfigPath))
+      await fs.writeFile(
+        sharedConfigPath,
+        "presets:\n  shared:\n    name: shared\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: left\n        - name: right\n",
+        "utf8",
+      )
+
+      const loaderWithDedup = createConfigLoader()
+      const config = await loaderWithDedup.loadConfig()
+
+      expect(config.presets.shared?.name).toBe("shared")
+      await expect(loaderWithDedup.findConfigFile()).resolves.toBe(sharedConfigPath)
+    })
   })
 
   describe("loadConfig - unit test", () => {
