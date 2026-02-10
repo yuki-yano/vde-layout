@@ -150,9 +150,15 @@ const findProjectConfigCandidate = (): string | null => {
   const { root } = path.parse(currentDir)
 
   while (true) {
-    const candidate = path.join(currentDir, ".vde", "layout.yml")
-    if (fs.existsSync(candidate)) {
-      return candidate
+    const candidates = [
+      path.join(currentDir, ".vde", "layout", "config.yml"),
+      path.join(currentDir, ".vde", "layout.yml"),
+    ]
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate
+      }
     }
 
     if (currentDir === root) {
