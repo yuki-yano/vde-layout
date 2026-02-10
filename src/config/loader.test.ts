@@ -210,8 +210,9 @@ describe("ConfigLoader", () => {
       await fs.remove(tempDir)
     })
 
-    it("includes project-local config path in search paths when available", async () => {
-      const localConfigPath = path.join(projectDir, ".vde", "layout.yml")
+    it("includes project-local nested config path in search paths when available", async () => {
+      const localConfigPath = path.join(projectDir, ".vde", "layout", "config.yml")
+      await fs.ensureDir(path.dirname(localConfigPath))
       await fs.writeFile(
         localConfigPath,
         "presets:\n  local:\n    name: local\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: left\n        - name: right\n",
@@ -224,6 +225,46 @@ describe("ConfigLoader", () => {
       expect(searchPaths[0]).toBe(localConfigPath)
     })
 
+    it("prefers project-local nested config.yml over legacy layout.yml", async () => {
+      const nestedConfigPath = path.join(projectDir, ".vde", "layout", "config.yml")
+      const legacyConfigPath = path.join(projectDir, ".vde", "layout.yml")
+
+      await fs.ensureDir(path.dirname(nestedConfigPath))
+      await fs.writeFile(
+        nestedConfigPath,
+        "presets:\n  modern:\n    name: modern\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: left\n        - name: right\n",
+        "utf8",
+      )
+
+      await fs.writeFile(
+        legacyConfigPath,
+        "presets:\n  legacy:\n    name: legacy\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: old-left\n        - name: old-right\n",
+        "utf8",
+      )
+
+      const loaderWithBoth = createConfigLoader()
+      const config = await loaderWithBoth.loadConfig()
+
+      expect(config.presets.modern?.name).toBe("modern")
+      expect(config.presets.legacy).toBeUndefined()
+      await expect(loaderWithBoth.findConfigFile()).resolves.toBe(nestedConfigPath)
+    })
+
+    it("falls back to project-local legacy layout.yml when nested config.yml is absent", async () => {
+      const legacyConfigPath = path.join(projectDir, ".vde", "layout.yml")
+      await fs.writeFile(
+        legacyConfigPath,
+        "presets:\n  legacy:\n    name: legacy\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: left\n        - name: right\n",
+        "utf8",
+      )
+
+      const loaderWithLegacy = createConfigLoader()
+      const config = await loaderWithLegacy.loadConfig()
+
+      expect(config.presets.legacy?.name).toBe("legacy")
+      await expect(loaderWithLegacy.findConfigFile()).resolves.toBe(legacyConfigPath)
+    })
+
     it("merges global and project configs preferring project values", async () => {
       const globalConfigPath = path.join(xdgDir, "vde", "layout.yml")
       await fs.writeFile(
@@ -232,7 +273,8 @@ describe("ConfigLoader", () => {
         "utf8",
       )
 
-      const localConfigPath = path.join(projectDir, ".vde", "layout.yml")
+      const localConfigPath = path.join(projectDir, ".vde", "layout", "config.yml")
+      await fs.ensureDir(path.dirname(localConfigPath))
       await fs.writeFile(
         localConfigPath,
         "presets:\n  dev:\n    name: project dev\n    layout:\n      type: horizontal\n      ratio: [2, 1]\n      panes:\n        - name: left\n        - name: right\n",

@@ -89,7 +89,7 @@ vde-layout resolves backends in the following order: CLI flag (`--backend`), pre
 
 ## Configuration Search Order
 When no `--config` flag is provided, vde-layout checks candidate files in this order for `findConfigFile()`:
-1. `<project-root>/.vde/layout.yml` (discovered by walking up from the current directory).
+1. Project scope discovered by walking up from the current directory; for each directory, vde-layout checks `.vde/layout/config.yml` first, then `.vde/layout.yml`.
 2. `$VDE_CONFIG_PATH/layout.yml` (if `VDE_CONFIG_PATH` is set).
 3. `$XDG_CONFIG_HOME/vde/layout/config.yml` (or `~/.config/vde/layout/config.yml` when `XDG_CONFIG_HOME` is unset).
 4. `$XDG_CONFIG_HOME/vde/layout.yml` fallback (or `~/.config/vde/layout.yml`).
@@ -97,7 +97,7 @@ When no `--config` flag is provided, vde-layout checks candidate files in this o
 For `loadConfig()`, vde-layout merges shared scopes first and project scope last:
 1. `$VDE_CONFIG_PATH/layout.yml`
 2. XDG scope (`.../vde/layout/config.yml` or fallback `.../vde/layout.yml`; first existing file only)
-3. `<project-root>/.vde/layout.yml`
+3. Project scope (`<project-root>/.vde/layout/config.yml` or fallback `<project-root>/.vde/layout.yml`, discovered by walking up from the current directory)
 
 ## Preset Structure
 Each preset is an object under the `presets` key:
