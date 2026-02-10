@@ -1,5 +1,7 @@
-export const selectUiModes = ["auto", "fzf"] as const
-export const selectSurfaceModes = ["auto", "inline", "tmux-popup"] as const
+import { SELECT_SURFACE_MODES, SELECT_UI_MODES } from "../models/schema"
+
+export const selectUiModes = SELECT_UI_MODES
+export const selectSurfaceModes = SELECT_SURFACE_MODES
 
 export type SelectUiMode = (typeof selectUiModes)[number]
 export type SelectSurfaceMode = (typeof selectSurfaceModes)[number]
