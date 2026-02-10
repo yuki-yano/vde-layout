@@ -68,6 +68,11 @@ pnpm run ci
 ## CLI Commands
 - `vde-layout [preset]` - Apply the named preset. When omitted, vde-layout uses the `default` preset; if none exists it lists available presets and exits.
 - `vde-layout list` - Show available presets with descriptions.
+- `vde-layout --select` - Open an interactive preset selector (auto mode; currently uses `fzf`).
+- `vde-layout --select --select-ui fzf` - Force the selector backend (`auto` or `fzf`).
+- `vde-layout --select --select-surface tmux-popup` - Render selector in a tmux popup (`fzf --tmux`).
+- `vde-layout --select --select-tmux-popup-opts "80%,70%"` - Pass popup sizing/placement to `fzf --tmux=<opts>`.
+- `vde-layout --select --fzf-arg "--cycle" --fzf-arg "--info=inline"` - Pass additional argument(s) to `fzf` (repeatable).
 - `vde-layout dev --dry-run` - Display the tmux steps without executing them.
 - `vde-layout dev --verbose` - Print informational logs, including resolved presets and plan details.
 - `vde-layout dev --backend wezterm` - Use the WezTerm backend (defaults to `tmux` when omitted).
@@ -78,6 +83,8 @@ pnpm run ci
 - `vde-layout --version` / `vde-layout -v` - Print package version.
 
 > **Note:** Applying a preset (without `--dry-run`) must be done inside an active tmux session when using the tmux backend. For the WezTerm backend, ensure a WezTerm window is running and focused so the CLI can discover it.
+>
+> **Selector UI note:** `--select` requires an interactive terminal and `fzf` on `$PATH`. `--select-surface tmux-popup` requires running inside tmux (`fzf --tmux`, tmux 3.3+ recommended).
 
 ## Terminal Backends
 vde-layout resolves backends in the following order: CLI flag (`--backend`), preset configuration, then defaults to `tmux`.
@@ -111,6 +118,21 @@ presets:
     layout:                     # optional; omit for single command presets
       # see Layout Structure
     command: "htop"             # optional; used when layout is omitted
+```
+
+### Defaults Structure
+Global/project defaults can be defined under `defaults`:
+```yaml
+defaults:
+  windowMode: new-window
+  selector:
+    ui: auto                 # auto | fzf
+    surface: auto            # auto | inline | tmux-popup
+    tmuxPopupOpts: "80%,70%" # passed to fzf as --tmux=<value>
+    fzf:
+      extraArgs:             # additional arguments passed to fzf
+        - --cycle
+        - --info=inline
 ```
 
 ### Layout Structure

@@ -21,6 +21,7 @@ type ExecutePresetCliOptions = {
 type ExecutePresetInput = {
   readonly presetName: string | undefined
   readonly options: ExecutePresetCliOptions
+  readonly skipLoadConfig?: boolean
   readonly presetManager: PresetManager
   readonly createCommandExecutor: (options: { verbose: boolean; dryRun: boolean }) => CommandExecutor
   readonly core: CoreBridge
@@ -35,6 +36,7 @@ type ExecutePresetInput = {
 export const executePreset = async ({
   presetName,
   options,
+  skipLoadConfig = false,
   presetManager,
   createCommandExecutor,
   core,
@@ -46,7 +48,9 @@ export const executePreset = async ({
   env = process.env,
 }: ExecutePresetInput): Promise<number> => {
   try {
-    await presetManager.loadConfig()
+    if (skipLoadConfig !== true) {
+      await presetManager.loadConfig()
+    }
 
     const preset =
       typeof presetName === "string" && presetName.length > 0

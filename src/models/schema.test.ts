@@ -211,6 +211,24 @@ describe("Zod schema validation", () => {
       const result = ConfigSchema.safeParse(emptyConfig)
       expect(result.success).toBe(true)
     })
+
+    it("accepts defaults.selector configuration", () => {
+      const result = ConfigSchema.safeParse({
+        defaults: {
+          selector: {
+            ui: "fzf",
+            surface: "tmux-popup",
+            tmuxPopupOpts: "80%,70%",
+            fzf: {
+              extraArgs: ["--cycle", "--info=inline"],
+            },
+          },
+        },
+        presets: {},
+      })
+
+      expect(result.success).toBe(true)
+    })
   })
 
   describe("Validation functions", () => {
@@ -229,6 +247,19 @@ describe("Zod schema validation", () => {
       if (!result.success) {
         expect(result.error).toContain("name")
       }
+    })
+
+    it("validateConfig rejects invalid defaults.selector.surface", () => {
+      const result = validateConfig({
+        defaults: {
+          selector: {
+            surface: "floating",
+          },
+        },
+        presets: {},
+      })
+
+      expect(result.success).toBe(false)
     })
 
     it("validatePreset returns detailed errors", () => {

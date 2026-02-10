@@ -178,6 +178,36 @@ presets:
     expect(result.presets.ops?.windowMode).toBeUndefined()
   })
 
+  it("should accept selector defaults configuration", () => {
+    const yaml = `
+defaults:
+  selector:
+    ui: fzf
+    surface: tmux-popup
+    tmuxPopupOpts: 80%,70%
+    fzf:
+      extraArgs:
+        - --cycle
+        - --info=inline
+presets:
+  dev:
+    name: dev
+    layout:
+      type: horizontal
+      ratio: [50, 50]
+      panes:
+        - name: editor
+          command: vim
+        - name: monitor
+          command: htop
+`
+    const result = validateYAML(yaml)
+    expect(result.defaults?.selector?.ui).toBe("fzf")
+    expect(result.defaults?.selector?.surface).toBe("tmux-popup")
+    expect(result.defaults?.selector?.tmuxPopupOpts).toBe("80%,70%")
+    expect(result.defaults?.selector?.fzf?.extraArgs).toEqual(["--cycle", "--info=inline"])
+  })
+
   describe("invalid configurations", () => {
     it("should throw ValidationError for invalid YAML syntax", () => {
       const yaml = `

@@ -62,9 +62,9 @@ describe("E2E Tests", () => {
       const result = runCommand("--help")
       expect(result.code).toBe(0)
       expect(result.stdout).toContain("VDE (Vibrant Development Environment) Layout Manager")
-      expect(result.stdout).toContain("Usage:")
-      expect(result.stdout).toContain("Options:")
-      expect(result.stdout).toContain("Commands:")
+      expect(result.stdout).toMatch(/USAGE|Usage:/)
+      expect(result.stdout).toMatch(/OPTIONS|Options:/)
+      expect(result.stdout).toMatch(/COMMANDS|Commands:/)
     })
   })
 
@@ -207,7 +207,7 @@ presets:
 
       const helpResult = runCommand("-h")
       expect(helpResult.code).toBe(0)
-      expect(helpResult.stdout).toContain("Usage:")
+      expect(helpResult.stdout).toMatch(/USAGE|Usage:/)
     })
   })
 })
