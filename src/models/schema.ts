@@ -2,6 +2,23 @@ import { z } from "zod"
 
 export const WindowModeSchema = z.enum(["new-window", "current-window"])
 const TerminalBackendSchema = z.enum(["tmux", "wezterm"])
+export const SelectUiModeSchema = z.enum(["auto", "fzf"])
+export const SelectSurfaceModeSchema = z.enum(["auto", "inline", "tmux-popup"])
+
+const SelectorFzfSchema = z
+  .object({
+    extraArgs: z.array(z.string().min(1)).optional(),
+  })
+  .strict()
+
+const SelectorDefaultsSchema = z
+  .object({
+    ui: SelectUiModeSchema.optional(),
+    surface: SelectSurfaceModeSchema.optional(),
+    tmuxPopupOpts: z.string().min(1).optional(),
+    fzf: SelectorFzfSchema.optional(),
+  })
+  .strict()
 
 // Terminal pane schema
 const TerminalPaneSchema = z
@@ -61,6 +78,7 @@ export const ConfigSchema = z.object({
   defaults: z
     .object({
       windowMode: WindowModeSchema.optional(),
+      selector: SelectorDefaultsSchema.optional(),
     })
     .optional(),
   presets: z.record(PresetSchema),

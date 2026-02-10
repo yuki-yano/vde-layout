@@ -19,6 +19,7 @@ export type ConfigLoader = {
 }
 
 type SearchPathGroup = readonly string[]
+type SelectorDefaults = NonNullable<NonNullable<Config["defaults"]>["selector"]>
 
 export const createConfigLoader = (options: ConfigLoaderOptions = {}): ConfigLoader => {
   const explicitConfigPaths = options.configPaths
@@ -228,11 +229,18 @@ const mergeConfigs = (base: Config, override: Config, emitWarning: (message: str
     )
   }
 
+  const mergedSelectorDefaults = mergeSelectorDefaults({
+    baseSelector: baseDefaults?.selector,
+    overrideSelector: overrideDefaults?.selector,
+    emitWarning,
+  })
+
   const mergedDefaults =
     baseDefaults !== undefined || overrideDefaults !== undefined
       ? {
           ...(baseDefaults ?? {}),
           ...(overrideDefaults ?? {}),
+          ...(mergedSelectorDefaults !== undefined ? { selector: mergedSelectorDefaults } : {}),
         }
       : undefined
 
@@ -244,4 +252,68 @@ const mergeConfigs = (base: Config, override: Config, emitWarning: (message: str
         defaults: mergedDefaults,
         presets: mergedPresets,
       }
+}
+
+const mergeSelectorDefaults = ({
+  baseSelector,
+  overrideSelector,
+  emitWarning,
+}: {
+  readonly baseSelector: SelectorDefaults | undefined
+  readonly overrideSelector: SelectorDefaults | undefined
+  readonly emitWarning: (message: string) => void
+}): SelectorDefaults | undefined => {
+  if (baseSelector === undefined && overrideSelector === undefined) {
+    return undefined
+  }
+
+  if (baseSelector?.ui !== undefined && overrideSelector?.ui !== undefined && baseSelector.ui !== overrideSelector.ui) {
+    emitWarning(
+      `[vde-layout] defaults.selector.ui conflict: "${baseSelector.ui}" overridden by "${overrideSelector.ui}"`,
+    )
+  }
+
+  if (
+    baseSelector?.surface !== undefined &&
+    overrideSelector?.surface !== undefined &&
+    baseSelector.surface !== overrideSelector.surface
+  ) {
+    emitWarning(
+      `[vde-layout] defaults.selector.surface conflict: "${baseSelector.surface}" overridden by "${overrideSelector.surface}"`,
+    )
+  }
+
+  if (
+    baseSelector?.tmuxPopupOpts !== undefined &&
+    overrideSelector?.tmuxPopupOpts !== undefined &&
+    baseSelector.tmuxPopupOpts !== overrideSelector.tmuxPopupOpts
+  ) {
+    emitWarning(
+      `[vde-layout] defaults.selector.tmuxPopupOpts conflict: "${baseSelector.tmuxPopupOpts}" overridden by "${overrideSelector.tmuxPopupOpts}"`,
+    )
+  }
+
+  const baseExtraArgs = baseSelector?.fzf?.extraArgs
+  const overrideExtraArgs = overrideSelector?.fzf?.extraArgs
+  if (
+    Array.isArray(baseExtraArgs) &&
+    Array.isArray(overrideExtraArgs) &&
+    JSON.stringify(baseExtraArgs) !== JSON.stringify(overrideExtraArgs)
+  ) {
+    emitWarning(`[vde-layout] defaults.selector.fzf.extraArgs conflict: global value overridden by project value`)
+  }
+
+  const mergedFzf =
+    baseSelector?.fzf !== undefined || overrideSelector?.fzf !== undefined
+      ? {
+          ...(baseSelector?.fzf ?? {}),
+          ...(overrideSelector?.fzf ?? {}),
+        }
+      : undefined
+
+  return {
+    ...(baseSelector ?? {}),
+    ...(overrideSelector ?? {}),
+    ...(mergedFzf !== undefined ? { fzf: mergedFzf } : {}),
+  }
 }

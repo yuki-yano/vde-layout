@@ -388,6 +388,213 @@ describe("CLI", () => {
       expect(customPresetManager.getConfigPathAtLastLoad()).toBe("/tmp/custom.yml")
     })
 
+    it("selects preset with --select and executes it", async () => {
+      const selectPreset = vi.fn(async () => ({
+        status: "selected" as const,
+        presetName: "dev",
+      }))
+      const cliWithSelect = createCli({
+        presetManager: mockPresetManager,
+        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => createRecordingExecutor(dryRun),
+        core: coreBridge,
+        selectPreset,
+      })
+
+      runExitCode = await cliWithSelect.run(["--select", "--dry-run"])
+
+      expect(runExitCode).toBe(0)
+      expect(selectPreset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uiMode: "auto",
+          surfaceMode: "auto",
+          fzfExtraArgs: [],
+          skipLoadConfig: true,
+        }),
+      )
+    })
+
+    it("loads config only once when using --select", async () => {
+      const loadConfigSpy = vi.spyOn(mockPresetManager, "loadConfig")
+      const selectPreset = vi.fn(async () => ({
+        status: "selected" as const,
+        presetName: "dev",
+      }))
+      const cliWithSelect = createCli({
+        presetManager: mockPresetManager,
+        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => createRecordingExecutor(dryRun),
+        core: coreBridge,
+        selectPreset,
+      })
+
+      runExitCode = await cliWithSelect.run(["--select", "--dry-run"])
+
+      expect(runExitCode).toBe(0)
+      expect(loadConfigSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it("accepts --select=fzf syntax and passes explicit UI mode", async () => {
+      const selectPreset = vi.fn(async () => ({
+        status: "selected" as const,
+        presetName: "dev",
+      }))
+      const cliWithSelect = createCli({
+        presetManager: mockPresetManager,
+        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => createRecordingExecutor(dryRun),
+        core: coreBridge,
+        selectPreset,
+      })
+
+      runExitCode = await cliWithSelect.run(["--select=fzf", "--dry-run"])
+
+      expect(runExitCode).toBe(0)
+      expect(selectPreset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uiMode: "fzf",
+          surfaceMode: "auto",
+          skipLoadConfig: true,
+        }),
+      )
+    })
+
+    it("passes selector surface and fzf args from CLI options", async () => {
+      const selectPreset = vi.fn(async () => ({
+        status: "selected" as const,
+        presetName: "dev",
+      }))
+      const cliWithSelect = createCli({
+        presetManager: mockPresetManager,
+        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => createRecordingExecutor(dryRun),
+        core: coreBridge,
+        selectPreset,
+      })
+
+      runExitCode = await cliWithSelect.run([
+        "--select",
+        "--select-surface",
+        "tmux-popup",
+        "--select-tmux-popup-opts",
+        "80%,70%",
+        "--fzf-arg",
+        "--cycle",
+        "--fzf-arg",
+        "--info=inline",
+        "--dry-run",
+      ])
+
+      expect(runExitCode).toBe(0)
+      expect(selectPreset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surfaceMode: "tmux-popup",
+          tmuxPopupOptions: "80%,70%",
+          fzfExtraArgs: ["--cycle", "--info=inline"],
+        }),
+      )
+    })
+
+    it("uses defaults.selector values when select options are omitted", async () => {
+      mockPresetManager.setDefaults({
+        selector: {
+          ui: "fzf",
+          surface: "inline",
+          tmuxPopupOpts: "75%,65%",
+          fzf: {
+            extraArgs: ["--cycle"],
+          },
+        },
+      })
+      const selectPreset = vi.fn(async () => ({
+        status: "selected" as const,
+        presetName: "dev",
+      }))
+      const cliWithSelect = createCli({
+        presetManager: mockPresetManager,
+        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => createRecordingExecutor(dryRun),
+        core: coreBridge,
+        selectPreset,
+      })
+
+      runExitCode = await cliWithSelect.run(["--select", "--dry-run"])
+
+      expect(runExitCode).toBe(0)
+      expect(selectPreset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uiMode: "fzf",
+          surfaceMode: "inline",
+          tmuxPopupOptions: "75%,65%",
+          fzfExtraArgs: ["--cycle"],
+        }),
+      )
+    })
+
+    it("returns 130 when selection is cancelled", async () => {
+      const selectPreset = vi.fn(async () => ({
+        status: "cancelled" as const,
+      }))
+      const cliWithSelect = createCli({
+        presetManager: mockPresetManager,
+        createCommandExecutor: ({ dryRun }: { verbose: boolean; dryRun: boolean }) => createRecordingExecutor(dryRun),
+        core: coreBridge,
+        selectPreset,
+      })
+
+      runExitCode = await cliWithSelect.run(["--select"])
+
+      expect(runExitCode).toBe(130)
+      expect(compilePresetFromValueMock).not.toHaveBeenCalled()
+    })
+
+    it("rejects preset argument with --select", async () => {
+      runExitCode = await cli.run(["dev", "--select"])
+
+      expect(runExitCode).toBe(1)
+      expect(errorOutput.join("\n")).toContain("Cannot use preset argument with --select")
+    })
+
+    it("rejects extra positional arguments for preset execution", async () => {
+      runExitCode = await cli.run(["dev", "extra", "--dry-run"])
+
+      expect(runExitCode).toBe(1)
+      expect(errorOutput.join("\n")).toContain("too many arguments")
+      expect(compilePresetFromValueMock).not.toHaveBeenCalled()
+    })
+
+    it("rejects --select-ui without --select", async () => {
+      runExitCode = await cli.run(["--select-ui", "fzf", "--dry-run"])
+
+      expect(runExitCode).toBe(1)
+      expect(errorOutput.join("\n")).toContain("--select-ui requires --select")
+    })
+
+    it("rejects --select-surface without --select", async () => {
+      runExitCode = await cli.run(["--select-surface", "inline", "--dry-run"])
+
+      expect(runExitCode).toBe(1)
+      expect(errorOutput.join("\n")).toContain("--select-surface requires --select")
+    })
+
+    it("rejects --select-tmux-popup-opts without --select", async () => {
+      runExitCode = await cli.run(["--select-tmux-popup-opts", "80%,70%", "--dry-run"])
+
+      expect(runExitCode).toBe(1)
+      expect(errorOutput.join("\n")).toContain("--select-tmux-popup-opts requires --select")
+    })
+
+    it("rejects --fzf-arg without --select", async () => {
+      runExitCode = await cli.run(["--fzf-arg", "--cycle", "--dry-run"])
+
+      expect(runExitCode).toBe(1)
+      expect(errorOutput.join("\n")).toContain("--fzf-arg requires --select")
+    })
+
+    it("rejects invalid backend values before execution", async () => {
+      runExitCode = await cli.run(["dev", "--backend", "screen", "--dry-run"])
+
+      expect(runExitCode).toBe(1)
+      expect(errorOutput.join("\n")).toContain("Invalid value for argument")
+      expect(errorOutput.join("\n")).toContain("--backend")
+      expect(compilePresetFromValueMock).not.toHaveBeenCalled()
+    })
+
     it("applies --config before list command loads presets", async () => {
       const customPresetManager = createMockPresetManager()
       const cliWithConfig = createCli({

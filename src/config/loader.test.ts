@@ -335,6 +335,53 @@ describe("ConfigLoader", () => {
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Preset "dev" windowMode conflict'))
     })
 
+    it("merges defaults.selector deeply and keeps unspecified fields", async () => {
+      const globalConfigPath = path.join(xdgDir, "vde", "layout.yml")
+      await fs.writeFile(
+        globalConfigPath,
+        "defaults:\n  selector:\n    ui: auto\n    surface: inline\n    tmuxPopupOpts: 90%,80%\n    fzf:\n      extraArgs:\n        - --cycle\npresets:\n  dev:\n    name: global dev\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: gleft\n        - name: gright\n",
+        "utf8",
+      )
+
+      const localConfigPath = path.join(projectDir, ".vde", "layout.yml")
+      await fs.writeFile(
+        localConfigPath,
+        "defaults:\n  selector:\n    surface: tmux-popup\n    fzf:\n      extraArgs:\n        - --info=inline\npresets:\n  dev:\n    name: project dev\n    layout:\n      type: horizontal\n      ratio: [2, 1]\n      panes:\n        - name: left\n        - name: right\n",
+        "utf8",
+      )
+
+      const loaderWithMerge = createConfigLoader()
+      const config = await loaderWithMerge.loadConfig()
+
+      expect(config.defaults?.selector?.ui).toBe("auto")
+      expect(config.defaults?.selector?.surface).toBe("tmux-popup")
+      expect(config.defaults?.selector?.tmuxPopupOpts).toBe("90%,80%")
+      expect(config.defaults?.selector?.fzf?.extraArgs).toEqual(["--info=inline"])
+    })
+
+    it("logs selector conflicts when project overrides global selector defaults", async () => {
+      const globalConfigPath = path.join(xdgDir, "vde", "layout.yml")
+      await fs.writeFile(
+        globalConfigPath,
+        "defaults:\n  selector:\n    surface: inline\n    fzf:\n      extraArgs:\n        - --cycle\npresets:\n  dev:\n    name: global dev\n    layout:\n      type: horizontal\n      ratio: [1, 1]\n      panes:\n        - name: gleft\n        - name: gright\n",
+        "utf8",
+      )
+
+      const localConfigPath = path.join(projectDir, ".vde", "layout.yml")
+      await fs.writeFile(
+        localConfigPath,
+        "defaults:\n  selector:\n    surface: tmux-popup\n    fzf:\n      extraArgs:\n        - --info=inline\npresets:\n  dev:\n    name: project dev\n    layout:\n      type: horizontal\n      ratio: [2, 1]\n      panes:\n        - name: left\n        - name: right\n",
+        "utf8",
+      )
+
+      const warnSpy = vi.fn()
+      const loaderWithMerge = createConfigLoader({ onWarning: warnSpy })
+      await loaderWithMerge.loadConfig()
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("defaults.selector.surface conflict"))
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("defaults.selector.fzf.extraArgs conflict"))
+    })
+
     it("emits warning to console by default when windowMode conflicts", async () => {
       const globalConfigPath = path.join(xdgDir, "vde", "layout.yml")
       await fs.writeFile(
