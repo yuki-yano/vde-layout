@@ -27,10 +27,14 @@ export type CompiledTerminalPane = {
   readonly options?: Readonly<Record<string, unknown>>
 }
 
+export type CompiledRatioEntry =
+  | { readonly kind: "weight"; readonly weight: number }
+  | { readonly kind: "fixed-cells"; readonly cells: number }
+
 export type CompiledSplitPane = {
   readonly kind: "split"
   readonly orientation: "horizontal" | "vertical"
-  readonly ratio: ReadonlyArray<number>
+  readonly ratio: ReadonlyArray<CompiledRatioEntry>
   readonly panes: ReadonlyArray<CompiledLayoutNode>
 }
 
@@ -72,6 +76,8 @@ export const compilePreset = ({ document, source }: CompilePresetInput): Compile
 export const compilePresetFromValue = ({ value, source }: CompilePresetFromValueInput): CompilePresetSuccess => {
   return compilePresetValue({ value, source })
 }
+
+const FIXED_RATIO_PATTERN = /^([1-9][0-9]*)c$/
 
 const compilePresetValue = ({ value, source }: CompilePresetFromValueInput): CompilePresetSuccess => {
   const parsed = value
@@ -201,7 +207,22 @@ const parseSplitPane = (
       path: `${context.path}.panes[${index}]`,
     }),
   )
-  const ratio = ratioInput.map((value): number => Number(value))
+  const ratio = ratioInput.map(
+    (value, index): CompiledRatioEntry =>
+      parseRatioEntry(value, {
+        source: context.source,
+        path: `${context.path}.ratio[${index}]`,
+      }),
+  )
+
+  if (!ratio.some((entry) => entry.kind === "weight")) {
+    throw compileError("RATIO_WEIGHT_MISSING", {
+      source: context.source,
+      message: "ratio must include at least one numeric weight",
+      path: `${context.path}.ratio`,
+      details: { ratio: ratioInput },
+    })
+  }
 
   return {
     kind: "split",
@@ -209,6 +230,38 @@ const parseSplitPane = (
     ratio,
     panes: panes.filter((pane): pane is CompiledLayoutNode => pane !== null),
   }
+}
+
+const parseRatioEntry = (
+  value: unknown,
+  context: { readonly source: string; readonly path: string },
+): CompiledRatioEntry => {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return {
+      kind: "weight",
+      weight: value,
+    }
+  }
+
+  if (typeof value === "string") {
+    const match = value.match(FIXED_RATIO_PATTERN)
+    if (match?.[1] !== undefined) {
+      const parsed = Number(match[1])
+      if (Number.isInteger(parsed) && parsed > 0) {
+        return {
+          kind: "fixed-cells",
+          cells: parsed,
+        }
+      }
+    }
+  }
+
+  throw compileError("RATIO_INVALID_VALUE", {
+    source: context.source,
+    message: 'ratio value must be a positive number or "<positive-integer>c"',
+    path: context.path,
+    details: { value },
+  })
 }
 
 const parseTerminalPane = (node: Record<string, unknown>): CompiledTerminalPane => {
@@ -365,10 +418,22 @@ const convertLayoutIssueToCompileError = ({
     })
   }
 
+  if (issue.message.includes("ratio must include at least one numeric weight")) {
+    const ratio = isRecord(layout) ? layout.ratio : undefined
+    return compileError("RATIO_WEIGHT_MISSING", {
+      source,
+      message: "ratio must include at least one numeric weight",
+      path: `${basePath}.ratio`,
+      details: {
+        ratio,
+      },
+    })
+  }
+
   if (issue.path.includes("ratio")) {
     return compileError("RATIO_INVALID_VALUE", {
       source,
-      message: "ratio value must be a positive number",
+      message: 'ratio value must be a positive number or "<positive-integer>c"',
       path: formatPath(basePath, issue.path),
       details: {
         value: getValueAtPath(layout, issue.path),

@@ -10,7 +10,7 @@ presets:
     description: "Development environment (Editor + Server + Logs)"
     layout:
       type: horizontal
-      ratio: [60, 40]
+      ratio: ["90c", 2]  # fixed left pane + weighted right pane
       panes:
         - command: nvim
           name: Editor

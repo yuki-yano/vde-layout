@@ -1,4 +1,10 @@
-import type { CompiledLayoutNode, CompiledPreset, CompiledSplitPane, CompiledTerminalPane } from "./compile"
+import type {
+  CompiledLayoutNode,
+  CompiledPreset,
+  CompiledRatioEntry,
+  CompiledSplitPane,
+  CompiledTerminalPane,
+} from "./compile"
 import { createCoreError, type CoreError } from "./errors"
 
 type CreateLayoutPlanInput = {
@@ -24,7 +30,7 @@ type PlanSplit = {
   readonly kind: "split"
   readonly id: string
   readonly orientation: "horizontal" | "vertical"
-  readonly ratio: ReadonlyArray<number>
+  readonly ratio: ReadonlyArray<CompiledRatioEntry>
   readonly panes: ReadonlyArray<PlanNode>
 }
 
@@ -118,7 +124,7 @@ const buildSplitNode = (
   node: CompiledSplitPane,
   context: { readonly parentId: string; readonly path: string; readonly source: string },
 ): BuildResult => {
-  const ratio = normalizeRatio(node.ratio, context)
+  const ratio = validateRatioEntries(node.ratio, context)
 
   const panes: PlanNode[] = []
   const focusPaneIds: string[] = []
@@ -190,27 +196,57 @@ const ensureFocus = (node: PlanNode, focusPaneId: string): PlanNode => {
   }
 }
 
-const normalizeRatio = (
-  ratio: ReadonlyArray<number>,
+const validateRatioEntries = (
+  ratio: ReadonlyArray<CompiledRatioEntry>,
   context: { readonly path: string; readonly source: string },
-): number[] => {
-  const total = ratio.reduce((sum, value, index) => {
-    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-      throw planError("RATIO_INVALID_VALUE", {
-        message: "ratio value must be a non-negative number",
-        path: `${context.path}.ratio[${index}]`,
-        source: context.source,
-        details: { value },
-      })
-    }
-    return sum + value
-  }, 0)
+): ReadonlyArray<CompiledRatioEntry> => {
+  let hasWeight = false
 
-  if (total === 0) {
-    return ratio.map(() => 1 / ratio.length)
+  for (let index = 0; index < ratio.length; index += 1) {
+    const value = ratio[index]
+    if (value?.kind === "weight") {
+      if (!Number.isFinite(value.weight) || value.weight <= 0) {
+        throw planError("RATIO_INVALID_VALUE", {
+          message: 'ratio value must be a positive number or "<positive-integer>c"',
+          path: `${context.path}.ratio[${index}]`,
+          source: context.source,
+          details: { value },
+        })
+      }
+      hasWeight = true
+      continue
+    }
+
+    if (value?.kind === "fixed-cells") {
+      if (!Number.isInteger(value.cells) || value.cells <= 0) {
+        throw planError("RATIO_INVALID_VALUE", {
+          message: 'ratio value must be a positive number or "<positive-integer>c"',
+          path: `${context.path}.ratio[${index}]`,
+          source: context.source,
+          details: { value },
+        })
+      }
+      continue
+    }
+
+    throw planError("RATIO_INVALID_VALUE", {
+      message: "ratio entry is invalid",
+      path: `${context.path}.ratio[${index}]`,
+      source: context.source,
+      details: { value },
+    })
   }
 
-  return ratio.map((value) => value / total)
+  if (!hasWeight) {
+    throw planError("RATIO_WEIGHT_MISSING", {
+      message: "ratio must include at least one numeric weight",
+      path: `${context.path}.ratio`,
+      source: context.source,
+      details: { ratio },
+    })
+  }
+
+  return ratio
 }
 
 const planError = (

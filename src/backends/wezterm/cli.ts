@@ -6,7 +6,7 @@ import { parseWeztermListResult, type WeztermListResult } from "./list-parser"
 export type { WeztermListResult } from "./list-parser"
 
 const WEZTERM_BINARY = "wezterm"
-const MINIMUM_VERSION = "20220624-141144-bd1b7c5d"
+export const WEZTERM_MINIMUM_VERSION = "20220624-141144-bd1b7c5d"
 const VERSION_REGEX = /(\d{8})-(\d{6})-([0-9a-fA-F]+)/i
 
 type ExecaLikeError = Error & {
@@ -39,14 +39,14 @@ export const verifyWeztermAvailability = async (): Promise<{ version: string }> 
   const detectedVersion = extractVersion(stdout)
   if (detectedVersion === undefined) {
     throw createEnvironmentError("Unable to determine wezterm version", ErrorCodes.UNSUPPORTED_WEZTERM_VERSION, {
-      requiredVersion: MINIMUM_VERSION,
+      requiredVersion: WEZTERM_MINIMUM_VERSION,
       detectedVersion: stdout.trim(),
     })
   }
 
-  if (!isVersionSupported(detectedVersion, MINIMUM_VERSION)) {
+  if (!isVersionSupported(detectedVersion, WEZTERM_MINIMUM_VERSION)) {
     throw createEnvironmentError("Unsupported wezterm version", ErrorCodes.UNSUPPORTED_WEZTERM_VERSION, {
-      requiredVersion: MINIMUM_VERSION,
+      requiredVersion: WEZTERM_MINIMUM_VERSION,
       detectedVersion,
     })
   }

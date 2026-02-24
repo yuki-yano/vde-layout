@@ -1,6 +1,6 @@
 import type { PlanEmission } from "../../core/emitter"
-import { createCoreError } from "../../core/errors"
-import { resolveSplitOrientation, resolveSplitPercentage } from "../../executor/split-step"
+import { createCoreError, isCoreError } from "../../core/errors"
+import { resolveSplitOrientation, resolveSplitSize, type ResolvedSplitSize } from "../../executor/split-step"
 import { resolveRequiredStepTargetPaneId } from "../../executor/step-target"
 import { prepareTerminalCommands } from "../../executor/terminal-command-preparation"
 import type { DryRunStep } from "../../executor/terminal-backend"
@@ -9,29 +9,71 @@ import { ErrorCodes } from "../../utils/errors"
 const SINGLE_QUOTE = "'"
 const SHELL_SINGLE_QUOTE_ESCAPE = `'"'"'`
 
+type PaneDimensions = {
+  readonly cols: number
+  readonly rows: number
+}
+
+type SplitArgumentSize =
+  | ResolvedSplitSize
+  | {
+      readonly mode: "cells-placeholder"
+      readonly cellsPlaceholder: string
+    }
+
+export type BuildWeztermDryRunStepsOptions = {
+  readonly initialPaneId?: string
+  readonly initialPaneSize?: PaneDimensions
+  readonly detectedVersion?: string
+}
+
 export const buildSplitArguments = (params: {
   readonly targetPaneId: string
-  readonly percent: string
+  readonly splitSize: SplitArgumentSize
   readonly horizontal: boolean
 }): string[] => {
   const directionFlag = params.horizontal ? "--right" : "--bottom"
-  return ["split-pane", directionFlag, "--percent", params.percent, "--pane-id", params.targetPaneId]
+  if (params.splitSize.mode === "percent") {
+    return ["split-pane", directionFlag, "--percent", params.splitSize.percentage, "--pane-id", params.targetPaneId]
+  }
+
+  if (params.splitSize.mode === "cells") {
+    return ["split-pane", directionFlag, "--cells", params.splitSize.cells, "--pane-id", params.targetPaneId]
+  }
+
+  return ["split-pane", directionFlag, "--cells", params.splitSize.cellsPlaceholder, "--pane-id", params.targetPaneId]
 }
 
-export const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
+export const buildDryRunSteps = (
+  emission: PlanEmission,
+  options: BuildWeztermDryRunStepsOptions = {},
+): DryRunStep[] => {
   const steps: DryRunStep[] = []
+  const paneSizes = new Map<string, PaneDimensions>()
+  if (options.initialPaneId !== undefined && options.initialPaneSize !== undefined) {
+    paneSizes.set(options.initialPaneId, options.initialPaneSize)
+  }
 
   for (const step of emission.steps) {
     if (step.kind === "split") {
       const target = resolveRequiredStepTargetPaneId(step)
+      const horizontal = resolveSplitOrientation(step) === "horizontal"
+      const splitSize = resolveDryRunSplitSize({
+        step,
+        targetPaneId: target,
+        paneSizes,
+        orientation: horizontal ? "horizontal" : "vertical",
+        detectedVersion: options.detectedVersion,
+      })
       const args = buildSplitArguments({
         targetPaneId: target,
-        percent: resolveSplitPercentage(step),
-        horizontal: resolveSplitOrientation(step) === "horizontal",
+        splitSize,
+        horizontal,
       })
+      const summary = step.splitSizing?.mode === "dynamic-cells" ? `${step.summary} [dynamic-cells]` : step.summary
       steps.push({
         backend: "wezterm",
-        summary: step.summary,
+        summary,
         command: `wezterm cli ${args.join(" ")}`,
       })
       continue
@@ -104,4 +146,115 @@ export const buildDryRunSteps = (emission: PlanEmission): DryRunStep[] => {
   }
 
   return steps
+}
+
+const resolveDryRunSplitSize = ({
+  step,
+  targetPaneId,
+  paneSizes,
+  orientation,
+  detectedVersion,
+}: {
+  readonly step: PlanEmission["steps"][number]
+  readonly targetPaneId: string
+  readonly paneSizes: Map<string, PaneDimensions>
+  readonly orientation: "horizontal" | "vertical"
+  readonly detectedVersion?: string
+}): SplitArgumentSize => {
+  if (step.kind !== "split") {
+    throw createCoreError("execution", {
+      code: ErrorCodes.INVALID_PLAN,
+      message: "Dry-run split sizing requested for non-split step",
+      path: step.id,
+    })
+  }
+
+  if (step.splitSizing?.mode === "dynamic-cells") {
+    const paneSize = paneSizes.get(targetPaneId)
+    const paneCells = paneSize ? (orientation === "horizontal" ? paneSize.cols : paneSize.rows) : undefined
+
+    if (typeof paneCells !== "number") {
+      return {
+        mode: "cells-placeholder",
+        cellsPlaceholder: "<dynamic>",
+      }
+    }
+
+    try {
+      const splitSize = resolveSplitSize(step, {
+        paneCells,
+        paneId: targetPaneId,
+        detectedVersion,
+        rawPaneRecord: {
+          backend: "wezterm",
+          paneId: targetPaneId,
+          sourceFormat: "unknown",
+          size: paneSize,
+        },
+      })
+
+      if (splitSize.mode === "cells" && typeof step.createdPaneId === "string" && step.createdPaneId.length > 0) {
+        updatePaneSizes({
+          paneSizes,
+          targetPaneId,
+          createdPaneId: step.createdPaneId,
+          orientation,
+          targetCells: splitSize.targetCells,
+          createdCells: splitSize.createdCells,
+        })
+      }
+
+      if (splitSize.mode === "cells") {
+        return splitSize
+      }
+    } catch (error) {
+      if (isCoreError(error) && error.code === ErrorCodes.SPLIT_SIZE_RESOLUTION_FAILED) {
+        return {
+          mode: "cells-placeholder",
+          cellsPlaceholder: "<dynamic>",
+        }
+      }
+      throw error
+    }
+
+    return {
+      mode: "cells-placeholder",
+      cellsPlaceholder: "<dynamic>",
+    }
+  }
+
+  return resolveSplitSize(step, {
+    paneId: targetPaneId,
+    detectedVersion,
+  })
+}
+
+const updatePaneSizes = ({
+  paneSizes,
+  targetPaneId,
+  createdPaneId,
+  orientation,
+  targetCells,
+  createdCells,
+}: {
+  readonly paneSizes: Map<string, PaneDimensions>
+  readonly targetPaneId: string
+  readonly createdPaneId: string
+  readonly orientation: "horizontal" | "vertical"
+  readonly targetCells: number
+  readonly createdCells: number
+}): void => {
+  const base = paneSizes.get(targetPaneId)
+  if (base === undefined) {
+    return
+  }
+
+  if (orientation === "horizontal") {
+    paneSizes.set(targetPaneId, { cols: targetCells, rows: base.rows })
+    paneSizes.set(createdPaneId, { cols: createdCells, rows: base.rows })
+    return
+  }
+
+  paneSizes.set(targetPaneId, { cols: base.cols, rows: targetCells })
+  paneSizes.set(createdPaneId, { cols: base.cols, rows: createdCells })
 }

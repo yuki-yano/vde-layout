@@ -20,6 +20,7 @@ vi.mock("../backends/wezterm/cli", () => ({
   listWeztermWindows: listMock,
   killWeztermPane: killMock,
   runWeztermCli: runMock,
+  WEZTERM_MINIMUM_VERSION: "20220624-141144-bd1b7c5d",
 }))
 
 const queueListResponses = (...responses: ReadonlyArray<WeztermListResult>): void => {
@@ -36,7 +37,7 @@ const makeList = (
   windows: ReadonlyArray<{
     windowId: string
     workspace?: string
-    panes: ReadonlyArray<{ paneId: string; active?: boolean }>
+    panes: ReadonlyArray<{ paneId: string; active?: boolean; cols?: number; rows?: number }>
   }>,
 ): WeztermListResult => {
   return {
@@ -51,6 +52,30 @@ const makeList = (
           panes: window.panes.map((pane) => ({
             paneId: pane.paneId,
             isActive: pane.active === true,
+            ...(typeof pane.cols === "number" || typeof pane.rows === "number"
+              ? {
+                  size: {
+                    cols: pane.cols,
+                    rows: pane.rows,
+                  },
+                }
+              : {}),
+            rawPaneRecord: {
+              backend: "wezterm",
+              windowId: window.windowId,
+              tabId: `${window.windowId}-tab`,
+              paneId: pane.paneId,
+              isActive: pane.active === true,
+              ...(typeof pane.cols === "number" || typeof pane.rows === "number"
+                ? {
+                    size: {
+                      cols: pane.cols,
+                      rows: pane.rows,
+                    },
+                  }
+                : {}),
+              sourceFormat: "wezterm-array",
+            },
           })),
         },
       ],
@@ -144,6 +169,37 @@ describe("createWeztermBackend", () => {
       backend: "wezterm",
       summary: "split root",
       command: "wezterm cli split-pane --bottom --percent 35 --pane-id root",
+    })
+  })
+
+  it("uses <dynamic> placeholder in dry-run when dynamic-cells cannot be resolved", () => {
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      steps: [
+        {
+          id: "root:split:1",
+          kind: "split",
+          summary: "split root",
+          targetPaneId: "root",
+          createdPaneId: "root.1",
+          orientation: "horizontal",
+          splitSizing: {
+            mode: "dynamic-cells",
+            target: { kind: "fixed-cells", cells: 80 },
+            remainingFixedCells: 0,
+            remainingWeight: 1,
+            remainingWeightPaneCount: 1,
+          },
+        },
+      ],
+      summary: { stepsCount: 1, focusPaneId: "root", initialPaneId: "root" },
+    }
+
+    expect(backend.getDryRunSteps(emission)[0]).toEqual({
+      backend: "wezterm",
+      summary: "split root [dynamic-cells]",
+      command: "wezterm cli split-pane --right --cells <dynamic> --pane-id root",
     })
   })
 
@@ -819,6 +875,63 @@ describe("createWeztermBackend", () => {
     )
     expect(result.executedSteps).toBe(2)
     expect(result.focusPaneId).toBe("101")
+  })
+
+  it("executes dynamic-cells split steps with --cells", async () => {
+    queueListResponses(
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true, cols: 200, rows: 60 }] }]),
+      makeList([{ windowId: "w1", panes: [{ paneId: "10", active: true, cols: 200, rows: 60 }, { paneId: "100" }] }]),
+      makeList([
+        {
+          windowId: "w1",
+          panes: [
+            { paneId: "10", active: true, cols: 200, rows: 60 },
+            { paneId: "100", cols: 200, rows: 60 },
+          ],
+        },
+      ]),
+      makeList([
+        {
+          windowId: "w1",
+          panes: [{ paneId: "10", active: false, cols: 80, rows: 60 }, { paneId: "100" }, { paneId: "101" }],
+        },
+      ]),
+    )
+    runMock.mockResolvedValueOnce("100 w1\n")
+    runMock.mockResolvedValue("ok")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      steps: [
+        {
+          id: "root:split:1",
+          kind: "split",
+          summary: "split root",
+          targetPaneId: "root",
+          createdPaneId: "root.1",
+          orientation: "horizontal",
+          splitSizing: {
+            mode: "dynamic-cells",
+            target: { kind: "fixed-cells", cells: 80 },
+            remainingFixedCells: 0,
+            remainingWeight: 1,
+            remainingWeightPaneCount: 1,
+          },
+        },
+      ],
+      summary: { stepsCount: 1, focusPaneId: "root", initialPaneId: "root" },
+      terminals: [],
+      hash: "hash",
+    }
+
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(runMock).toHaveBeenNthCalledWith(
+      2,
+      ["split-pane", "--right", "--cells", "120", "--pane-id", "100"],
+      expect.objectContaining({ message: expect.stringContaining("split step") }),
+    )
+    expect(result.executedSteps).toBe(1)
   })
 
   it("applies terminal commands for cwd, env and command execution", async () => {

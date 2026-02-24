@@ -25,6 +25,7 @@ export const ErrorCodes = {
   WEZTERM_NOT_FOUND: "WEZTERM_NOT_FOUND",
   UNSUPPORTED_WEZTERM_VERSION: "UNSUPPORTED_WEZTERM_VERSION",
   USER_CANCELLED: "USER_CANCELLED",
+  SPLIT_SIZE_RESOLUTION_FAILED: "SPLIT_SIZE_RESOLUTION_FAILED",
 } as const
 
 const createBaseError = (
@@ -160,6 +161,26 @@ const formatters: Record<string, (error: VDELayoutError) => string> = {
     }
     if (requiredVersion) {
       lines.push(`Required version: ${requiredVersion} or higher`)
+    }
+    return lines.join("\n")
+  },
+  [ErrorCodes.SPLIT_SIZE_RESOLUTION_FAILED]: (error) => {
+    const paneId = typeof error.details.paneId === "string" ? error.details.paneId : ""
+    const paneCells = typeof error.details.paneCells === "number" ? String(error.details.paneCells) : ""
+    const detected = typeof error.details.detectedVersion === "string" ? error.details.detectedVersion : ""
+    const required = typeof error.details.requiredVersion === "string" ? error.details.requiredVersion : ""
+    const lines = ["", "Unable to resolve split size from pane dimensions."]
+    if (paneId) {
+      lines.push(`Pane ID: ${paneId}`)
+    }
+    if (paneCells) {
+      lines.push(`Pane cells: ${paneCells}`)
+    }
+    if (detected) {
+      lines.push(`Detected version: ${detected}`)
+    }
+    if (required) {
+      lines.push(`Required version: ${required}`)
     }
     return lines.join("\n")
   },

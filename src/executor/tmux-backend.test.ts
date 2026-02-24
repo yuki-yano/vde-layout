@@ -8,11 +8,12 @@ import { LogLevel } from "../utils/logger"
 import type { Logger } from "../utils/logger"
 import type { TmuxTerminalBackendContext } from "./terminal-backend"
 
-const { verifyEnvironmentMock, getExecutorMock, getCommandStringMock } = vi.hoisted(() => {
+const { verifyEnvironmentMock, getExecutorMock, getCommandStringMock, executeMock } = vi.hoisted(() => {
   return {
     verifyEnvironmentMock: vi.fn(),
     getExecutorMock: vi.fn(),
     getCommandStringMock: vi.fn((args: string[]) => `tmux ${args.join(" ")}`),
+    executeMock: vi.fn(),
   }
 })
 
@@ -26,6 +27,7 @@ vi.mock("../backends/tmux/executor.ts", () => {
       verifyTmuxEnvironment: verifyEnvironmentMock,
       getExecutor: getExecutorMock,
       getCommandString: getCommandStringMock,
+      execute: executeMock,
     })),
   }
 })
@@ -92,7 +94,9 @@ describe("createTmuxBackend", () => {
     getExecutorMock.mockReset()
     executePlanMock.mockReset()
     getCommandStringMock.mockReset()
+    executeMock.mockReset()
     getCommandStringMock.mockImplementation((args: string[]) => `tmux ${args.join(" ")}`)
+    executeMock.mockResolvedValue("tmux 3.4")
   })
 
   const createContext = (overrides: Partial<TmuxTerminalBackendContext> = {}): TmuxTerminalBackendContext => ({
@@ -134,6 +138,7 @@ describe("createTmuxBackend", () => {
       windowMode: "new-window",
       windowName: "test",
       onConfirmKill: undefined,
+      detectedVersion: undefined,
     })
     expect(result.executedSteps).toBe(2)
   })
@@ -149,6 +154,60 @@ describe("createTmuxBackend", () => {
       summary: "split",
       command: "tmux split-window -h -t root -p 50",
     })
+  })
+
+  it("falls back to <dynamic> in dry-run when dynamic-cells cannot be resolved", () => {
+    const originalTMUX = process.env.TMUX
+    const originalTMUXPane = process.env.TMUX_PANE
+    delete process.env.TMUX
+    delete process.env.TMUX_PANE
+
+    try {
+      const baseEmission = createEmission()
+      const [splitStep, focusStep] = baseEmission.steps
+      if (splitStep === undefined || focusStep === undefined) {
+        throw new Error("expected split and focus steps")
+      }
+
+      const emission: PlanEmission = {
+        ...baseEmission,
+        steps: [
+          {
+            ...splitStep,
+            splitSizing: {
+              mode: "dynamic-cells",
+              target: { kind: "fixed-cells", cells: 80 },
+              remainingFixedCells: 0,
+              remainingWeight: 1,
+              remainingWeightPaneCount: 1,
+            },
+            percentage: undefined,
+          },
+          focusStep,
+        ],
+      }
+
+      const backend = createTmuxBackend(createContext())
+      const steps = backend.getDryRunSteps(emission)
+
+      expect(steps[0]).toEqual({
+        backend: "tmux",
+        summary: "split",
+        command: "tmux split-window -h -t root -l <dynamic>",
+      })
+    } finally {
+      if (originalTMUX === undefined) {
+        delete process.env.TMUX
+      } else {
+        process.env.TMUX = originalTMUX
+      }
+
+      if (originalTMUXPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalTMUXPane
+      }
+    }
   })
 
   it("throws MISSING_TARGET when dry-run split step omits target metadata", () => {

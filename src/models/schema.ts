@@ -22,6 +22,17 @@ const SelectorDefaultsSchema = z
   })
   .strict()
 
+const RatioValueSchema = z.union([
+  z.number().positive(),
+  z.string().regex(/^[1-9][0-9]*c$/, {
+    message: 'ratio value must be a positive number or "<positive-integer>c"',
+  }),
+])
+
+const hasNumericWeight = (ratio: ReadonlyArray<number | string>): boolean => {
+  return ratio.some((value) => typeof value === "number")
+}
+
 // Terminal pane schema
 const TerminalPaneSchema = z
   .object({
@@ -42,12 +53,15 @@ const SplitPaneSchema: z.ZodType<unknown> = z.lazy(() =>
   z
     .object({
       type: z.enum(["horizontal", "vertical"]),
-      ratio: z.array(z.number().positive()).min(1),
+      ratio: z.array(RatioValueSchema).min(1),
       panes: z.array(PaneSchema).min(1),
     })
     .strict()
     .refine((data) => data.ratio.length === data.panes.length, {
       message: "Number of elements in ratio array does not match number of elements in panes array",
+    })
+    .refine((data) => hasNumericWeight(data.ratio), {
+      message: "ratio must include at least one numeric weight",
     }),
 )
 
@@ -58,11 +72,14 @@ export const PaneSchema: z.ZodType<unknown> = z.lazy(() => z.union([SplitPaneSch
 export const LayoutSchema = z
   .object({
     type: z.enum(["horizontal", "vertical"]),
-    ratio: z.array(z.number().positive()).min(1),
+    ratio: z.array(RatioValueSchema).min(1),
     panes: z.array(PaneSchema).min(1),
   })
   .refine((data) => data.ratio.length === data.panes.length, {
     message: "Number of elements in ratio array does not match number of elements in panes array",
+  })
+  .refine((data) => hasNumericWeight(data.ratio), {
+    message: "ratio must include at least one numeric weight",
   })
 
 // Preset schema definition

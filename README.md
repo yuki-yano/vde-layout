@@ -4,7 +4,7 @@ vde-layout is a CLI that reproduces terminal layouts (tmux or WezTerm) from YAML
 
 ## Key Capabilities
 - Keep reusable presets for development, monitoring, reviews, and more.
-- Build nested horizontal/vertical splits with ratio-based sizing.
+- Build nested horizontal/vertical splits with ratio-based sizing and fixed-cell panes.
 - Launch commands in each pane with custom working directories, environment variables, delays, and titles.
 - Preview every tmux step in dry-run mode before you apply a preset.
 - Target tmux or WezTerm backends with the same preset definitions.
@@ -39,13 +39,13 @@ pnpm run ci
        description: Editor, server, and logs
        layout:
          type: horizontal
-         ratio: [3, 2]
+         ratio: ["90c", 2]
          panes:
            - name: editor
              command: nvim
              focus: true
            - type: vertical
-             ratio: [7, 3]
+             ratio: [2, 1]
              panes:
                - name: server
                  command: npm run dev
@@ -139,7 +139,7 @@ defaults:
 ```yaml
 layout:
   type: horizontal | vertical   # required
-  ratio: [3, 2]                 # required; positive numbers, auto-normalized
+  ratio: ["90c", 2, 1]          # required; number weight or "<positive-integer>c"
   panes:                        # required
     - name: "left"              # required for terminal panes
       command: "npm run start"  # optional
@@ -223,11 +223,21 @@ panes:
     ephemeral: true  # Run once and close
 ```
 
-### Ratio Normalization
-Ratios can be any set of positive integers. vde-layout normalizes them to percentages:
-- `[1, 1]` -> `[50, 50]`
-- `[2, 3]` -> `[40, 60]`
-- `[1, 2, 1]` -> `[25, 50, 25]`
+### Ratio and Fixed Cells
+- `ratio` supports `number` (weight) and `"<positive-integer>c"` (fixed cells).
+- Fixed-cell entries are reserved first, then the remaining cells are distributed by numeric weights.
+- Each split must include at least one numeric weight.
+- `ratio.length` must match `panes.length`.
+
+Examples:
+- `[1, 1]` -> equal split
+- `["90c", 2, 1]` -> first pane fixed to 90 cells, remaining cells split as 2:1
+- `[1, "40c", 1]` -> middle pane fixed to 40 cells, sides split equally from the remaining cells
+
+Constraints:
+- `["90c", "40c"]` is invalid (no numeric weight)
+- `0c`, `1.5c`, `"90"` are invalid
+- If runtime pane size is too small to satisfy fixed cells plus minimum remaining panes, execution fails with `SPLIT_SIZE_RESOLUTION_FAILED`
 
 ### Single Command Presets
 If you omit `layout`, the preset runs a single command in one pane (or opens the default shell when `command` is omitted):

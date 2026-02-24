@@ -42,6 +42,14 @@ export const createMockExecutor = (): MockExecutor => {
       return "%0"
     }
 
+    if (args.includes("display-message") && args.includes("#{pane_width}")) {
+      return "200"
+    }
+
+    if (args.includes("display-message") && args.includes("#{pane_height}")) {
+      return "60"
+    }
+
     if (args.includes("display-message") && args.includes("#{pane_id}")) {
       return mockPaneIds[0] ?? "%0"
     }

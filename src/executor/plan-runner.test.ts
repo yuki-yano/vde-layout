@@ -138,6 +138,37 @@ describe("executePlan", () => {
     })
   })
 
+  it("uses -l with resolved cells for dynamic-cells split sizing", async () => {
+    const executor = createMockExecutor()
+    const emission: PlanEmission = {
+      ...baseEmission,
+      steps: [
+        {
+          ...baseSplitStep,
+          orientation: "horizontal",
+          splitSizing: {
+            mode: "dynamic-cells",
+            target: { kind: "fixed-cells", cells: 90 },
+            remainingFixedCells: 0,
+            remainingWeight: 1,
+            remainingWeightPaneCount: 1,
+          },
+          percentage: undefined,
+        },
+        baseFocusStep,
+      ],
+    }
+
+    await executePlan({ emission, executor, windowMode: "new-window" })
+
+    expect(executor.getExecutedCommands()).toEqual(
+      expect.arrayContaining([
+        ["display-message", "-p", "-t", "%0", "#{pane_width}"],
+        ["split-window", "-h", "-t", "%0", "-l", "110"],
+      ]),
+    )
+  })
+
   it("reuses current window and closes other panes when current-window mode is selected", async () => {
     const executor = createMockExecutor()
     executor.setMockPaneIds(["%2", "%3"])

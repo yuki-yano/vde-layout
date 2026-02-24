@@ -1,6 +1,6 @@
 import type { CommandStep, EmittedTerminal } from "../../core/emitter"
 import { createCoreError } from "../../core/errors"
-import { resolveSplitOrientation, resolveSplitPercentage } from "../../executor/split-step"
+import { resolveSplitOrientation, resolveSplitSize } from "../../executor/split-step"
 import { prepareTerminalCommands } from "../../executor/terminal-command-preparation"
 import { waitForDelay } from "../../utils/async"
 import { ErrorCodes } from "../../utils/errors"
@@ -8,6 +8,7 @@ import { buildSplitArguments } from "./dry-run"
 import { collectPaneIdsForWindow } from "./layout-resolution"
 import { registerPaneWithAncestors, resolveRealPaneId } from "./pane-map"
 import type { ExecuteWeztermCommand, ListWeztermWindows, LogPaneMapping, PaneMap } from "./shared"
+import { WEZTERM_MINIMUM_VERSION, type WeztermListResult } from "./cli"
 
 const findNewPaneId = (before: Set<string>, after: Set<string>): string | undefined => {
   for (const paneId of after) {
@@ -69,6 +70,7 @@ export const applySplitStep = async ({
   runCommand,
   listWindows,
   logPaneMapping,
+  detectedVersion,
 }: {
   readonly step: CommandStep
   readonly paneMap: PaneMap
@@ -76,6 +78,7 @@ export const applySplitStep = async ({
   readonly runCommand: ExecuteWeztermCommand
   readonly listWindows: ListWeztermWindows
   readonly logPaneMapping: LogPaneMapping
+  readonly detectedVersion?: string
 }): Promise<void> => {
   const targetVirtualId = step.targetPaneId
   if (typeof targetVirtualId !== "string" || targetVirtualId.length === 0) {
@@ -90,11 +93,21 @@ export const applySplitStep = async ({
 
   const beforeList = await listWindows()
   const beforePaneIds = collectPaneIdsForWindow(beforeList, windowId)
+  const orientation = resolveSplitOrientation(step)
+  const targetPane = findPaneById(beforeList, targetRealId)
+  const paneCells = resolvePaneCellsForOrientation(targetPane?.size, orientation)
+  const splitSize = resolveSplitSize(step, {
+    paneCells,
+    paneId: targetRealId,
+    requiredVersion: WEZTERM_MINIMUM_VERSION,
+    detectedVersion,
+    rawPaneRecord: targetPane?.rawPaneRecord,
+  })
 
   const args = buildSplitArguments({
     targetPaneId: targetRealId,
-    percent: resolveSplitPercentage(step),
-    horizontal: resolveSplitOrientation(step) === "horizontal",
+    splitSize,
+    horizontal: orientation === "horizontal",
   })
 
   await runCommand(args, {
@@ -118,6 +131,40 @@ export const applySplitStep = async ({
     registerPaneWithAncestors(paneMap, step.createdPaneId, newPaneId)
     logPaneMapping(step.createdPaneId, newPaneId)
   }
+}
+
+const findPaneById = (
+  list: WeztermListResult,
+  paneId: string,
+):
+  | {
+      readonly size?: { readonly cols?: number; readonly rows?: number }
+      readonly rawPaneRecord?: Record<string, unknown>
+    }
+  | undefined => {
+  for (const window of list.windows) {
+    for (const tab of window.tabs) {
+      for (const pane of tab.panes) {
+        if (pane.paneId === paneId) {
+          return {
+            size: pane.size,
+            rawPaneRecord: pane.rawPaneRecord,
+          }
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+const resolvePaneCellsForOrientation = (
+  size: { readonly cols?: number; readonly rows?: number } | undefined,
+  orientation: "horizontal" | "vertical",
+): number | undefined => {
+  if (orientation === "horizontal") {
+    return size?.cols
+  }
+  return size?.rows
 }
 
 export const applyTerminalCommands = async ({
