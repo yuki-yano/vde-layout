@@ -1,3 +1,4 @@
+import { type PaneDimensions, updatePaneSizes } from "../pane-tracking"
 import type { PlanEmission } from "../../core/emitter"
 import { createCoreError, isCoreError } from "../../core/errors"
 import { resolveSplitOrientation, resolveSplitSize, type ResolvedSplitSize } from "../../executor/split-step"
@@ -5,14 +6,8 @@ import { resolveRequiredStepTargetPaneId } from "../../executor/step-target"
 import { prepareTerminalCommands } from "../../executor/terminal-command-preparation"
 import type { DryRunStep } from "../../executor/terminal-backend"
 import { ErrorCodes } from "../../utils/errors"
-
 const SINGLE_QUOTE = "'"
 const SHELL_SINGLE_QUOTE_ESCAPE = `'"'"'`
-
-type PaneDimensions = {
-  readonly cols: number
-  readonly rows: number
-}
 
 type SplitArgumentSize =
   | ResolvedSplitSize
@@ -227,34 +222,4 @@ const resolveDryRunSplitSize = ({
     paneId: targetPaneId,
     detectedVersion,
   })
-}
-
-const updatePaneSizes = ({
-  paneSizes,
-  targetPaneId,
-  createdPaneId,
-  orientation,
-  targetCells,
-  createdCells,
-}: {
-  readonly paneSizes: Map<string, PaneDimensions>
-  readonly targetPaneId: string
-  readonly createdPaneId: string
-  readonly orientation: "horizontal" | "vertical"
-  readonly targetCells: number
-  readonly createdCells: number
-}): void => {
-  const base = paneSizes.get(targetPaneId)
-  if (base === undefined) {
-    return
-  }
-
-  if (orientation === "horizontal") {
-    paneSizes.set(targetPaneId, { cols: targetCells, rows: base.rows })
-    paneSizes.set(createdPaneId, { cols: createdCells, rows: base.rows })
-    return
-  }
-
-  paneSizes.set(targetPaneId, { cols: base.cols, rows: targetCells })
-  paneSizes.set(createdPaneId, { cols: base.cols, rows: createdCells })
 }

@@ -6,6 +6,7 @@ import { waitForDelay } from "../../utils/async"
 import { ErrorCodes } from "../../utils/errors"
 import { buildSplitArguments } from "./dry-run"
 import { collectPaneIdsForWindow } from "./layout-resolution"
+import type { WeztermPaneSize, WeztermRawPaneRecord } from "./list-parser"
 import { registerPaneWithAncestors, resolveRealPaneId } from "./pane-map"
 import type { ExecuteWeztermCommand, ListWeztermWindows, LogPaneMapping, PaneMap } from "./shared"
 import { WEZTERM_MINIMUM_VERSION, type WeztermListResult } from "./cli"
@@ -138,8 +139,8 @@ const findPaneById = (
   paneId: string,
 ):
   | {
-      readonly size?: { readonly cols?: number; readonly rows?: number }
-      readonly rawPaneRecord?: Record<string, unknown>
+      readonly size?: WeztermPaneSize
+      readonly rawPaneRecord?: WeztermRawPaneRecord
     }
   | undefined => {
   for (const window of list.windows) {

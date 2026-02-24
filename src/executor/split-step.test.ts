@@ -48,6 +48,27 @@ describe("split-step resolvers", () => {
     )
   })
 
+  it("throws INVALID_PLAN when resolving percentage for dynamic-cells sizing", () => {
+    expect(() =>
+      resolveSplitPercentage(
+        splitStep({
+          splitSizing: {
+            mode: "dynamic-cells",
+            target: { kind: "weight", weight: 1 },
+            remainingFixedCells: 0,
+            remainingWeight: 1,
+            remainingWeightPaneCount: 1,
+          },
+        }),
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        code: ErrorCodes.INVALID_PLAN,
+        path: "root:split:1",
+      }),
+    )
+  })
+
   it("resolves dynamic split size using pane cells", () => {
     const resolved = resolveSplitSize(
       splitStep({

@@ -288,9 +288,16 @@ const buildSplitCommand = async ({
   readonly executor: CommandExecutor
   readonly detectedVersion?: string
 }): Promise<string[]> => {
-  const directionFlag = resolveSplitOrientation(step) === "horizontal" ? "-h" : "-v"
+  const orientation = resolveSplitOrientation(step)
+  const directionFlag = orientation === "horizontal" ? "-h" : "-v"
   if (isDynamicSplit(step)) {
-    const paneCells = await resolveTmuxPaneCells({ executor, step, targetRealId, detectedVersion })
+    const paneCells = await resolveTmuxPaneCells({
+      executor,
+      step,
+      targetRealId,
+      orientation,
+      detectedVersion,
+    })
     const splitSize = resolveSplitSize(step, {
       paneCells,
       paneId: targetRealId,
@@ -346,14 +353,15 @@ const resolveTmuxPaneCells = async ({
   executor,
   step,
   targetRealId,
+  orientation,
   detectedVersion,
 }: {
   readonly executor: CommandExecutor
   readonly step: CommandStep
   readonly targetRealId: string
+  readonly orientation: "horizontal" | "vertical"
   readonly detectedVersion?: string
 }): Promise<number> => {
-  const orientation = resolveSplitOrientation(step)
   const format = orientation === "horizontal" ? "#{pane_width}" : "#{pane_height}"
   const output = await executeCommand(executor, ["display-message", "-p", "-t", targetRealId, format], {
     code: ErrorCodes.TMUX_COMMAND_FAILED,

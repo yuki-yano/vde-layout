@@ -240,6 +240,28 @@ const createArrayRawPaneRecord = (entry: NormalizedArrayEntry): WeztermRawPaneRe
   }
 }
 
+const createObjectRawPaneRecord = ({
+  rawPane,
+  context,
+  paneId,
+  size,
+}: {
+  readonly rawPane: RawListPane
+  readonly context: { readonly windowId: string; readonly tabId: string }
+  readonly paneId: string
+  readonly size?: WeztermPaneSize
+}): WeztermRawPaneRecord => {
+  return {
+    backend: "wezterm",
+    windowId: context.windowId,
+    tabId: context.tabId,
+    paneId,
+    isActive: rawPane.is_active === true,
+    size,
+    sourceFormat: "wezterm-object",
+  }
+}
+
 const parseArrayResponse = (parsed: unknown): WeztermListResult | undefined => {
   if (!Array.isArray(parsed)) {
     return undefined
@@ -286,15 +308,12 @@ const parseObjectPane = (
     paneId: paneIdRaw,
     isActive: rawPane.is_active === true,
     ...(size !== undefined ? { size } : {}),
-    rawPaneRecord: {
-      backend: "wezterm",
-      windowId: context.windowId,
-      tabId: context.tabId,
+    rawPaneRecord: createObjectRawPaneRecord({
+      rawPane,
+      context,
       paneId: paneIdRaw,
-      isActive: rawPane.is_active === true,
       size,
-      sourceFormat: "wezterm-object",
-    },
+    }),
   }
 }
 

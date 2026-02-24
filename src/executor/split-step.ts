@@ -25,7 +25,7 @@ export type ResolvedSplitSize =
       readonly createdCells: number
     }
 
-const asSplitStep = (step: CommandStep, field: "orientation" | "percentage"): SplitCommandStep => {
+const asSplitStep = (step: CommandStep, field: "orientation" | "percentage" | "sizing"): SplitCommandStep => {
   if (step.kind !== "split") {
     throw createCoreError("execution", {
       code: ErrorCodes.INVALID_PLAN,
@@ -70,7 +70,7 @@ const resolveSplitSizingMetadata = (step: SplitCommandStep): SplitSizing | undef
 }
 
 export const resolveSplitSize = (step: CommandStep, context: SplitSizeResolutionContext = {}): ResolvedSplitSize => {
-  const splitStep = asSplitStep(step, "percentage")
+  const splitStep = asSplitStep(step, "sizing")
   const splitSizing = resolveSplitSizingMetadata(splitStep)
 
   if (splitSizing === undefined) {
@@ -130,6 +130,7 @@ export const resolveSplitSize = (step: CommandStep, context: SplitSizeResolution
   }
 
   const minTargetCells = target.kind === "fixed-cells" ? target.cells : 1
+  // Together with minTargetCells, minCreatedCells reserves remainingFixedCells + remainingWeightPaneCount.
   const minCreatedCells = remainingFixedCells + remainingWeightPaneCount
 
   if (
@@ -207,12 +208,22 @@ export const resolveSplitSize = (step: CommandStep, context: SplitSizeResolution
 }
 
 export const resolveSplitPercentage = (step: CommandStep): string => {
+  const splitStep = asSplitStep(step, "percentage")
+  const splitSizing = resolveSplitSizingMetadata(splitStep)
+  if (splitSizing?.mode === "dynamic-cells") {
+    throw createCoreError("execution", {
+      code: ErrorCodes.INVALID_PLAN,
+      message: "Split step uses dynamic sizing and has no percentage value",
+      path: splitStep.id,
+      details: { splitSizing: splitStep.splitSizing },
+    })
+  }
+
   const resolved = resolveSplitSize(step)
   if (resolved.mode === "percent") {
     return resolved.percentage
   }
 
-  const splitStep = asSplitStep(step, "percentage")
   throw createCoreError("execution", {
     code: ErrorCodes.INVALID_PLAN,
     message: "Split step uses dynamic sizing and has no percentage value",

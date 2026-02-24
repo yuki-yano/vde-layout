@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import type { PlanEmission } from "../../core/emitter"
 import { createCoreError } from "../../core/errors"
 import type {
@@ -8,6 +9,7 @@ import type {
   WeztermTerminalBackendContext,
 } from "../../executor/terminal-backend"
 import { ErrorCodes } from "../../utils/errors"
+import type { Logger } from "../../utils/logger"
 import { listWeztermWindows, runWeztermCli, verifyWeztermAvailability, type WeztermListResult } from "./cli"
 import { buildDryRunSteps } from "./dry-run"
 import { findWorkspaceForPane, resolveInitialPane } from "./layout-resolution"
@@ -15,7 +17,6 @@ import { parseWeztermListResult } from "./list-parser"
 import { registerPaneWithAncestors } from "./pane-map"
 import { applyFocusStep, applySplitStep, applyTerminalCommands } from "./step-execution"
 import type { ExecuteWeztermCommand, PaneMap } from "./shared"
-import { execFileSync } from "node:child_process"
 
 const ensureVirtualPaneId = (emission: PlanEmission): string => {
   const { initialPaneId } = emission.summary
@@ -159,7 +160,10 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
     getDryRunSteps: (emission: PlanEmission): DryRunStep[] => {
       const actualPaneId =
         typeof context.paneId === "string" && context.paneId.length > 0 ? context.paneId : process.env.WEZTERM_PANE
-      const initialPaneSize = resolveInitialWeztermPaneSize(actualPaneId)
+      const initialPaneSize = resolveInitialWeztermPaneSize({
+        paneId: actualPaneId,
+        logger: context.logger,
+      })
       return buildDryRunSteps(emission, {
         initialPaneId: emission.summary.initialPaneId,
         initialPaneSize,
@@ -169,9 +173,13 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
   }
 }
 
-const resolveInitialWeztermPaneSize = (
-  paneId: string | undefined,
-): { readonly cols: number; readonly rows: number } | undefined => {
+const resolveInitialWeztermPaneSize = ({
+  paneId,
+  logger,
+}: {
+  readonly paneId: string | undefined
+  readonly logger: Logger
+}): { readonly cols: number; readonly rows: number } | undefined => {
   if (typeof paneId !== "string" || paneId.length === 0) {
     return undefined
   }
@@ -183,6 +191,7 @@ const resolveInitialWeztermPaneSize = (
     })
     const parsed = parseWeztermListResult(stdout)
     if (parsed === undefined) {
+      logger.debug(`[wezterm] Failed to parse pane list while resolving initial pane size for pane ${paneId}`)
       return undefined
     }
     for (const window of parsed.windows) {
@@ -198,7 +207,9 @@ const resolveInitialWeztermPaneSize = (
       }
     }
     return undefined
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    logger.debug(`[wezterm] Failed to resolve initial pane size for pane ${paneId}: ${reason}`)
     return undefined
   }
 }

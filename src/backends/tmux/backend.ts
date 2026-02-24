@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process"
+import { type PaneDimensions, updatePaneSizes } from "../pane-tracking"
 import { createTmuxExecutor } from "./executor"
 import type { CommandStep, PlanEmission } from "../../core/emitter"
 import { isCoreError } from "../../core/errors"
@@ -15,11 +16,6 @@ import type {
 } from "../../executor/terminal-backend"
 import { ErrorCodes } from "../../utils/errors"
 
-type PaneDimensions = {
-  readonly cols: number
-  readonly rows: number
-}
-
 const TMUX_VERSION_REGEX = /^tmux\s+(.+)$/
 
 export const createTmuxBackend = (context: TmuxTerminalBackendContext): TerminalBackend => {
@@ -35,7 +31,7 @@ export const createTmuxBackend = (context: TmuxTerminalBackendContext): Terminal
     const paneSizes = new Map<string, PaneDimensions>()
     const initialPane = emission.summary.initialPaneId
     const initialPaneSize = resolveInitialTmuxPaneSize()
-    if (typeof initialPaneSize !== "undefined") {
+    if (initialPaneSize !== undefined) {
       paneSizes.set(initialPane, initialPaneSize)
     }
 
@@ -161,36 +157,6 @@ const buildTmuxCommand = ({
   throw createUnsupportedStepKindError(step)
 }
 
-const updatePaneSizes = ({
-  paneSizes,
-  targetPaneId,
-  createdPaneId,
-  orientation,
-  targetCells,
-  createdCells,
-}: {
-  readonly paneSizes: Map<string, PaneDimensions>
-  readonly targetPaneId: string
-  readonly createdPaneId: string
-  readonly orientation: "horizontal" | "vertical"
-  readonly targetCells: number
-  readonly createdCells: number
-}): void => {
-  const base = paneSizes.get(targetPaneId)
-  if (base === undefined) {
-    return
-  }
-
-  if (orientation === "horizontal") {
-    paneSizes.set(targetPaneId, { cols: targetCells, rows: base.rows })
-    paneSizes.set(createdPaneId, { cols: createdCells, rows: base.rows })
-    return
-  }
-
-  paneSizes.set(targetPaneId, { cols: base.cols, rows: targetCells })
-  paneSizes.set(createdPaneId, { cols: base.cols, rows: createdCells })
-}
-
 const detectTmuxVersion = async (tmuxExecutor: ReturnType<typeof createTmuxExecutor>): Promise<string | undefined> => {
   try {
     const raw = await tmuxExecutor.execute(["-V"])
@@ -214,14 +180,11 @@ const resolveInitialTmuxPaneSize = (): PaneDimensions | undefined => {
   }
 
   try {
-    const colsRaw = execFileSync("tmux", ["display-message", "-p", "-t", tmuxPane, "#{pane_width}"], {
+    const sizeOutput = execFileSync("tmux", ["display-message", "-p", "-t", tmuxPane, "#{pane_width} #{pane_height}"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim()
-    const rowsRaw = execFileSync("tmux", ["display-message", "-p", "-t", tmuxPane, "#{pane_height}"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim()
+    const [colsRaw = "", rowsRaw = ""] = sizeOutput.split(/\s+/, 2)
 
     const cols = Number.parseInt(colsRaw, 10)
     const rows = Number.parseInt(rowsRaw, 10)

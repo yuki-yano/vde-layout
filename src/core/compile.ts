@@ -1,6 +1,6 @@
 import { parse } from "yaml"
 import { z } from "zod"
-import { LayoutSchema } from "../models/schema"
+import { LayoutIssueParamCodes, LayoutSchema } from "../models/schema"
 import { createCoreError, type CoreError } from "./errors"
 
 export type CompilePresetInput = {
@@ -382,6 +382,8 @@ const convertLayoutIssueToCompileError = ({
   readonly basePath: string
   readonly layout: unknown
 }): CoreError => {
+  const issueParamCode = getIssueParamCode(issue)
+
   if (isMissingArrayIssue(issue, "panes")) {
     return compileError("LAYOUT_PANES_MISSING", {
       source,
@@ -409,7 +411,10 @@ const convertLayoutIssueToCompileError = ({
     })
   }
 
-  if (issue.message.includes("Number of elements in ratio array does not match number of elements in panes array")) {
+  if (
+    issueParamCode === LayoutIssueParamCodes.RATIO_LENGTH_MISMATCH ||
+    issue.message.includes("Number of elements in ratio array does not match number of elements in panes array")
+  ) {
     return compileError("LAYOUT_RATIO_MISMATCH", {
       source,
       message: "ratio and panes arrays must have the same length",
@@ -418,7 +423,10 @@ const convertLayoutIssueToCompileError = ({
     })
   }
 
-  if (issue.message.includes("ratio must include at least one numeric weight")) {
+  if (
+    issueParamCode === LayoutIssueParamCodes.RATIO_WEIGHT_MISSING ||
+    issue.message.includes("ratio must include at least one numeric weight")
+  ) {
     const ratio = isRecord(layout) ? layout.ratio : undefined
     return compileError("RATIO_WEIGHT_MISSING", {
       source,
@@ -458,6 +466,15 @@ const isMissingArrayIssue = (issue: z.ZodIssue, field: "panes" | "ratio"): boole
   }
 
   return issue.code === "invalid_type" || (issue.code === "too_small" && issue.type === "array")
+}
+
+const getIssueParamCode = (issue: z.ZodIssue): string | undefined => {
+  if (issue.code !== z.ZodIssueCode.custom) {
+    return undefined
+  }
+  const customIssue = issue as z.ZodCustomIssue
+  const code = customIssue.params?.code
+  return typeof code === "string" ? code : undefined
 }
 
 const getRatioLengthDetails = (layout: unknown): Readonly<Record<string, unknown>> | undefined => {

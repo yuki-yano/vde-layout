@@ -33,6 +33,11 @@ const hasNumericWeight = (ratio: ReadonlyArray<number | string>): boolean => {
   return ratio.some((value) => typeof value === "number")
 }
 
+export const LayoutIssueParamCodes = {
+  RATIO_LENGTH_MISMATCH: "RATIO_LENGTH_MISMATCH",
+  RATIO_WEIGHT_MISSING: "RATIO_WEIGHT_MISSING",
+} as const
+
 // Terminal pane schema
 const TerminalPaneSchema = z
   .object({
@@ -59,9 +64,11 @@ const SplitPaneSchema: z.ZodType<unknown> = z.lazy(() =>
     .strict()
     .refine((data) => data.ratio.length === data.panes.length, {
       message: "Number of elements in ratio array does not match number of elements in panes array",
+      params: { code: LayoutIssueParamCodes.RATIO_LENGTH_MISMATCH },
     })
     .refine((data) => hasNumericWeight(data.ratio), {
       message: "ratio must include at least one numeric weight",
+      params: { code: LayoutIssueParamCodes.RATIO_WEIGHT_MISSING },
     }),
 )
 
@@ -77,9 +84,11 @@ export const LayoutSchema = z
   })
   .refine((data) => data.ratio.length === data.panes.length, {
     message: "Number of elements in ratio array does not match number of elements in panes array",
+    params: { code: LayoutIssueParamCodes.RATIO_LENGTH_MISMATCH },
   })
   .refine((data) => hasNumericWeight(data.ratio), {
     message: "ratio must include at least one numeric weight",
+    params: { code: LayoutIssueParamCodes.RATIO_WEIGHT_MISSING },
   })
 
 // Preset schema definition
