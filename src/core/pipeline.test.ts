@@ -60,7 +60,10 @@ describe("compileCorePipeline", () => {
           layout: {
             kind: "split",
             orientation: "horizontal",
-            ratio: [0.5, 0.5],
+            ratio: [
+              { kind: "weight", weight: 1 },
+              { kind: "weight", weight: 1 },
+            ],
             panes: [
               { kind: "terminal", name: "one", command: "nvim", focus: true },
               { kind: "terminal", name: "two" },
@@ -80,7 +83,10 @@ describe("compileCorePipeline", () => {
               kind: "split",
               id: "root",
               orientation: "horizontal",
-              ratio: [0.5, 0.5],
+              ratio: [
+                { kind: "weight", weight: 1 },
+                { kind: "weight", weight: 1 },
+              ],
               panes: [
                 { kind: "terminal", id: "root.0", name: "one", focus: true },
                 { kind: "terminal", id: "root.1", name: "two", focus: false },

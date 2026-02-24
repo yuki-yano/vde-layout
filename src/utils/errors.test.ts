@@ -185,4 +185,20 @@ describe("error helpers", () => {
     expect(unsupportedWithoutVersionsFormatted).toContain("Error: wezterm version")
     expect(unsupportedWithoutVersionsFormatted).toContain("Unsupported wezterm version detected.")
   })
+
+  it("formats split size resolution errors with pane/version details", () => {
+    const error = createEnvironmentError("split size failed", ErrorCodes.SPLIT_SIZE_RESOLUTION_FAILED, {
+      paneId: "100",
+      paneCells: 80,
+      detectedVersion: "20240203-110809",
+      requiredVersion: "20220624-141144-bd1b7c5d",
+    })
+
+    const formatted = formatError(error)
+    expect(formatted).toContain("Unable to resolve split size from pane dimensions.")
+    expect(formatted).toContain("Pane ID: 100")
+    expect(formatted).toContain("Pane cells: 80")
+    expect(formatted).toContain("Detected version: 20240203-110809")
+    expect(formatted).toContain("Required version: 20220624-141144-bd1b7c5d")
+  })
 })

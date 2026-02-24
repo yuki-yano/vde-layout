@@ -4,17 +4,19 @@ import type { CommandExecutor } from "../contracts"
 import { waitForDelay } from "../utils/async"
 import { ErrorCodes } from "../utils/errors"
 import { resolvePaneMapping } from "../utils/pane-map"
-import { resolveSplitOrientation, resolveSplitPercentage } from "./split-step"
+import { resolveSplitOrientation, resolveSplitSize } from "./split-step"
 import { prepareTerminalCommands } from "./terminal-command-preparation"
 
 export const executeSplitStep = async ({
   step,
   executor,
   paneMap,
+  detectedVersion,
 }: {
   readonly step: CommandStep
   readonly executor: CommandExecutor
   readonly paneMap: Map<string, string>
+  readonly detectedVersion?: string
 }): Promise<void> => {
   const targetVirtualId = ensureNonEmpty(step.targetPaneId, () =>
     raiseExecutionError(ErrorCodes.MISSING_TARGET, {
@@ -31,7 +33,12 @@ export const executeSplitStep = async ({
   )
 
   const panesBefore = await listPaneIds(executor, step)
-  const splitCommand = buildSplitCommand(step, targetRealId)
+  const splitCommand = await buildSplitCommand({
+    step,
+    targetRealId,
+    executor,
+    detectedVersion,
+  })
   await executeCommand(executor, splitCommand, {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
     message: `Failed to execute split step ${step.id}`,
@@ -270,10 +277,59 @@ const findNewPaneId = (before: string[], after: string[]): string | undefined =>
   return after.find((id) => !beforeSet.has(id))
 }
 
-const buildSplitCommand = (step: CommandStep, targetRealId: string): string[] => {
-  const directionFlag = resolveSplitOrientation(step) === "horizontal" ? "-h" : "-v"
-  const percentage = resolveSplitPercentage(step)
-  return ["split-window", directionFlag, "-t", targetRealId, "-p", percentage]
+const buildSplitCommand = async ({
+  step,
+  targetRealId,
+  executor,
+  detectedVersion,
+}: {
+  readonly step: CommandStep
+  readonly targetRealId: string
+  readonly executor: CommandExecutor
+  readonly detectedVersion?: string
+}): Promise<string[]> => {
+  const orientation = resolveSplitOrientation(step)
+  const directionFlag = orientation === "horizontal" ? "-h" : "-v"
+  if (isDynamicSplit(step)) {
+    const paneCells = await resolveTmuxPaneCells({
+      executor,
+      step,
+      targetRealId,
+      orientation,
+      detectedVersion,
+    })
+    const splitSize = resolveSplitSize(step, {
+      paneCells,
+      paneId: targetRealId,
+      detectedVersion,
+      rawPaneRecord: {
+        backend: "tmux",
+        paneId: targetRealId,
+        sourceFormat: "tmux-format",
+      },
+    })
+    if (splitSize.mode === "cells") {
+      return ["split-window", directionFlag, "-t", targetRealId, "-l", splitSize.cells]
+    }
+    return raiseExecutionError(ErrorCodes.INVALID_PLAN, {
+      message: "Dynamic split resolved to a non-cell sizing mode",
+      path: step.id,
+      details: { splitSize },
+    })
+  }
+
+  const splitSize = resolveSplitSize(step, {
+    paneId: targetRealId,
+    detectedVersion,
+  })
+  if (splitSize.mode === "percent") {
+    return ["split-window", directionFlag, "-t", targetRealId, "-p", splitSize.percentage]
+  }
+  return raiseExecutionError(ErrorCodes.INVALID_PLAN, {
+    message: "Percent split resolved to a non-percent sizing mode",
+    path: step.id,
+    details: { splitSize },
+  })
 }
 
 const buildFocusCommand = (targetRealId: string): string[] => {
@@ -291,6 +347,46 @@ export const registerPane = (paneMap: Map<string, string>, virtualId: string, re
 
 export const resolvePaneId = (paneMap: Map<string, string>, virtualId: string): string | undefined => {
   return resolvePaneMapping(paneMap, virtualId)
+}
+
+const resolveTmuxPaneCells = async ({
+  executor,
+  step,
+  targetRealId,
+  orientation,
+  detectedVersion,
+}: {
+  readonly executor: CommandExecutor
+  readonly step: CommandStep
+  readonly targetRealId: string
+  readonly orientation: "horizontal" | "vertical"
+  readonly detectedVersion?: string
+}): Promise<number> => {
+  const format = orientation === "horizontal" ? "#{pane_width}" : "#{pane_height}"
+  const output = await executeCommand(executor, ["display-message", "-p", "-t", targetRealId, format], {
+    code: ErrorCodes.TMUX_COMMAND_FAILED,
+    message: "Failed to resolve tmux pane size",
+    path: step.id,
+    details: { command: ["display-message", "-p", "-t", targetRealId, format] },
+  })
+  const value = Number.parseInt(output.trim(), 10)
+  if (!Number.isInteger(value) || value <= 0) {
+    raiseExecutionError(ErrorCodes.SPLIT_SIZE_RESOLUTION_FAILED, {
+      message: "Unable to parse tmux pane size",
+      path: step.id,
+      details: {
+        paneId: targetRealId,
+        orientation,
+        output,
+        detectedVersion,
+      },
+    })
+  }
+  return value
+}
+
+const isDynamicSplit = (step: CommandStep): boolean => {
+  return step.kind === "split" && step.splitSizing?.mode === "dynamic-cells"
 }
 
 const ensureNonEmpty = <T extends string>(value: T | undefined, buildError: () => never): T => {

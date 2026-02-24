@@ -1,6 +1,23 @@
-type WeztermListPane = {
+export type WeztermPaneSize = {
+  readonly cols?: number
+  readonly rows?: number
+}
+
+export type WeztermRawPaneRecord = {
+  readonly backend: "wezterm"
+  readonly windowId?: string
+  readonly tabId?: string
+  readonly paneId: string
+  readonly isActive?: boolean
+  readonly size?: WeztermPaneSize
+  readonly sourceFormat: "wezterm-array" | "wezterm-object" | "unknown"
+}
+
+export type WeztermListPane = {
   readonly paneId: string
   readonly isActive: boolean
+  readonly size?: WeztermPaneSize
+  readonly rawPaneRecord: WeztermRawPaneRecord
 }
 
 type WeztermListTab = {
@@ -20,9 +37,15 @@ export type WeztermListResult = {
   readonly windows: ReadonlyArray<WeztermListWindow>
 }
 
+type RawListSize = {
+  readonly cols?: unknown
+  readonly rows?: unknown
+}
+
 type RawListPane = {
   readonly pane_id?: number | string
   readonly is_active?: unknown
+  readonly size?: RawListSize
 }
 
 type RawListTab = {
@@ -44,6 +67,7 @@ type RawListEntry = {
   readonly pane_id?: number | string
   readonly workspace?: unknown
   readonly is_active?: unknown
+  readonly size?: RawListSize
 }
 
 type RawListResult = {
@@ -71,6 +95,29 @@ const toWorkspaceString = (value: unknown): string | undefined => {
   return undefined
 }
 
+const toPositiveInteger = (value: unknown): number | undefined => {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    return undefined
+  }
+  return value
+}
+
+const toPaneSize = (value: unknown): WeztermPaneSize | undefined => {
+  if (typeof value !== "object" || value === null) {
+    return undefined
+  }
+  const raw = value as RawListSize
+  const cols = toPositiveInteger(raw.cols)
+  const rows = toPositiveInteger(raw.rows)
+  if (cols === undefined && rows === undefined) {
+    return undefined
+  }
+  return {
+    cols,
+    rows,
+  }
+}
+
 type MutableTabRecord = {
   tabId: string
   isActive: boolean
@@ -90,6 +137,7 @@ type NormalizedArrayEntry = {
   paneId: string
   workspace?: string
   isActive: boolean
+  size?: WeztermPaneSize
 }
 
 const toImmutablePanes = (panes: ReadonlyArray<WeztermListPane>): WeztermListPane[] => {
@@ -97,6 +145,8 @@ const toImmutablePanes = (panes: ReadonlyArray<WeztermListPane>): WeztermListPan
     (pane): WeztermListPane => ({
       paneId: pane.paneId,
       isActive: pane.isActive,
+      ...(pane.size !== undefined ? { size: pane.size } : {}),
+      rawPaneRecord: pane.rawPaneRecord,
     }),
   )
 }
@@ -139,6 +189,7 @@ const normalizeArrayEntry = (entry: unknown): NormalizedArrayEntry | undefined =
     paneId: paneIdRaw,
     workspace: toWorkspaceString(listEntry.workspace),
     isActive: listEntry.is_active === true,
+    size: toPaneSize(listEntry.size),
   }
 }
 
@@ -177,6 +228,40 @@ const getOrCreateTabRecord = (windowRecord: MutableWindowRecord, tabId: string):
   return createdTab
 }
 
+const createArrayRawPaneRecord = (entry: NormalizedArrayEntry): WeztermRawPaneRecord => {
+  return {
+    backend: "wezterm",
+    windowId: entry.windowId,
+    tabId: entry.tabId,
+    paneId: entry.paneId,
+    isActive: entry.isActive,
+    size: entry.size,
+    sourceFormat: "wezterm-array",
+  }
+}
+
+const createObjectRawPaneRecord = ({
+  rawPane,
+  context,
+  paneId,
+  size,
+}: {
+  readonly rawPane: RawListPane
+  readonly context: { readonly windowId: string; readonly tabId: string }
+  readonly paneId: string
+  readonly size?: WeztermPaneSize
+}): WeztermRawPaneRecord => {
+  return {
+    backend: "wezterm",
+    windowId: context.windowId,
+    tabId: context.tabId,
+    paneId,
+    isActive: rawPane.is_active === true,
+    size,
+    sourceFormat: "wezterm-object",
+  }
+}
+
 const parseArrayResponse = (parsed: unknown): WeztermListResult | undefined => {
   if (!Array.isArray(parsed)) {
     return undefined
@@ -197,13 +282,18 @@ const parseArrayResponse = (parsed: unknown): WeztermListResult | undefined => {
     tabRecord.panes.push({
       paneId: normalizedEntry.paneId,
       isActive: normalizedEntry.isActive,
+      ...(normalizedEntry.size !== undefined ? { size: normalizedEntry.size } : {}),
+      rawPaneRecord: createArrayRawPaneRecord(normalizedEntry),
     })
   }
 
   return { windows: toImmutableWindows(windowMap) }
 }
 
-const parseObjectPane = (pane: unknown): WeztermListPane | undefined => {
+const parseObjectPane = (
+  pane: unknown,
+  context: { readonly windowId: string; readonly tabId: string },
+): WeztermListPane | undefined => {
   if (typeof pane !== "object" || pane === null) {
     return undefined
   }
@@ -212,13 +302,22 @@ const parseObjectPane = (pane: unknown): WeztermListPane | undefined => {
   if (!isNonEmptyString(paneIdRaw)) {
     return undefined
   }
+
+  const size = toPaneSize(rawPane.size)
   return {
     paneId: paneIdRaw,
     isActive: rawPane.is_active === true,
+    ...(size !== undefined ? { size } : {}),
+    rawPaneRecord: createObjectRawPaneRecord({
+      rawPane,
+      context,
+      paneId: paneIdRaw,
+      size,
+    }),
   }
 }
 
-const parseObjectTab = (tab: unknown): WeztermListTab | undefined => {
+const parseObjectTab = (tab: unknown, context: { readonly windowId: string }): WeztermListTab | undefined => {
   if (typeof tab !== "object" || tab === null) {
     return undefined
   }
@@ -231,7 +330,10 @@ const parseObjectTab = (tab: unknown): WeztermListTab | undefined => {
   const paneRecords = Array.isArray(rawTab.panes) ? rawTab.panes : []
   const panes: WeztermListPane[] = []
   for (const pane of paneRecords) {
-    const mappedPane = parseObjectPane(pane)
+    const mappedPane = parseObjectPane(pane, {
+      windowId: context.windowId,
+      tabId: tabIdRaw,
+    })
     if (mappedPane) {
       panes.push(mappedPane)
     }
@@ -257,7 +359,7 @@ const parseObjectWindow = (window: unknown): WeztermListWindow | undefined => {
   const tabs: WeztermListTab[] = []
   const rawTabs = Array.isArray(rawWindow.tabs) ? rawWindow.tabs : []
   for (const tab of rawTabs) {
-    const mappedTab = parseObjectTab(tab)
+    const mappedTab = parseObjectTab(tab, { windowId: windowIdRaw })
     if (mappedTab) {
       tabs.push(mappedTab)
     }

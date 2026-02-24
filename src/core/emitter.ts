@@ -1,11 +1,22 @@
 import { createHash } from "crypto"
 import type { LayoutPlan, PlanNode } from "./planner"
+import type { CompiledRatioEntry } from "./compile"
 
 type EmitPlanInput = {
   readonly plan: LayoutPlan
 }
 
 type CommandStepKind = "split" | "focus"
+
+export type SplitSizing =
+  | { readonly mode: "percent"; readonly percentage: number }
+  | {
+      readonly mode: "dynamic-cells"
+      readonly target: CompiledRatioEntry
+      readonly remainingFixedCells: number
+      readonly remainingWeight: number
+      readonly remainingWeightPaneCount: number
+    }
 
 export type CommandStep = {
   readonly id: string
@@ -16,6 +27,7 @@ export type CommandStep = {
   readonly createdPaneId?: string
   readonly orientation?: "horizontal" | "vertical"
   readonly percentage?: number
+  readonly splitSizing?: SplitSizing
 }
 
 export type EmittedTerminal = {
@@ -84,16 +96,17 @@ const collectSplitSteps = (node: PlanNode, steps: CommandStep[]): void => {
 
 const appendSplitSteps = (node: SplitNode, steps: CommandStep[]): void => {
   const directionFlag = node.orientation === "horizontal" ? "-h" : "-v"
+  const hasFixedCells = node.ratio.some((entry) => entry.kind === "fixed-cells")
 
   for (let index = 1; index < node.panes.length; index += 1) {
-    const remainingIncludingTarget = node.ratio.slice(index - 1).reduce((sum, value) => sum + value, 0)
-    const remainingAfterTarget = node.ratio.slice(index).reduce((sum, value) => sum + value, 0)
-
-    const desiredPercentage =
-      remainingIncludingTarget === 0 ? 0 : (remainingAfterTarget / remainingIncludingTarget) * 100
-    const percentage = clampPercent(desiredPercentage)
     const targetPaneId = node.panes[index - 1]?.id ?? node.id
     const createdPaneId = node.panes[index]?.id
+
+    const splitSizing = hasFixedCells
+      ? buildDynamicSplitSizing(node.ratio, index)
+      : buildPercentSplitSizing(node.ratio, index)
+
+    const percentage = splitSizing.mode === "percent" ? splitSizing.percentage : undefined
 
     steps.push({
       id: `${node.id}:split:${index}`,
@@ -103,7 +116,47 @@ const appendSplitSteps = (node: SplitNode, steps: CommandStep[]): void => {
       createdPaneId,
       orientation: node.orientation,
       percentage,
+      splitSizing,
     })
+  }
+}
+
+const buildPercentSplitSizing = (ratio: ReadonlyArray<CompiledRatioEntry>, index: number): SplitSizing => {
+  const remainingIncludingTarget = ratio
+    .slice(index - 1)
+    .reduce((sum, entry) => sum + (entry.kind === "weight" ? entry.weight : 0), 0)
+  const remainingAfterTarget = ratio
+    .slice(index)
+    .reduce((sum, entry) => sum + (entry.kind === "weight" ? entry.weight : 0), 0)
+
+  const desiredPercentage = remainingIncludingTarget <= 0 ? 0 : (remainingAfterTarget / remainingIncludingTarget) * 100
+
+  return {
+    mode: "percent",
+    percentage: clampPercent(desiredPercentage),
+  }
+}
+
+const buildDynamicSplitSizing = (ratio: ReadonlyArray<CompiledRatioEntry>, index: number): SplitSizing => {
+  const target = ratio[index - 1]!
+  const remaining = ratio.slice(index)
+
+  const remainingFixedCells = remaining.reduce((sum, entry) => {
+    return entry.kind === "fixed-cells" ? sum + entry.cells : sum
+  }, 0)
+  const remainingWeight = remaining.reduce((sum, entry) => {
+    return entry.kind === "weight" ? sum + entry.weight : sum
+  }, 0)
+  const remainingWeightPaneCount = remaining.reduce((count, entry) => {
+    return entry.kind === "weight" ? count + 1 : count
+  }, 0)
+
+  return {
+    mode: "dynamic-cells",
+    target,
+    remainingFixedCells,
+    remainingWeight,
+    remainingWeightPaneCount,
   }
 }
 

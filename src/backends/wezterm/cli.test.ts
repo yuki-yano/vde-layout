@@ -61,7 +61,7 @@ describe("runWeztermCli", () => {
 
     const result = await listWeztermWindows()
 
-    expect(result.windows).toEqual([
+    expect(result.windows).toMatchObject([
       {
         windowId: "5",
         isActive: true,
@@ -71,14 +71,22 @@ describe("runWeztermCli", () => {
             tabId: "7",
             isActive: true,
             panes: [
-              { paneId: "10", isActive: true },
-              { paneId: "11", isActive: false },
+              {
+                paneId: "10",
+                isActive: true,
+                rawPaneRecord: { sourceFormat: "wezterm-array" },
+              },
+              {
+                paneId: "11",
+                isActive: false,
+                rawPaneRecord: { sourceFormat: "wezterm-array" },
+              },
             ],
           },
           {
             tabId: "8",
             isActive: false,
-            panes: [{ paneId: "12", isActive: false }],
+            panes: [{ paneId: "12", isActive: false, rawPaneRecord: { sourceFormat: "wezterm-array" } }],
           },
         ],
       },
@@ -90,7 +98,7 @@ describe("runWeztermCli", () => {
           {
             tabId: "9",
             isActive: true,
-            panes: [{ paneId: "13", isActive: true }],
+            panes: [{ paneId: "13", isActive: true, rawPaneRecord: { sourceFormat: "wezterm-array" } }],
           },
         ],
       },
@@ -129,7 +137,7 @@ describe("runWeztermCli", () => {
 
     const result = await listWeztermWindows()
 
-    expect(result.windows).toEqual([
+    expect(result.windows).toMatchObject([
       {
         windowId: "w1",
         isActive: true,
@@ -138,7 +146,7 @@ describe("runWeztermCli", () => {
           {
             tabId: "tab-1",
             isActive: true,
-            panes: [{ paneId: "10", isActive: true }],
+            panes: [{ paneId: "10", isActive: true, rawPaneRecord: { sourceFormat: "wezterm-object" } }],
           },
         ],
       },
@@ -154,7 +162,7 @@ describe("runWeztermCli", () => {
 
     const result = await listWeztermWindows()
 
-    expect(result.windows).toEqual([
+    expect(result.windows).toMatchObject([
       {
         windowId: "w1",
         isActive: true,
@@ -163,12 +171,12 @@ describe("runWeztermCli", () => {
           {
             tabId: "w1",
             isActive: false,
-            panes: [{ paneId: "10", isActive: false }],
+            panes: [{ paneId: "10", isActive: false, rawPaneRecord: { sourceFormat: "wezterm-array" } }],
           },
           {
             tabId: "tab-2",
             isActive: true,
-            panes: [{ paneId: "11", isActive: true }],
+            panes: [{ paneId: "11", isActive: true, rawPaneRecord: { sourceFormat: "wezterm-array" } }],
           },
         ],
       },

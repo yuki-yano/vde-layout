@@ -4,7 +4,7 @@ import { compilePreset, createLayoutPlan } from "./index"
 import { isCoreError } from "./errors"
 
 describe("createLayoutPlan", () => {
-  it("normalizes ratios and assigns deterministic pane IDs and focus", () => {
+  it("preserves ratio entries and assigns deterministic pane IDs and focus", () => {
     const document = `
 name: layout-sample
 layout:
@@ -31,7 +31,10 @@ layout:
     }
 
     expect(root.orientation).toBe("horizontal")
-    expect(root.ratio).toEqual([2 / 3, 1 / 3])
+    expect(root.ratio).toEqual([
+      { kind: "weight", weight: 2 },
+      { kind: "weight", weight: 1 },
+    ])
     expect(root.panes.map((pane) => pane.id)).toEqual(["root.0", "root.1"])
 
     const nested = root.panes[1]
@@ -39,7 +42,10 @@ layout:
       throw new Error("expected nested split")
     }
 
-    expect(nested.ratio).toEqual([0.5, 0.5])
+    expect(nested.ratio).toEqual([
+      { kind: "weight", weight: 1 },
+      { kind: "weight", weight: 1 },
+    ])
     expect(nested.panes.map((pane) => pane.id)).toEqual(["root.1.0", "root.1.1"])
   })
 
@@ -120,15 +126,18 @@ name: single-pane
     })
   })
 
-  it("normalizes ratios evenly when the total is zero", () => {
+  it("throws RATIO_WEIGHT_MISSING when split has no numeric weights", () => {
     const preset: CompiledPreset = {
-      name: "zero-ratio",
+      name: "fixed-only-ratio",
       version: "legacy",
       metadata: { source: "tests/manual" },
       layout: {
         kind: "split",
         orientation: "horizontal",
-        ratio: [0, 0],
+        ratio: [
+          { kind: "fixed-cells", cells: 10 },
+          { kind: "fixed-cells", cells: 20 },
+        ],
         panes: [
           { kind: "terminal", name: "left" },
           { kind: "terminal", name: "right" },
@@ -136,13 +145,16 @@ name: single-pane
       },
     }
 
-    const { plan } = createLayoutPlan({ preset })
-    const root = plan.root
-    if (root.kind !== "split") {
-      throw new Error("expected split root")
+    expect.assertions(2)
+    try {
+      createLayoutPlan({ preset })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
+        expect(error.code).toBe("RATIO_WEIGHT_MISSING")
+      }
     }
-
-    expect(root.ratio).toEqual([0.5, 0.5])
   })
 
   it("throws when no terminal panes exist in the layout", () => {
@@ -153,12 +165,12 @@ name: single-pane
       layout: {
         kind: "split",
         orientation: "horizontal",
-        ratio: [1],
+        ratio: [{ kind: "weight", weight: 1 }],
         panes: [
           {
             kind: "split",
             orientation: "vertical",
-            ratio: [1],
+            ratio: [{ kind: "weight", weight: 1 }],
             panes: [],
           },
         ],

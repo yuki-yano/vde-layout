@@ -5,12 +5,12 @@ import { parseWeztermListResult } from "./list-parser"
 describe("parseWeztermListResult", () => {
   it("parses array-form list output and groups panes by window/tab", () => {
     const stdout = JSON.stringify([
-      { window_id: 1, tab_id: 2, pane_id: 10, is_active: true },
+      { window_id: 1, tab_id: 2, pane_id: 10, is_active: true, size: { cols: 120, rows: 40 } },
       { window_id: 1, tab_id: 2, pane_id: 11, is_active: false },
       { window_id: 1, tab_id: 3, pane_id: 12, is_active: false },
     ])
 
-    expect(parseWeztermListResult(stdout)).toEqual({
+    expect(parseWeztermListResult(stdout)).toMatchObject({
       windows: [
         {
           windowId: "1",
@@ -21,14 +21,47 @@ describe("parseWeztermListResult", () => {
               tabId: "2",
               isActive: true,
               panes: [
-                { paneId: "10", isActive: true },
-                { paneId: "11", isActive: false },
+                {
+                  paneId: "10",
+                  isActive: true,
+                  size: { cols: 120, rows: 40 },
+                  rawPaneRecord: {
+                    backend: "wezterm",
+                    windowId: "1",
+                    tabId: "2",
+                    paneId: "10",
+                    sourceFormat: "wezterm-array",
+                  },
+                },
+                {
+                  paneId: "11",
+                  isActive: false,
+                  rawPaneRecord: {
+                    backend: "wezterm",
+                    windowId: "1",
+                    tabId: "2",
+                    paneId: "11",
+                    sourceFormat: "wezterm-array",
+                  },
+                },
               ],
             },
             {
               tabId: "3",
               isActive: false,
-              panes: [{ paneId: "12", isActive: false }],
+              panes: [
+                {
+                  paneId: "12",
+                  isActive: false,
+                  rawPaneRecord: {
+                    backend: "wezterm",
+                    windowId: "1",
+                    tabId: "3",
+                    paneId: "12",
+                    sourceFormat: "wezterm-array",
+                  },
+                },
+              ],
             },
           ],
         },
@@ -61,7 +94,7 @@ describe("parseWeztermListResult", () => {
       ],
     })
 
-    expect(parseWeztermListResult(stdout)).toEqual({
+    expect(parseWeztermListResult(stdout)).toMatchObject({
       windows: [
         {
           windowId: "w1",
@@ -71,7 +104,19 @@ describe("parseWeztermListResult", () => {
             {
               tabId: "tab-1",
               isActive: true,
-              panes: [{ paneId: "10", isActive: true }],
+              panes: [
+                {
+                  paneId: "10",
+                  isActive: true,
+                  rawPaneRecord: {
+                    backend: "wezterm",
+                    windowId: "w1",
+                    tabId: "tab-1",
+                    paneId: "10",
+                    sourceFormat: "wezterm-object",
+                  },
+                },
+              ],
             },
           ],
         },

@@ -1,15 +1,19 @@
+import { execFileSync } from "node:child_process"
 import type { PlanEmission } from "../../core/emitter"
 import { createCoreError } from "../../core/errors"
 import type {
   ApplyPlanParameters,
   ApplyPlanResult,
+  DryRunStep,
   TerminalBackend,
   WeztermTerminalBackendContext,
 } from "../../executor/terminal-backend"
 import { ErrorCodes } from "../../utils/errors"
+import type { Logger } from "../../utils/logger"
 import { listWeztermWindows, runWeztermCli, verifyWeztermAvailability, type WeztermListResult } from "./cli"
 import { buildDryRunSteps } from "./dry-run"
 import { findWorkspaceForPane, resolveInitialPane } from "./layout-resolution"
+import { parseWeztermListResult } from "./list-parser"
 import { registerPaneWithAncestors } from "./pane-map"
 import { applyFocusStep, applySplitStep, applyTerminalCommands } from "./step-execution"
 import type { ExecuteWeztermCommand, PaneMap } from "./shared"
@@ -27,6 +31,8 @@ const ensureVirtualPaneId = (emission: PlanEmission): string => {
 }
 
 export const createWeztermBackend = (context: WeztermTerminalBackendContext): TerminalBackend => {
+  let detectedVersion: string | undefined
+
   const formatCommand = (args: ReadonlyArray<string>): string => {
     return `wezterm cli ${args.join(" ")}`
   }
@@ -64,7 +70,8 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
     if (context.dryRun) {
       return
     }
-    await verifyWeztermAvailability()
+    const verification = await verifyWeztermAvailability()
+    detectedVersion = verification.version
   }
 
   const applyPlan = async ({ emission, windowMode }: ApplyPlanParameters): Promise<ApplyPlanResult> => {
@@ -112,6 +119,7 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
           runCommand,
           listWindows,
           logPaneMapping,
+          detectedVersion,
         })
         executedSteps += 1
       } else if (step.kind === "focus") {
@@ -149,6 +157,59 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
   return {
     verifyEnvironment,
     applyPlan,
-    getDryRunSteps: buildDryRunSteps,
+    getDryRunSteps: (emission: PlanEmission): DryRunStep[] => {
+      const actualPaneId =
+        typeof context.paneId === "string" && context.paneId.length > 0 ? context.paneId : process.env.WEZTERM_PANE
+      const initialPaneSize = resolveInitialWeztermPaneSize({
+        paneId: actualPaneId,
+        logger: context.logger,
+      })
+      return buildDryRunSteps(emission, {
+        initialPaneId: emission.summary.initialPaneId,
+        initialPaneSize,
+        detectedVersion,
+      })
+    },
+  }
+}
+
+const resolveInitialWeztermPaneSize = ({
+  paneId,
+  logger,
+}: {
+  readonly paneId: string | undefined
+  readonly logger: Logger
+}): { readonly cols: number; readonly rows: number } | undefined => {
+  if (typeof paneId !== "string" || paneId.length === 0) {
+    return undefined
+  }
+
+  try {
+    const stdout = execFileSync("wezterm", ["cli", "list", "--format", "json"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+    const parsed = parseWeztermListResult(stdout)
+    if (parsed === undefined) {
+      logger.debug(`[wezterm] Failed to parse pane list while resolving initial pane size for pane ${paneId}`)
+      return undefined
+    }
+    for (const window of parsed.windows) {
+      for (const tab of window.tabs) {
+        for (const pane of tab.panes) {
+          if (pane.paneId === paneId) {
+            if (typeof pane.size?.cols === "number" && typeof pane.size?.rows === "number") {
+              return { cols: pane.size.cols, rows: pane.size.rows }
+            }
+            return undefined
+          }
+        }
+      }
+    }
+    return undefined
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    logger.debug(`[wezterm] Failed to resolve initial pane size for pane ${paneId}: ${reason}`)
+    return undefined
   }
 }

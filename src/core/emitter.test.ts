@@ -23,6 +23,10 @@ layout:
       kind: "split",
       orientation: "horizontal",
       percentage: 50,
+      splitSizing: {
+        mode: "percent",
+        percentage: 50,
+      },
       targetPaneId: "root.0",
     })
     expect(emission.steps[0]?.command).toBeUndefined()
@@ -119,6 +123,10 @@ layout:
         id: "root:split:1",
         orientation: "horizontal",
         percentage: 67,
+        splitSizing: {
+          mode: "percent",
+          percentage: 67,
+        },
         targetPaneId: "root.0",
         createdPaneId: "root.1",
       }),
@@ -126,6 +134,10 @@ layout:
         id: "root:split:2",
         orientation: "horizontal",
         percentage: 50,
+        splitSizing: {
+          mode: "percent",
+          percentage: 50,
+        },
         targetPaneId: "root.1",
         createdPaneId: "root.2",
       }),
@@ -133,6 +145,10 @@ layout:
         id: "root.1:split:1",
         orientation: "vertical",
         percentage: 67,
+        splitSizing: {
+          mode: "percent",
+          percentage: 67,
+        },
         targetPaneId: "root.1.0",
         createdPaneId: "root.1.1",
       }),
@@ -159,5 +175,46 @@ layout:
     const second = emitPlan({ plan })
 
     expect(first.hash).toBe(second.hash)
+  })
+
+  it("emits dynamic-cells sizing metadata when fixed cells are present", () => {
+    const document = `
+name: dynamic-sample
+layout:
+  type: horizontal
+  ratio: ["90c", 2, 1]
+  panes:
+    - name: left
+    - name: middle
+    - name: right
+`
+
+    const { preset } = compilePreset({ document, source: "tests/dynamic.yml" })
+    const { plan } = createLayoutPlan({ preset })
+    const emission = emitPlan({ plan })
+    const splitSteps = emission.steps.filter((step) => step.kind === "split")
+
+    expect(splitSteps).toEqual([
+      expect.objectContaining({
+        id: "root:split:1",
+        splitSizing: {
+          mode: "dynamic-cells",
+          target: { kind: "fixed-cells", cells: 90 },
+          remainingFixedCells: 0,
+          remainingWeight: 3,
+          remainingWeightPaneCount: 2,
+        },
+      }),
+      expect.objectContaining({
+        id: "root:split:2",
+        splitSizing: {
+          mode: "dynamic-cells",
+          target: { kind: "weight", weight: 2 },
+          remainingFixedCells: 0,
+          remainingWeight: 1,
+          remainingWeightPaneCount: 1,
+        },
+      }),
+    ])
   })
 })

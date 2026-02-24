@@ -32,7 +32,10 @@ layout:
     expect(root).toMatchObject({
       kind: "split",
       orientation: "horizontal",
-      ratio: [1, 2],
+      ratio: [
+        { kind: "weight", weight: 1 },
+        { kind: "weight", weight: 2 },
+      ],
     })
     expect(root?.kind === "split" ? root.panes[0] : undefined).toMatchObject({
       kind: "terminal",
@@ -193,7 +196,34 @@ layout:
     expect(result.preset.layout).toMatchObject({
       kind: "split",
       orientation: "horizontal",
-      ratio: [1, 1],
+      ratio: [
+        { kind: "weight", weight: 1 },
+        { kind: "weight", weight: 1 },
+      ],
+    })
+  })
+
+  it("converts mixed ratio entries into weight/fixed-cells", () => {
+    const result = compilePresetFromValue({
+      source: "tests/value-input-mixed-ratio",
+      value: {
+        name: "mixed-ratio",
+        layout: {
+          type: "horizontal",
+          ratio: ["90c", 2, 1],
+          panes: [{ name: "left" }, { name: "middle" }, { name: "right" }],
+        },
+      },
+    })
+
+    expect(result.preset.layout).toMatchObject({
+      kind: "split",
+      orientation: "horizontal",
+      ratio: [
+        { kind: "fixed-cells", cells: 90 },
+        { kind: "weight", weight: 2 },
+        { kind: "weight", weight: 1 },
+      ],
     })
   })
 
@@ -308,6 +338,29 @@ layout:
       expect(isCoreError(error)).toBe(true)
       if (isCoreError(error)) {
         expect(error.code).toBe("LAYOUT_INVALID_NODE")
+      }
+    }
+  })
+
+  it("returns RATIO_WEIGHT_MISSING for fixed-cells-only ratios", () => {
+    expect.assertions(2)
+    try {
+      compilePresetFromValue({
+        source: "tests/value-input-fixed-only-ratio",
+        value: {
+          name: "fixed-only-ratio",
+          layout: {
+            type: "horizontal",
+            ratio: ["40c", "20c"],
+            panes: [{ name: "left" }, { name: "right" }],
+          },
+        },
+      })
+      throw new Error("expected failure")
+    } catch (error) {
+      expect(isCoreError(error)).toBe(true)
+      if (isCoreError(error)) {
+        expect(error.code).toBe("RATIO_WEIGHT_MISSING")
       }
     }
   })

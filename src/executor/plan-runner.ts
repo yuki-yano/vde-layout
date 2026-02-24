@@ -22,6 +22,7 @@ type ExecutePlanInput = {
   readonly windowName?: string
   readonly windowMode: WindowMode
   readonly onConfirmKill?: ConfirmPaneClosure
+  readonly detectedVersion?: string
 }
 
 type ExecutePlanSuccess = {
@@ -34,6 +35,7 @@ export const executePlan = async ({
   windowName,
   windowMode,
   onConfirmKill,
+  detectedVersion,
 }: ExecutePlanInput): Promise<ExecutePlanSuccess> => {
   const initialVirtualPaneId = emission.summary.initialPaneId
   if (typeof initialVirtualPaneId !== "string" || initialVirtualPaneId.length === 0) {
@@ -102,7 +104,7 @@ export const executePlan = async ({
 
   for (const step of emission.steps) {
     if (step.kind === "split") {
-      await executeSplitStep({ step, executor, paneMap })
+      await executeSplitStep({ step, executor, paneMap, detectedVersion })
       executedSteps += 1
     } else if (step.kind === "focus") {
       await executeFocusStep({ step, executor, paneMap })

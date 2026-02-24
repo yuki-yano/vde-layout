@@ -33,7 +33,7 @@ describe("Zod schema validation", () => {
     it("validates valid split container definition", () => {
       const validPane: Pane = {
         type: "horizontal",
-        ratio: [60, 40],
+        ratio: ["60c", 40],
         panes: [{ name: "left" }, { name: "right" }],
       }
 
@@ -57,6 +57,20 @@ describe("Zod schema validation", () => {
 
       const result = PaneSchema.safeParse(nestedPane)
       expect(result.success).toBe(true)
+    })
+
+    it("rejects fixed-cells-only ratio", () => {
+      const invalidPane = {
+        type: "horizontal",
+        ratio: ["40c", "20c"],
+        panes: [{ name: "left" }, { name: "right" }],
+      }
+
+      const result = validatePane(invalidPane)
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toContain("ratio must include at least one numeric weight")
+      }
     })
 
     it("rejects invalid type value", () => {
@@ -91,7 +105,7 @@ describe("Zod schema validation", () => {
     it("validates valid layout definition", () => {
       const validLayout: Layout = {
         type: "vertical",
-        ratio: [70, 30],
+        ratio: ["90c", 30],
         panes: [{ name: "main", command: "nvim" }, { name: "terminal" }],
       }
 
@@ -106,6 +120,18 @@ describe("Zod schema validation", () => {
       }
 
       const result = LayoutSchema.safeParse(invalidLayout)
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects invalid ratio suffix values", () => {
+      const result = validatePreset({
+        name: "Invalid ratio suffix",
+        layout: {
+          type: "horizontal",
+          ratio: ["90", 1],
+          panes: [{ name: "left" }, { name: "right" }],
+        },
+      })
       expect(result.success).toBe(false)
     })
   })

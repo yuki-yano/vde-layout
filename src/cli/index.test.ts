@@ -92,7 +92,10 @@ describe("CLI", () => {
     layout: {
       kind: "split",
       orientation: "horizontal",
-      ratio: [0.5, 0.5],
+      ratio: [
+        { kind: "weight", weight: 1 },
+        { kind: "weight", weight: 1 },
+      ],
       panes: [
         {
           kind: "terminal",
@@ -114,7 +117,10 @@ describe("CLI", () => {
       kind: "split",
       id: "root",
       orientation: "horizontal",
-      ratio: [0.5, 0.5],
+      ratio: [
+        { kind: "weight", weight: 1 },
+        { kind: "weight", weight: 1 },
+      ],
       panes: [
         {
           kind: "terminal",
