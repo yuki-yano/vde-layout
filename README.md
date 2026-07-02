@@ -119,7 +119,7 @@ presets:
       # see Layout Structure
     command: "htop"             # optional; used when layout is omitted
     hooks:                      # optional; see Hooks
-      afterApply: "vde-tmux-sidebar open {{pane_id:sidebar}}"
+      afterApply: "vde-tmux-sidebar open"
 ```
 
 ### Defaults Structure
@@ -189,27 +189,29 @@ presets:
 - Coordinate tasks across multiple panes within your preset configuration
 
 ### Hooks
-`hooks.afterApply` runs an arbitrary host command once, after a preset has been applied successfully. It is a general-purpose hook (not specific to any tool); one intended use is opening a sidebar tool such as [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar) once the layout has finished building.
+`hooks.afterApply` runs an arbitrary host command once, after a preset has been applied successfully. It is a general-purpose hook (not specific to any tool); one intended use is idempotently opening a sidebar tool such as [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar) once the layout has finished building — the sidebar itself is managed by that separate tool, not defined as a layout pane in vde-layout's preset.
 
 ```yaml
 presets:
-  dev-with-sidebar:
-    name: Dev with Sidebar
+  dev:
+    name: Dev
     layout:
       type: horizontal
-      ratio: [1, 3]
+      ratio: [3, 1]
       panes:
-        - name: sidebar
         - name: editor
+          command: nvim
           focus: true
+        - name: repl
+          command: node
     hooks:
-      afterApply: "vde-tmux-sidebar open {{pane_id:sidebar}}"
+      afterApply: "vde-tmux-sidebar open"
 ```
 
 - Runs exactly once, only after `applyPlan` succeeds; it never runs during `--dry-run` (dry-run instead prints the unresolved command as a planned step).
 - Executes as a host shell command (equivalent to `sh -c "<command>"`, so pipes/args/redirection work) in the directory vde-layout was invoked from (the CLI's `cwd`), not inside any particular tmux pane.
 - If the command fails, or if a template token inside it cannot be resolved, vde-layout logs a warning and the preset apply is still reported as successful (exit code is unaffected).
-- Template tokens are supported: `{{pane_id:<name>}}` resolves as usual. Because the hook doesn't run "in" any specific pane, `{{this_pane}}` and `{{focus_pane}}` both resolve to the pane that ended up focused after the apply.
+- Template tokens are supported, but `{{pane_id:<name>}}` only resolves against the pane names created by *this apply's* own `layout` — it cannot address an existing external pane such as a sidebar. This is especially easy to get wrong in `current-window` mode: the reused current pane is bound to the layout tree's first pane name, so a hook that tries `{{pane_id:sidebar}}` for a preset pane named `sidebar` would silently resolve to the current pane, not the real sidebar. Because the hook doesn't run "in" any specific pane, `{{this_pane}}` and `{{focus_pane}}` both resolve to the pane that ended up focused after the apply.
 
 ### Ephemeral Panes
 Ephemeral panes automatically close after their command completes. This is useful for one-time tasks like builds, tests, or initialization scripts.
