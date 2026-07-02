@@ -160,6 +160,54 @@ describe("createTmuxBackend", () => {
     expect(result.executedSteps).toBe(2)
   })
 
+  it("resolves the real focus pane id and pane name map from the plan runner's pane map", async () => {
+    const emission: PlanEmission = {
+      ...createEmission(),
+      terminals: [
+        { virtualPaneId: "root", command: undefined, cwd: undefined, env: undefined, focus: true, name: "main" },
+        {
+          virtualPaneId: "root.1",
+          command: undefined,
+          cwd: undefined,
+          env: undefined,
+          focus: false,
+          name: "sidebar",
+        },
+      ],
+    }
+    executePlanMock.mockResolvedValue({
+      executedSteps: 2,
+      paneMap: new Map([
+        ["root", "%0"],
+        ["root.1", "%1"],
+      ]),
+    })
+    const context = createContext()
+    getExecutorMock.mockReturnValue(context.executor)
+
+    const backend = createTmuxBackend(context)
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(result.focusPaneId).toBe("%0")
+    expect(Object.fromEntries(result.paneNameToRealId ?? new Map())).toEqual({
+      main: "%0",
+      sidebar: "%1",
+    })
+  })
+
+  it("falls back to an empty pane name map when the plan runner omits pane mapping", async () => {
+    const emission = createEmission()
+    executePlanMock.mockResolvedValue({ executedSteps: 2 })
+    const context = createContext()
+    getExecutorMock.mockReturnValue(context.executor)
+
+    const backend = createTmuxBackend(context)
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(result.focusPaneId).toBeUndefined()
+    expect(Object.fromEntries(result.paneNameToRealId ?? new Map())).toEqual({})
+  })
+
   it("provides dry-run steps with tmux command strings", () => {
     const emission = createEmission()
     const backend = createTmuxBackend(createContext())

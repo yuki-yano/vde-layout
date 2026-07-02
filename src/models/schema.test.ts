@@ -199,6 +199,50 @@ describe("Zod schema validation", () => {
 
       expect(result.success).toBe(false)
     })
+
+    it("accepts hooks.afterApply in preset definition", () => {
+      const result = PresetSchema.safeParse({
+        name: "Sidebar Preset",
+        hooks: {
+          afterApply: "vde-tmux-sidebar open {{pane_id:sidebar}}",
+        },
+      })
+
+      expect(result.success).toBe(true)
+    })
+
+    it("validates preset without hooks field", () => {
+      const result = PresetSchema.safeParse({
+        name: "No Hooks Preset",
+      })
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.hooks).toBeUndefined()
+      }
+    })
+
+    it("rejects empty string for hooks.afterApply", () => {
+      const result = validatePreset({
+        name: "Invalid Hooks Preset",
+        hooks: {
+          afterApply: "",
+        },
+      })
+
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects unknown keys inside hooks", () => {
+      const result = validatePreset({
+        name: "Invalid Hooks Preset",
+        hooks: {
+          beforeApply: "echo not-supported",
+        },
+      })
+
+      expect(result.success).toBe(false)
+    })
   })
 
   describe("ConfigSchema", () => {

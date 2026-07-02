@@ -27,6 +27,7 @@ type ExecutePlanInput = {
 
 type ExecutePlanSuccess = {
   readonly executedSteps: number
+  readonly paneMap: ReadonlyMap<string, string>
 }
 
 export const executePlan = async ({
@@ -158,7 +159,7 @@ export const executePlan = async ({
     })
   }
 
-  return { executedSteps }
+  return { executedSteps, paneMap }
 }
 
 /**

@@ -75,6 +75,16 @@ describe("executePlan", () => {
     ])
   })
 
+  it("returns a virtual-to-real pane id map covering every emitted pane", async () => {
+    const executor = createMockExecutor()
+    const result = await executePlan({ emission: baseEmission, executor, windowMode: "new-window" })
+
+    expect(Object.fromEntries(result.paneMap)).toEqual({
+      "root.0": "%0",
+      "root.1": "%1",
+    })
+  })
+
   it("prefers structured split metadata over raw command arguments when provided", async () => {
     const executor = createMockExecutor()
     const emission: PlanEmission = {

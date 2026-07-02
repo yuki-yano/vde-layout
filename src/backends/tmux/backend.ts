@@ -8,6 +8,7 @@ import { SIDEBAR_LIST_PANES_FORMAT } from "../../executor/sidebar-detection"
 import { resolveSplitOrientation as resolveSplitOrientationFromStep, resolveSplitSize } from "../../executor/split-step"
 import { resolveRequiredStepTargetPaneId } from "../../executor/step-target"
 import { createUnsupportedStepKindError } from "../../executor/unsupported-step-kind"
+import { buildNameToRealIdMap } from "../../utils/template-tokens"
 import type {
   ApplyPlanParameters,
   ApplyPlanResult,
@@ -67,9 +68,16 @@ export const createTmuxBackend = (context: TmuxTerminalBackendContext): Terminal
       detectedVersion,
     })
 
+    // The plan runner tracks a virtual-pane-id -> real-pane-id map internally; expose
+    // it (resolved) here so callers such as hooks.afterApply can address panes by
+    // name/focus without knowing tmux's virtual ids. Tests may stub executePlan
+    // without a paneMap, so fall back to an empty one rather than throwing.
+    const paneMap = executionResult.paneMap ?? new Map<string, string>()
+
     return {
       executedSteps: executionResult.executedSteps,
-      focusPaneId: emission.summary.focusPaneId,
+      focusPaneId: paneMap.get(emission.summary.focusPaneId),
+      paneNameToRealId: buildNameToRealIdMap(emission.terminals, paneMap),
     }
   }
 

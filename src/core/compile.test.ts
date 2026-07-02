@@ -203,6 +203,38 @@ layout:
     })
   })
 
+  it("passes through hooks.afterApply into the compiled preset", () => {
+    const result = compilePresetFromValue({
+      source: "tests/hooks-input",
+      value: {
+        name: "hooks-preset",
+        layout: {
+          type: "horizontal",
+          ratio: [1, 1],
+          panes: [{ name: "main" }, { name: "sidebar" }],
+        },
+        hooks: {
+          afterApply: "vde-tmux-sidebar open {{pane_id:sidebar}}",
+        },
+      },
+    })
+
+    expect(result.preset.hooks).toEqual({
+      afterApply: "vde-tmux-sidebar open {{pane_id:sidebar}}",
+    })
+  })
+
+  it("compiles a preset without hooks to an undefined hooks field", () => {
+    const result = compilePresetFromValue({
+      source: "tests/no-hooks-input",
+      value: {
+        name: "no-hooks-preset",
+      },
+    })
+
+    expect(result.preset.hooks).toBeUndefined()
+  })
+
   it("converts mixed ratio entries into weight/fixed-cells", () => {
     const result = compilePresetFromValue({
       source: "tests/value-input-mixed-ratio",
