@@ -211,6 +211,7 @@ presets:
 - Runs exactly once, only after `applyPlan` succeeds; it never runs during `--dry-run` (dry-run instead prints the unresolved command as a planned step).
 - Executes as a host shell command (equivalent to `sh -c "<command>"`, so pipes/args/redirection work) in the directory vde-layout was invoked from (the CLI's `cwd`), not inside any particular tmux pane.
 - If the command fails, or if a template token inside it cannot be resolved, vde-layout logs a warning and the preset apply is still reported as successful (exit code is unaffected).
+- The command is killed and treated as a failure (logged as a warning) if it runs for longer than 30 seconds.
 - Template tokens are supported, but `{{pane_id:<name>}}` only resolves against the pane names created by *this apply's* own `layout` — it cannot address an existing external pane such as a sidebar. This is especially easy to get wrong in `current-window` mode: the reused current pane is bound to the layout tree's first pane name, so a hook that tries `{{pane_id:sidebar}}` for a preset pane named `sidebar` would silently resolve to the current pane, not the real sidebar. Because the hook doesn't run "in" any specific pane, `{{this_pane}}` and `{{focus_pane}}` both resolve to the pane that ended up focused after the apply.
 
 ### Ephemeral Panes

@@ -197,7 +197,7 @@ describe("executePlan", () => {
     expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%3"], dryRun: true })
 
     const commands = executor.getExecutedCommands()
-    expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+    expect(commands[0]).toEqual(["list-panes", "-t", "%2", "-F", "#{pane_id}\t#{@vde_sidebar}"])
     expect(commands[1]).toEqual(["kill-pane", "-t", "%3"])
     expect(commands.find((cmd) => cmd[0] === "new-window")).toBeUndefined()
 
@@ -254,7 +254,7 @@ describe("executePlan", () => {
     ).rejects.toMatchObject({ code: ErrorCodes.USER_CANCELLED })
 
     const commands = executor.getExecutedCommands()
-    expect(commands).toEqual([["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"]])
+    expect(commands).toEqual([["list-panes", "-t", "%2", "-F", "#{pane_id}\t#{@vde_sidebar}"]])
 
     if (originalPane === undefined) {
       delete process.env.TMUX_PANE
@@ -283,7 +283,7 @@ describe("executePlan", () => {
       expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%3"], dryRun: true })
 
       const commands = executor.getExecutedCommands()
-      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[0]).toEqual(["list-panes", "-t", "%2", "-F", "#{pane_id}\t#{@vde_sidebar}"])
       expect(commands[1]).toEqual(["kill-pane", "-t", "%3"])
       expect(commands).not.toContainEqual(["kill-pane", "-t", "%4"])
       expect(commands.some((cmd) => cmd[0] === "kill-pane" && cmd.includes("-a"))).toBe(false)
@@ -316,12 +316,15 @@ describe("executePlan", () => {
       expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%4"], dryRun: true })
 
       const commands = executor.getExecutedCommands()
-      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[0]).toEqual(["list-panes", "-t", "%2", "-F", "#{pane_id}\t#{@vde_sidebar}"])
       expect(commands[1]).toEqual(["kill-pane", "-t", "%4"])
       // The layout is built from the resolved origin pane (%3), never the sidebar (%2).
       expect(commands).toContainEqual(["split-window", "-h", "-t", "%3", "-p", "50"])
       expect(commands).toContainEqual(["select-pane", "-t", "%3"])
-      expect(commands.some((cmd) => cmd.includes("%2"))).toBe(false)
+      // %2 (the sidebar) is only ever referenced as the `-t` scope for the initial
+      // list-panes classification query, never as the target of a pane-mutating
+      // command (kill-pane/split-window/select-pane).
+      expect(commands.some((cmd) => cmd[0] !== "list-panes" && cmd.includes("%2"))).toBe(false)
     } finally {
       if (originalPane === undefined) {
         delete process.env.TMUX_PANE
@@ -351,9 +354,14 @@ describe("executePlan", () => {
       expect(onConfirmKill).not.toHaveBeenCalled()
 
       const commands = executor.getExecutedCommands()
-      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
-      expect(commands[1]).toEqual(["split-window", "-h", "-t", "%9"])
-      expect(commands[2]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[0]).toEqual(["list-panes", "-t", "%9", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      // The new pane's id is read directly from split-window's `-P -F` stdout, rather
+      // than diffing a follow-up list-panes call against the pre-split pane set.
+      expect(commands[1]).toEqual(["split-window", "-h", "-P", "-F", "#{pane_id}", "-t", "%9"])
+      // No follow-up sidebar-classification list-panes call is issued after the
+      // split; the next list-panes call (index 2) belongs to executeSplitStep's own
+      // before/after pane diffing for the emitted layout split.
+      expect(commands[2]).toEqual(["list-panes", "-F", "#{pane_id}"])
       expect(commands.some((cmd) => cmd[0] === "kill-pane")).toBe(false)
       // The newly split pane (%1) becomes the origin for the rest of the layout.
       expect(commands).toContainEqual(["split-window", "-h", "-t", "%1", "-p", "50"])
@@ -411,9 +419,13 @@ describe("executePlan", () => {
         execute: vi.fn(async (command: string | string[]) => {
           const args = typeof command === "string" ? command.split(" ").slice(1) : command
           if (args[0] === "list-panes") {
-            // Always reports only the sidebar pane, simulating a split that never
-            // produced a new (or newly-visible) normal pane.
             return "%9\t1"
+          }
+          if (args[0] === "split-window") {
+            // Simulates tmux's `-P -F "#{pane_id}"` producing blank/unusable stdout
+            // (e.g. an unexpected tmux version or output format), so plan-runner has
+            // no pane id to read the new pane from.
+            return "   "
           }
           return ""
         }),
@@ -907,7 +919,7 @@ describe("executePlan", () => {
       expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%1"], dryRun: true })
 
       const commands = executor.getExecutedCommands()
-      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[0]).toEqual(["list-panes", "-t", "%0", "-F", "#{pane_id}\t#{@vde_sidebar}"])
       expect(commands[1]).toEqual(["kill-pane", "-t", "%1"])
     } finally {
       if (originalPane === undefined) {
@@ -943,7 +955,7 @@ describe("executePlan", () => {
 
       const commands = executor.getExecutedCommands()
       expect(commands[0]).toEqual(["display-message", "-p", "#{pane_id}"])
-      expect(commands[1]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[1]).toEqual(["list-panes", "-t", "%9", "-F", "#{pane_id}\t#{@vde_sidebar}"])
       expect(commands[2]).toEqual(["kill-pane", "-t", "%10"])
     } finally {
       if (originalPane === undefined) {

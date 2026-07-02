@@ -180,6 +180,7 @@ describe("createDefaultRunHostCommand", () => {
     expect(execaMock).toHaveBeenCalledWith("vde-tmux-sidebar open %2 | logger", {
       shell: true,
       cwd: "/workspace",
+      timeout: 30_000,
     })
   })
 })

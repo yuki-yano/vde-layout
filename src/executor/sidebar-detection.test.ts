@@ -38,6 +38,24 @@ describe("classifyWindowPanes", () => {
     expect(executor.getExecutedCommands()).toEqual([["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"]])
   })
 
+  it("scopes list-panes to the target pane's window via -t when targetPaneId is provided", async () => {
+    const executor = createMockExecutor()
+    executor.setMockPaneIds(["%0"])
+
+    await classifyWindowPanes(executor, "root.0", "%3")
+
+    expect(executor.getExecutedCommands()).toEqual([["list-panes", "-t", "%3", "-F", "#{pane_id}\t#{@vde_sidebar}"]])
+  })
+
+  it("falls back to the untargeted list-panes query when targetPaneId is an empty string", async () => {
+    const executor = createMockExecutor()
+    executor.setMockPaneIds(["%0"])
+
+    await classifyWindowPanes(executor, "root.0", "")
+
+    expect(executor.getExecutedCommands()).toEqual([["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"]])
+  })
+
   it("throws a TMUX_COMMAND_FAILED CoreError when the executor rejects", async () => {
     const executor = {
       execute: async () => {

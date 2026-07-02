@@ -59,7 +59,10 @@ export const executePlan = async ({
       isDryRun,
     })
 
-    const { sidebarPanes, normalPanes } = await classifyWindowPanes(executor, initialVirtualPaneId)
+    // Target the classification at the current pane's own window (via `-t
+    // currentPaneId`) rather than tmux's "active" window, so multi-window/multi-session
+    // setups always classify the window this invocation is actually running in.
+    const { sidebarPanes, normalPanes } = await classifyWindowPanes(executor, initialVirtualPaneId, currentPaneId)
     const sidebarPaneIds = new Set(sidebarPanes)
 
     let originPaneId: string
@@ -74,7 +77,6 @@ export const executePlan = async ({
           : await splitPaneBesideSidebar({
               executor,
               sidebarPaneId: currentPaneId,
-              existingPaneIds: new Set([...sidebarPanes, ...normalPanes]),
               contextPath: initialVirtualPaneId,
             })
     } else {
@@ -167,29 +169,30 @@ export const executePlan = async ({
  * pane. Only reached when the current window contains nothing but sidebar panes
  * (no normal pane to reuse). The split direction is fixed to a horizontal split
  * away from the sidebar (i.e. the new pane appears on the opposite side).
+ *
+ * Uses `-P -F "#{pane_id}"` to have tmux report the newly created pane id directly
+ * in the split-window output, rather than diffing a follow-up `list-panes` call
+ * against the pre-split pane set (which was fragile under concurrent pane changes).
  */
 const splitPaneBesideSidebar = async ({
   executor,
   sidebarPaneId,
-  existingPaneIds,
   contextPath,
 }: {
   readonly executor: CommandExecutor
   readonly sidebarPaneId: string
-  readonly existingPaneIds: ReadonlySet<string>
   readonly contextPath: string
 }): Promise<string> => {
-  await executeCommand(executor, ["split-window", "-h", "-t", sidebarPaneId], {
+  const command = ["split-window", "-h", "-P", "-F", "#{pane_id}", "-t", sidebarPaneId]
+  const output = await executeCommand(executor, command, {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
     message: "Failed to split a pane beside the sidebar",
     path: contextPath,
-    details: { command: ["split-window", "-h", "-t", sidebarPaneId] },
+    details: { command },
   })
 
-  const after = await classifyWindowPanes(executor, contextPath)
-  const newPaneId = after.normalPanes.find((paneId) => !existingPaneIds.has(paneId))
-
-  if (newPaneId === undefined) {
+  const newPaneId = output.trim()
+  if (newPaneId.length === 0) {
     return raiseExecutionError(ErrorCodes.INVALID_PANE, {
       message: "Unable to determine the pane created beside the sidebar",
       path: contextPath,

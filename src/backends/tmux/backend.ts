@@ -208,7 +208,7 @@ const resolveInitialTmuxPaneSize = (): PaneDimensions | undefined => {
   // resolution, which applies the same correction when windowMode is
   // "current-window"), not the sidebar itself. A real split is never performed
   // here: when the window has no other pane yet, sizing is simply left unresolved.
-  const originPaneId = resolveDryRunOriginPaneId()
+  const originPaneId = resolveDryRunOriginPaneId(tmuxPane)
   if (originPaneId === undefined) {
     return undefined
   }
@@ -241,9 +241,14 @@ const queryTmuxCurrentPaneSizeAndSidebarFlag = (
   }
 }
 
-const resolveDryRunOriginPaneId = (): string | undefined => {
+// `-t targetPaneId` scopes `list-panes` to the window that pane belongs to, so the
+// caller's current pane id must be passed through here too (see the module-level
+// comment above on why this correction is windowMode-independent): without it,
+// this would list tmux's "active" window instead of the one this process is
+// actually running in, which can differ in multi-window/multi-session setups.
+const resolveDryRunOriginPaneId = (targetPaneId: string): string | undefined => {
   try {
-    const output = execFileSync("tmux", ["list-panes", "-F", SIDEBAR_LIST_PANES_FORMAT], {
+    const output = execFileSync("tmux", ["list-panes", "-t", targetPaneId, "-F", SIDEBAR_LIST_PANES_FORMAT], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     })

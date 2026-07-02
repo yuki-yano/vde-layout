@@ -108,6 +108,12 @@ export const createMockExecutor = (): MockExecutor => {
       mockPaneCounter += 1
       const newPaneId = `%${mockPaneCounter}`
       mockPaneIds = [...mockPaneIds, newPaneId]
+
+      // `-P -F "#{pane_id}"` asks tmux to print the newly created pane id, matching
+      // real tmux's split-window behavior (see splitPaneBesideSidebar).
+      if (args.includes("-P") && args.includes("#{pane_id}")) {
+        return newPaneId
+      }
     }
 
     return ""

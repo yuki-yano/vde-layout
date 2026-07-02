@@ -348,6 +348,14 @@ describe("createTmuxBackend", () => {
         summary: "split",
         command: "tmux split-window -h -t root -l 40",
       })
+      // list-panes must be scoped via -t to the current pane's own window (%5),
+      // not tmux's globally "active" window, so multi-window/multi-session setups
+      // resolve the origin pane correctly.
+      expect(execFileSyncMock).toHaveBeenCalledWith(
+        "tmux",
+        ["list-panes", "-t", "%5", "-F", "#{pane_id}\t#{@vde_sidebar}"],
+        expect.anything(),
+      )
     })
 
     it("falls back to <dynamic> when the sidebar has no normal pane to measure", () => {

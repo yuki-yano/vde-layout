@@ -4,6 +4,11 @@ import type { Logger } from "../utils/logger"
 
 export type RunHostCommand = (command: string, options: { readonly cwd: string }) => Promise<void>
 
+// Guards against a hook command that hangs indefinitely (e.g. a misbehaving sidebar
+// tool). A timed-out execution rejects, which is handled the same as any other
+// hook failure below: logged as a warning and never surfaced as a CLI error.
+const AFTER_APPLY_HOOK_TIMEOUT_MS = 30_000
+
 export type AfterApplyHookContext = {
   readonly cwd: string
   readonly focusPaneId?: string
@@ -90,6 +95,6 @@ export const runAfterApplyHook = async ({
  */
 export const createDefaultRunHostCommand = (): RunHostCommand => {
   return async (command, { cwd }) => {
-    await execa(command, { shell: true, cwd })
+    await execa(command, { shell: true, cwd, timeout: AFTER_APPLY_HOOK_TIMEOUT_MS })
   }
 }

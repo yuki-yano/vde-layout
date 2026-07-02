@@ -20,8 +20,18 @@ export type ClassifyWindowPanesResult = {
 export const classifyWindowPanes = async (
   executor: CommandExecutor,
   contextPath: string,
+  targetPaneId?: string,
 ): Promise<ClassifyWindowPanesResult> => {
-  const output = await executeCommand(executor, ["list-panes", "-F", SIDEBAR_LIST_PANES_FORMAT], {
+  // `-t <pane-id>` scopes `list-panes` to the window that pane belongs to (tmux
+  // resolves a pane id target to its containing window), so passing the current
+  // pane id here guarantees the classification covers that pane's window even in
+  // multi-window/multi-session setups where the "active" window might differ.
+  const command =
+    typeof targetPaneId === "string" && targetPaneId.length > 0
+      ? ["list-panes", "-t", targetPaneId, "-F", SIDEBAR_LIST_PANES_FORMAT]
+      : ["list-panes", "-F", SIDEBAR_LIST_PANES_FORMAT]
+
+  const output = await executeCommand(executor, command, {
     code: ErrorCodes.TMUX_COMMAND_FAILED,
     message: "Failed to list tmux panes for sidebar detection",
     path: contextPath,
