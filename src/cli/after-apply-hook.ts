@@ -17,6 +17,10 @@ type RunAfterApplyHookInput = {
   readonly runHostCommand?: RunHostCommand
 }
 
+// Matches the {{this_pane}}/{{focus_pane}} tokens that this module resolves to
+// context.focusPaneId (see the comment below on why they share one value).
+const FOCUS_PANE_TOKEN_PATTERN = /\{\{(?:this_pane|focus_pane)\}\}/
+
 /**
  * Runs the `hooks.afterApply` preset command once, after a preset has been applied
  * successfully. Failures (token resolution or command execution) are logged as
@@ -30,6 +34,18 @@ export const runAfterApplyHook = async ({
   runHostCommand = createDefaultRunHostCommand(),
 }: RunAfterApplyHookInput): Promise<void> => {
   if (typeof hookCommand !== "string" || hookCommand.length === 0) {
+    return
+  }
+
+  // {{this_pane}}/{{focus_pane}} resolve to context.focusPaneId (see the comment
+  // below), but replaceTemplateTokens substitutes them verbatim even when given an
+  // empty string - it only validates {{pane_id:<name>}} lookups. Treat a missing
+  // focus pane id as an unresolved token here too, rather than silently running the
+  // command with an empty pane id spliced in.
+  if (context.focusPaneId === undefined && FOCUS_PANE_TOKEN_PATTERN.test(hookCommand)) {
+    logger.warn(
+      "hooks.afterApply skipped: failed to resolve template tokens ({{this_pane}}/{{focus_pane}} require a focus pane id, but none was available)",
+    )
     return
   }
 
@@ -51,6 +67,10 @@ export const runAfterApplyHook = async ({
     logger.warn(`hooks.afterApply skipped: failed to resolve template tokens (${reason})`)
     return
   }
+
+  // Mirrors real-executor.ts's "Executing: <command>" log; logger.info is already
+  // gated on --verbose/VDE_VERBOSE by the shared logger implementation.
+  logger.info(`Executing: ${resolvedCommand}`)
 
   try {
     await runHostCommand(resolvedCommand, { cwd: context.cwd })

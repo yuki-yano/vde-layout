@@ -95,6 +95,57 @@ describe("runAfterApplyHook", () => {
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("missing"))
   })
 
+  it("warns and skips execution when {{focus_pane}} is used but no focus pane id is available", async () => {
+    const logger = createMockLogger()
+    const runHostCommand = vi.fn(async () => {})
+
+    await runAfterApplyHook({
+      hookCommand: "notify-focus {{focus_pane}}",
+      context: { cwd: "/workspace" },
+      logger,
+      runHostCommand,
+    })
+
+    expect(runHostCommand).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("focus pane"))
+  })
+
+  it("warns and skips execution when {{this_pane}} is used but no focus pane id is available", async () => {
+    const logger = createMockLogger()
+    const runHostCommand = vi.fn(async () => {})
+
+    await runAfterApplyHook({
+      hookCommand: "notify-focus {{this_pane}}",
+      context: { cwd: "/workspace" },
+      logger,
+      runHostCommand,
+    })
+
+    expect(runHostCommand).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+  })
+
+  it("logs the resolved command via logger.info before executing it", async () => {
+    const logger = createMockLogger()
+    const runHostCommand = vi.fn(async () => {})
+
+    await runAfterApplyHook({
+      hookCommand: "vde-tmux-sidebar open {{pane_id:sidebar}}",
+      context: {
+        cwd: "/workspace",
+        paneNameToRealId: new Map([["sidebar", "%2"]]),
+      },
+      logger,
+      runHostCommand,
+    })
+
+    expect(logger.info).toHaveBeenCalledWith("Executing: vde-tmux-sidebar open %2")
+    const infoOrder = (logger.info as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    const runOrder = runHostCommand.mock.invocationCallOrder[0]
+    expect(infoOrder).toBeLessThan(runOrder as number)
+  })
+
   it("warns but does not throw when the host command fails", async () => {
     const logger = createMockLogger()
     const runHostCommand = vi.fn(async () => {

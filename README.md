@@ -118,6 +118,8 @@ presets:
     layout:                     # optional; omit for single command presets
       # see Layout Structure
     command: "htop"             # optional; used when layout is omitted
+    hooks:                      # optional; see Hooks
+      afterApply: "vde-tmux-sidebar open {{pane_id:sidebar}}"
 ```
 
 ### Defaults Structure
@@ -185,6 +187,29 @@ presets:
 - Send commands to other panes: `tmux send-keys -t {{pane_id:editor}} "npm test" Enter`
 - Display pane information for debugging: `echo "Current: {{this_pane}}, Focus: {{focus_pane}}"`
 - Coordinate tasks across multiple panes within your preset configuration
+
+### Hooks
+`hooks.afterApply` runs an arbitrary host command once, after a preset has been applied successfully. It is a general-purpose hook (not specific to any tool); one intended use is opening a sidebar tool such as [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar) once the layout has finished building.
+
+```yaml
+presets:
+  dev-with-sidebar:
+    name: Dev with Sidebar
+    layout:
+      type: horizontal
+      ratio: [1, 3]
+      panes:
+        - name: sidebar
+        - name: editor
+          focus: true
+    hooks:
+      afterApply: "vde-tmux-sidebar open {{pane_id:sidebar}}"
+```
+
+- Runs exactly once, only after `applyPlan` succeeds; it never runs during `--dry-run` (dry-run instead prints the unresolved command as a planned step).
+- Executes as a host shell command (equivalent to `sh -c "<command>"`, so pipes/args/redirection work) in the directory vde-layout was invoked from (the CLI's `cwd`), not inside any particular tmux pane.
+- If the command fails, or if a template token inside it cannot be resolved, vde-layout logs a warning and the preset apply is still reported as successful (exit code is unaffected).
+- Template tokens are supported: `{{pane_id:<name>}}` resolves as usual. Because the hook doesn't run "in" any specific pane, `{{this_pane}}` and `{{focus_pane}}` both resolve to the pane that ended up focused after the apply.
 
 ### Ephemeral Panes
 Ephemeral panes automatically close after their command completes. This is useful for one-time tasks like builds, tests, or initialization scripts.
@@ -255,6 +280,7 @@ presets:
 - Each preset may override the default by specifying its own `windowMode`.
 - CLI flags (`--current-window` / `--new-window`) take highest precedence and override both presets and defaults.
 - When `current-window` mode is used during an actual run, vde-layout prompts for confirmation before closing panes other than the pane running the command. Dry-run mode prints the intended closures without prompting.
+- **Sidebar protection:** panes with the tmux pane user option `@vde_sidebar` set to `1` (as set by tools like [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar)) are treated as protected sidebar panes in `current-window` mode. They are never killed when reusing the window, and the preset's layout is built in the remaining, non-sidebar area of the window instead of the sidebar pane itself.
 
 
 ## Runtime Behavior
