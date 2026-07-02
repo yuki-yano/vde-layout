@@ -187,8 +187,8 @@ describe("executePlan", () => {
     expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%3"], dryRun: true })
 
     const commands = executor.getExecutedCommands()
-    expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}"])
-    expect(commands[1]).toEqual(["kill-pane", "-a", "-t", "%2"])
+    expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+    expect(commands[1]).toEqual(["kill-pane", "-t", "%3"])
     expect(commands.find((cmd) => cmd[0] === "new-window")).toBeUndefined()
 
     if (originalPane === undefined) {
@@ -244,12 +244,115 @@ describe("executePlan", () => {
     ).rejects.toMatchObject({ code: ErrorCodes.USER_CANCELLED })
 
     const commands = executor.getExecutedCommands()
-    expect(commands).toEqual([["list-panes", "-F", "#{pane_id}"]])
+    expect(commands).toEqual([["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"]])
 
     if (originalPane === undefined) {
       delete process.env.TMUX_PANE
     } else {
       process.env.TMUX_PANE = originalPane
+    }
+  })
+
+  it("excludes sidebar panes from the kill target and closes remaining panes individually", async () => {
+    const executor = createMockExecutor()
+    executor.setMockPaneIds(["%2", "%3", "%4"])
+    executor.setMockProtectedPaneIds(["%4"])
+    const originalPane = process.env.TMUX_PANE
+    process.env.TMUX_PANE = "%2"
+    const onConfirmKill = vi.fn().mockResolvedValue(true)
+
+    try {
+      const result = await executePlan({
+        emission: baseEmission,
+        executor,
+        windowMode: "current-window",
+        onConfirmKill,
+      })
+
+      expect(result.executedSteps).toBe(2)
+      expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%3"], dryRun: true })
+
+      const commands = executor.getExecutedCommands()
+      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[1]).toEqual(["kill-pane", "-t", "%3"])
+      expect(commands).not.toContainEqual(["kill-pane", "-t", "%4"])
+      expect(commands.some((cmd) => cmd[0] === "kill-pane" && cmd.includes("-a"))).toBe(false)
+    } finally {
+      if (originalPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalPane
+      }
+    }
+  })
+
+  it("uses the first normal pane as the split origin when the current pane is the sidebar", async () => {
+    const executor = createMockExecutor()
+    executor.setMockPaneIds(["%2", "%3", "%4"])
+    executor.setMockProtectedPaneIds(["%2"])
+    const originalPane = process.env.TMUX_PANE
+    process.env.TMUX_PANE = "%2"
+    const onConfirmKill = vi.fn().mockResolvedValue(true)
+
+    try {
+      const result = await executePlan({
+        emission: baseEmission,
+        executor,
+        windowMode: "current-window",
+        onConfirmKill,
+      })
+
+      expect(result.executedSteps).toBe(2)
+      expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%4"], dryRun: true })
+
+      const commands = executor.getExecutedCommands()
+      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[1]).toEqual(["kill-pane", "-t", "%4"])
+      // The layout is built from the resolved origin pane (%3), never the sidebar (%2).
+      expect(commands).toContainEqual(["split-window", "-h", "-t", "%3", "-p", "50"])
+      expect(commands).toContainEqual(["select-pane", "-t", "%3"])
+      expect(commands.some((cmd) => cmd.includes("%2"))).toBe(false)
+    } finally {
+      if (originalPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalPane
+      }
+    }
+  })
+
+  it("splits a pane beside the sidebar as the origin when the window has only the sidebar pane", async () => {
+    const executor = createMockExecutor()
+    executor.setMockPaneIds(["%9"])
+    executor.setMockProtectedPaneIds(["%9"])
+    const originalPane = process.env.TMUX_PANE
+    process.env.TMUX_PANE = "%9"
+    const onConfirmKill = vi.fn().mockResolvedValue(true)
+
+    try {
+      const result = await executePlan({
+        emission: baseEmission,
+        executor,
+        windowMode: "current-window",
+        onConfirmKill,
+      })
+
+      expect(result.executedSteps).toBe(2)
+      expect(onConfirmKill).not.toHaveBeenCalled()
+
+      const commands = executor.getExecutedCommands()
+      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[1]).toEqual(["split-window", "-h", "-t", "%9"])
+      expect(commands[2]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands.some((cmd) => cmd[0] === "kill-pane")).toBe(false)
+      // The newly split pane (%1) becomes the origin for the rest of the layout.
+      expect(commands).toContainEqual(["split-window", "-h", "-t", "%1", "-p", "50"])
+    } finally {
+      if (originalPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalPane
+      }
     }
   })
 
@@ -723,8 +826,8 @@ describe("executePlan", () => {
       expect(onConfirmKill).toHaveBeenCalledWith({ panesToClose: ["%1"], dryRun: true })
 
       const commands = executor.getExecutedCommands()
-      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}"])
-      expect(commands[1]).toEqual(["kill-pane", "-a", "-t", "%0"])
+      expect(commands[0]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[1]).toEqual(["kill-pane", "-t", "%1"])
     } finally {
       if (originalPane === undefined) {
         delete process.env.TMUX_PANE
@@ -759,8 +862,8 @@ describe("executePlan", () => {
 
       const commands = executor.getExecutedCommands()
       expect(commands[0]).toEqual(["display-message", "-p", "#{pane_id}"])
-      expect(commands[1]).toEqual(["list-panes", "-F", "#{pane_id}"])
-      expect(commands[2]).toEqual(["kill-pane", "-a", "-t", "%9"])
+      expect(commands[1]).toEqual(["list-panes", "-F", "#{pane_id}\t#{@vde_sidebar}"])
+      expect(commands[2]).toEqual(["kill-pane", "-t", "%10"])
     } finally {
       if (originalPane === undefined) {
         delete process.env.TMUX_PANE

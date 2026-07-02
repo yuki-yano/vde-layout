@@ -4,6 +4,7 @@ import { createTmuxExecutor } from "./executor"
 import type { CommandStep, PlanEmission } from "../../core/emitter"
 import { isCoreError } from "../../core/errors"
 import { executePlan } from "../../executor/plan-runner"
+import { SIDEBAR_LIST_PANES_FORMAT } from "../../executor/sidebar-detection"
 import { resolveSplitOrientation as resolveSplitOrientationFromStep, resolveSplitSize } from "../../executor/split-step"
 import { resolveRequiredStepTargetPaneId } from "../../executor/step-target"
 import { createUnsupportedStepKindError } from "../../executor/unsupported-step-kind"
@@ -179,8 +180,74 @@ const resolveInitialTmuxPaneSize = (): PaneDimensions | undefined => {
     return undefined
   }
 
+  const currentPane = queryTmuxCurrentPaneSizeAndSidebarFlag(tmuxPane)
+  if (currentPane === undefined) {
+    return undefined
+  }
+
+  if (!currentPane.isSidebar) {
+    return { cols: currentPane.cols, rows: currentPane.rows }
+  }
+
+  // The current pane is the protected sidebar. Dry-run sizing must reflect the
+  // pane the layout will actually be built from (see plan-runner's split-origin
+  // resolution), not the sidebar itself. A real split is never performed here:
+  // when the window has no other pane yet, sizing is simply left unresolved.
+  const originPaneId = resolveDryRunOriginPaneId()
+  if (originPaneId === undefined) {
+    return undefined
+  }
+
+  return queryTmuxPaneSize(originPaneId)
+}
+
+const queryTmuxCurrentPaneSizeAndSidebarFlag = (
+  paneId: string,
+): { cols: number; rows: number; isSidebar: boolean } | undefined => {
   try {
-    const sizeOutput = execFileSync("tmux", ["display-message", "-p", "-t", tmuxPane, "#{pane_width} #{pane_height}"], {
+    const output = execFileSync(
+      "tmux",
+      ["display-message", "-p", "-t", paneId, "#{pane_width} #{pane_height} #{@vde_sidebar}"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    ).trim()
+    const [colsRaw = "", rowsRaw = "", sidebarFlag = ""] = output.split(/\s+/, 3)
+
+    const cols = Number.parseInt(colsRaw, 10)
+    const rows = Number.parseInt(rowsRaw, 10)
+    if (!Number.isInteger(cols) || cols <= 0 || !Number.isInteger(rows) || rows <= 0) {
+      return undefined
+    }
+    return { cols, rows, isSidebar: sidebarFlag === "1" }
+  } catch {
+    return undefined
+  }
+}
+
+const resolveDryRunOriginPaneId = (): string | undefined => {
+  try {
+    const output = execFileSync("tmux", ["list-panes", "-F", SIDEBAR_LIST_PANES_FORMAT], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+
+    for (const line of output.split("\n")) {
+      const [paneId, sidebarFlag] = line.split("\t")
+      if (typeof paneId === "string" && paneId.trim().length > 0 && sidebarFlag?.trim() !== "1") {
+        return paneId.trim()
+      }
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+const queryTmuxPaneSize = (paneId: string): PaneDimensions | undefined => {
+  try {
+    const sizeOutput = execFileSync("tmux", ["display-message", "-p", "-t", paneId, "#{pane_width} #{pane_height}"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim()
