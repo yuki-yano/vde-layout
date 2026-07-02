@@ -17,6 +17,7 @@ import { parseWeztermListResult } from "./list-parser"
 import { registerPaneWithAncestors } from "./pane-map"
 import { applyFocusStep, applySplitStep, applyTerminalCommands } from "./step-execution"
 import type { ExecuteWeztermCommand, PaneMap } from "./shared"
+import { buildNameToRealIdMap } from "../../utils/template-tokens"
 
 const ensureVirtualPaneId = (emission: PlanEmission): string => {
   const { initialPaneId } = emission.summary
@@ -151,6 +152,7 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
     return {
       executedSteps,
       focusPaneId,
+      paneNameToRealId: buildNameToRealIdMap(emission.terminals, paneMap),
     }
   }
 

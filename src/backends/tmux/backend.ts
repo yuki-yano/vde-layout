@@ -4,9 +4,11 @@ import { createTmuxExecutor } from "./executor"
 import type { CommandStep, PlanEmission } from "../../core/emitter"
 import { isCoreError } from "../../core/errors"
 import { executePlan } from "../../executor/plan-runner"
+import { SIDEBAR_LIST_PANES_FORMAT } from "../../executor/sidebar-detection"
 import { resolveSplitOrientation as resolveSplitOrientationFromStep, resolveSplitSize } from "../../executor/split-step"
 import { resolveRequiredStepTargetPaneId } from "../../executor/step-target"
 import { createUnsupportedStepKindError } from "../../executor/unsupported-step-kind"
+import { buildNameToRealIdMap } from "../../utils/template-tokens"
 import type {
   ApplyPlanParameters,
   ApplyPlanResult,
@@ -66,9 +68,16 @@ export const createTmuxBackend = (context: TmuxTerminalBackendContext): Terminal
       detectedVersion,
     })
 
+    // The plan runner tracks a virtual-pane-id -> real-pane-id map internally; expose
+    // it (resolved) here so callers such as hooks.afterApply can address panes by
+    // name/focus without knowing tmux's virtual ids. Tests may stub executePlan
+    // without a paneMap, so fall back to an empty one rather than throwing.
+    const paneMap = executionResult.paneMap ?? new Map<string, string>()
+
     return {
       executedSteps: executionResult.executedSteps,
-      focusPaneId: emission.summary.focusPaneId,
+      focusPaneId: paneMap.get(emission.summary.focusPaneId),
+      paneNameToRealId: buildNameToRealIdMap(emission.terminals, paneMap),
     }
   }
 
@@ -167,6 +176,12 @@ const detectTmuxVersion = async (tmuxExecutor: ReturnType<typeof createTmuxExecu
   }
 }
 
+// This is windowMode-independent: it only reads process.env.TMUX_PANE/TMUX and is
+// invoked purely to seed dry-run size estimates, regardless of whether the plan will
+// eventually be applied in "current-window" or "new-window" mode. The sidebar
+// correction below therefore applies unconditionally whenever the process happens to
+// be running with its current pane inside a real tmux sidebar, not just when
+// windowMode is "current-window".
 const resolveInitialTmuxPaneSize = (): PaneDimensions | undefined => {
   const tmuxPane = process.env.TMUX_PANE
   const tmuxSession = process.env.TMUX
@@ -179,8 +194,80 @@ const resolveInitialTmuxPaneSize = (): PaneDimensions | undefined => {
     return undefined
   }
 
+  const currentPane = queryTmuxCurrentPaneSizeAndSidebarFlag(tmuxPane)
+  if (currentPane === undefined) {
+    return undefined
+  }
+
+  if (!currentPane.isSidebar) {
+    return { cols: currentPane.cols, rows: currentPane.rows }
+  }
+
+  // The current pane is the protected sidebar. Dry-run sizing must reflect the
+  // pane the layout will actually be built from (see plan-runner's split-origin
+  // resolution, which applies the same correction when windowMode is
+  // "current-window"), not the sidebar itself. A real split is never performed
+  // here: when the window has no other pane yet, sizing is simply left unresolved.
+  const originPaneId = resolveDryRunOriginPaneId(tmuxPane)
+  if (originPaneId === undefined) {
+    return undefined
+  }
+
+  return queryTmuxPaneSize(originPaneId)
+}
+
+const queryTmuxCurrentPaneSizeAndSidebarFlag = (
+  paneId: string,
+): { cols: number; rows: number; isSidebar: boolean } | undefined => {
   try {
-    const sizeOutput = execFileSync("tmux", ["display-message", "-p", "-t", tmuxPane, "#{pane_width} #{pane_height}"], {
+    const output = execFileSync(
+      "tmux",
+      ["display-message", "-p", "-t", paneId, "#{pane_width} #{pane_height} #{@vde_sidebar}"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    ).trim()
+    const [colsRaw = "", rowsRaw = "", sidebarFlag = ""] = output.split(/\s+/, 3)
+
+    const cols = Number.parseInt(colsRaw, 10)
+    const rows = Number.parseInt(rowsRaw, 10)
+    if (!Number.isInteger(cols) || cols <= 0 || !Number.isInteger(rows) || rows <= 0) {
+      return undefined
+    }
+    return { cols, rows, isSidebar: sidebarFlag === "1" }
+  } catch {
+    return undefined
+  }
+}
+
+// `-t targetPaneId` scopes `list-panes` to the window that pane belongs to, so the
+// caller's current pane id must be passed through here too (see the module-level
+// comment above on why this correction is windowMode-independent): without it,
+// this would list tmux's "active" window instead of the one this process is
+// actually running in, which can differ in multi-window/multi-session setups.
+const resolveDryRunOriginPaneId = (targetPaneId: string): string | undefined => {
+  try {
+    const output = execFileSync("tmux", ["list-panes", "-t", targetPaneId, "-F", SIDEBAR_LIST_PANES_FORMAT], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+
+    for (const line of output.split("\n")) {
+      const [paneId, sidebarFlag] = line.split("\t")
+      if (typeof paneId === "string" && paneId.trim().length > 0 && sidebarFlag?.trim() !== "1") {
+        return paneId.trim()
+      }
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+const queryTmuxPaneSize = (paneId: string): PaneDimensions | undefined => {
+  try {
+    const sizeOutput = execFileSync("tmux", ["display-message", "-p", "-t", paneId, "#{pane_width} #{pane_height}"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim()

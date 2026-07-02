@@ -9,6 +9,7 @@ export type {
   CompilePresetFromValueInput,
   CompilePresetSuccess,
   CompiledPreset,
+  CompiledPresetHooks,
   CompiledRatioEntry,
 } from "./compile"
 export type { CreateLayoutPlanSuccess, LayoutPlan, PlanNode } from "./planner"

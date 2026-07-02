@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 
 import type { DryRunStep } from "../executor/terminal-backend"
-import { buildPresetSource, determineCliWindowMode, renderDryRun } from "./command-helpers"
+import { buildPresetSource, determineCliWindowMode, renderDryRun, renderDryRunHook } from "./command-helpers"
 
 describe("command helpers", () => {
   describe("buildPresetSource", () => {
@@ -68,6 +68,26 @@ describe("command helpers", () => {
       expect(output).toHaveBeenCalledTimes(2)
       expect(output).toHaveBeenNthCalledWith(1, expect.stringContaining("Planned terminal steps (dry-run)"))
       expect(output).toHaveBeenNthCalledWith(2, " 1. [tmux] split root: tmux split-window -h -t root -p 50")
+    })
+  })
+
+  describe("renderDryRunHook", () => {
+    it("renders the unresolved afterApply command as a planned step", () => {
+      const output = vi.fn()
+
+      renderDryRunHook("vde-tmux-sidebar open {{pane_id:sidebar}}", output)
+
+      expect(output).toHaveBeenCalledTimes(2)
+      expect(output).toHaveBeenNthCalledWith(1, expect.stringContaining("Planned hooks (dry-run)"))
+      expect(output).toHaveBeenNthCalledWith(2, " 1. [afterApply] vde-tmux-sidebar open {{pane_id:sidebar}}")
+    })
+
+    it("renders nothing when no afterApply hook is configured", () => {
+      const output = vi.fn()
+
+      renderDryRunHook(undefined, output)
+
+      expect(output).not.toHaveBeenCalled()
     })
   })
 })

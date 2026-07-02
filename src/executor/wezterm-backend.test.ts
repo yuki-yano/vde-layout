@@ -360,6 +360,25 @@ describe("createWeztermBackend", () => {
     expect(result.focusPaneId).toBe("42")
   })
 
+  it("resolves the pane name map from the final virtual-to-real pane mapping", async () => {
+    queueListResponses(
+      makeList([{ windowId: "7", panes: [{ paneId: "10", active: true }] }]),
+      makeList([{ windowId: "7", panes: [{ paneId: "10", active: true }, { paneId: "42" }] }]),
+    )
+    runMock.mockResolvedValueOnce("42 7\n")
+
+    const backend = createWeztermBackend(createContext())
+    const emission: PlanEmission = {
+      ...minimalEmission(),
+      terminals: [
+        { virtualPaneId: "root", command: undefined, cwd: undefined, env: undefined, focus: true, name: "main" },
+      ],
+    }
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(Object.fromEntries(result.paneNameToRealId ?? new Map())).toEqual({ main: "42" })
+  })
+
   it("targets the workspace of the current pane when multiple workspaces exist", async () => {
     queueListResponses(
       makeList([

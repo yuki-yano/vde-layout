@@ -1,11 +1,13 @@
 import { createTerminalBackend } from "../executor/backend-factory"
 import { resolveTerminalBackendKind } from "../executor/backend-resolver"
 import type { TerminalBackendKind } from "../executor/terminal-backend"
+import type { CompiledPreset } from "../core/index"
 import type { WindowMode } from "../models/types"
 import type { CommandExecutor } from "../contracts"
 import type { PresetManager } from "../contracts"
 import type { Logger } from "../utils/logger"
-import { buildPresetSource, determineCliWindowMode, renderDryRun } from "./command-helpers"
+import { runAfterApplyHook } from "./after-apply-hook"
+import { buildPresetSource, determineCliWindowMode, renderDryRun, renderDryRunHook } from "./command-helpers"
 import type { CoreBridge } from "./core-bridge"
 import { createPaneKillPrompter } from "./user-prompt"
 import { resolveWindowMode } from "./window-mode"
@@ -101,12 +103,15 @@ export const executePreset = async ({
     }
 
     let emission
+    let compiledPreset: CompiledPreset
     try {
-      emission = buildPlanEmission({
+      const built = buildPlanEmission({
         core,
         preset,
         presetName,
       })
+      emission = built.emission
+      compiledPreset = built.compiledPreset
     } catch (error) {
       return handlePipelineFailure(error)
     }
@@ -114,6 +119,7 @@ export const executePreset = async ({
     if (options.dryRun === true) {
       const dryRunSteps = backend.getDryRunSteps(emission)
       renderDryRun(dryRunSteps, output)
+      renderDryRunHook(compiledPreset.hooks?.afterApply, output)
     } else {
       try {
         const executionResult = await backend.applyPlan({
@@ -125,6 +131,19 @@ export const executePreset = async ({
           }),
         })
         logger.info(`Executed ${executionResult.executedSteps} ${backendKind} steps`)
+
+        const afterApplyCommand = compiledPreset.hooks?.afterApply
+        if (afterApplyCommand !== undefined) {
+          await runAfterApplyHook({
+            hookCommand: afterApplyCommand,
+            context: {
+              cwd,
+              focusPaneId: executionResult.focusPaneId,
+              paneNameToRealId: executionResult.paneNameToRealId,
+            },
+            logger,
+          })
+        }
       } catch (error) {
         return handlePipelineFailure(error)
       }
@@ -145,13 +164,17 @@ const buildPlanEmission = ({
   readonly core: CoreBridge
   readonly preset: ReturnType<PresetManager["getDefaultPreset"]>
   readonly presetName?: string
-}): ReturnType<CoreBridge["emitPlan"]> => {
+}): {
+  readonly emission: ReturnType<CoreBridge["emitPlan"]>
+  readonly compiledPreset: CompiledPreset
+} => {
   const compileResult = core.compilePresetFromValue({
     value: preset,
     source: buildPresetSource(presetName),
   })
   const planResult = core.createLayoutPlan({ preset: compileResult.preset })
-  return core.emitPlan({ plan: planResult.plan })
+  const emission = core.emitPlan({ plan: planResult.plan })
+  return { emission, compiledPreset: compileResult.preset }
 }
 
 const resolveWindowName = ({

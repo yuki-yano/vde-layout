@@ -13,6 +13,12 @@ const SelectorFzfSchema = z
   })
   .strict()
 
+const HooksSchema = z
+  .object({
+    afterApply: z.string().min(1).optional(),
+  })
+  .strict()
+
 const SelectorDefaultsSchema = z
   .object({
     ui: SelectUiModeSchema.optional(),
@@ -99,6 +105,7 @@ export const PresetSchema = z.object({
   command: z.string().optional(),
   windowMode: WindowModeSchema.optional(),
   backend: TerminalBackendSchema.optional(),
+  hooks: HooksSchema.optional(),
 })
 
 // Config schema definition

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { CommandExecutor } from "../contracts"
 import type { PlanEmission } from "../core/emitter"
@@ -21,6 +21,10 @@ const { executePlanMock } = vi.hoisted(() => ({
   executePlanMock: vi.fn(),
 }))
 
+const { execFileSyncMock } = vi.hoisted(() => ({
+  execFileSyncMock: vi.fn(),
+}))
+
 vi.mock("../backends/tmux/executor.ts", () => {
   return {
     createTmuxExecutor: vi.fn(() => ({
@@ -35,6 +39,12 @@ vi.mock("../backends/tmux/executor.ts", () => {
 vi.mock("./plan-runner.ts", () => {
   return {
     executePlan: executePlanMock,
+  }
+})
+
+vi.mock("node:child_process", () => {
+  return {
+    execFileSync: execFileSyncMock,
   }
 })
 
@@ -97,6 +107,13 @@ describe("createTmuxBackend", () => {
     executeMock.mockReset()
     getCommandStringMock.mockImplementation((args: string[]) => `tmux ${args.join(" ")}`)
     executeMock.mockResolvedValue("tmux 3.4")
+    execFileSyncMock.mockReset()
+    // Default: behave as if no real tmux session backs process.env.TMUX_PANE, so
+    // pane-size resolution silently falls back to undefined unless a test opts in
+    // with its own implementation.
+    execFileSyncMock.mockImplementation(() => {
+      throw new Error("tmux not available")
+    })
   })
 
   const createContext = (overrides: Partial<TmuxTerminalBackendContext> = {}): TmuxTerminalBackendContext => ({
@@ -141,6 +158,54 @@ describe("createTmuxBackend", () => {
       detectedVersion: undefined,
     })
     expect(result.executedSteps).toBe(2)
+  })
+
+  it("resolves the real focus pane id and pane name map from the plan runner's pane map", async () => {
+    const emission: PlanEmission = {
+      ...createEmission(),
+      terminals: [
+        { virtualPaneId: "root", command: undefined, cwd: undefined, env: undefined, focus: true, name: "main" },
+        {
+          virtualPaneId: "root.1",
+          command: undefined,
+          cwd: undefined,
+          env: undefined,
+          focus: false,
+          name: "sidebar",
+        },
+      ],
+    }
+    executePlanMock.mockResolvedValue({
+      executedSteps: 2,
+      paneMap: new Map([
+        ["root", "%0"],
+        ["root.1", "%1"],
+      ]),
+    })
+    const context = createContext()
+    getExecutorMock.mockReturnValue(context.executor)
+
+    const backend = createTmuxBackend(context)
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(result.focusPaneId).toBe("%0")
+    expect(Object.fromEntries(result.paneNameToRealId ?? new Map())).toEqual({
+      main: "%0",
+      sidebar: "%1",
+    })
+  })
+
+  it("falls back to an empty pane name map when the plan runner omits pane mapping", async () => {
+    const emission = createEmission()
+    executePlanMock.mockResolvedValue({ executedSteps: 2 })
+    const context = createContext()
+    getExecutorMock.mockReturnValue(context.executor)
+
+    const backend = createTmuxBackend(context)
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(result.focusPaneId).toBeUndefined()
+    expect(Object.fromEntries(result.paneNameToRealId ?? new Map())).toEqual({})
   })
 
   it("provides dry-run steps with tmux command strings", () => {
@@ -208,6 +273,134 @@ describe("createTmuxBackend", () => {
         process.env.TMUX_PANE = originalTMUXPane
       }
     }
+  })
+
+  const withDynamicCellsEmission = (): PlanEmission => {
+    const baseEmission = createEmission()
+    const [splitStep, focusStep] = baseEmission.steps
+    if (splitStep === undefined || focusStep === undefined) {
+      throw new Error("expected split and focus steps")
+    }
+
+    return {
+      ...baseEmission,
+      steps: [
+        {
+          ...splitStep,
+          splitSizing: {
+            mode: "dynamic-cells",
+            target: { kind: "fixed-cells", cells: 80 },
+            remainingFixedCells: 0,
+            remainingWeight: 1,
+            remainingWeightPaneCount: 1,
+          },
+          percentage: undefined,
+        },
+        focusStep,
+      ],
+    }
+  }
+
+  describe("dry-run pane sizing when the current pane is the protected sidebar", () => {
+    let originalTMUX: string | undefined
+    let originalTMUXPane: string | undefined
+
+    beforeEach(() => {
+      originalTMUX = process.env.TMUX
+      originalTMUXPane = process.env.TMUX_PANE
+      process.env.TMUX = "test-socket,123,0"
+      process.env.TMUX_PANE = "%5"
+    })
+
+    afterEach(() => {
+      if (originalTMUX === undefined) {
+        delete process.env.TMUX
+      } else {
+        process.env.TMUX = originalTMUX
+      }
+
+      if (originalTMUXPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalTMUXPane
+      }
+    })
+
+    it("uses the resolved origin pane's size when the current pane is the sidebar", () => {
+      execFileSyncMock.mockImplementation((_command: string, args: string[]) => {
+        if (args[3] === "%5" && args[4] === "#{pane_width} #{pane_height} #{@vde_sidebar}") {
+          return "10 20 1"
+        }
+        if (args[0] === "list-panes") {
+          return "%5\t1\n%6\t\n"
+        }
+        if (args[3] === "%6" && args[4] === "#{pane_width} #{pane_height}") {
+          return "120 40"
+        }
+        throw new Error(`unexpected tmux call: ${args.join(" ")}`)
+      })
+
+      const backend = createTmuxBackend(createContext())
+      const steps = backend.getDryRunSteps(withDynamicCellsEmission())
+
+      expect(steps[0]).toEqual({
+        backend: "tmux",
+        summary: "split",
+        command: "tmux split-window -h -t root -l 40",
+      })
+      // list-panes must be scoped via -t to the current pane's own window (%5),
+      // not tmux's globally "active" window, so multi-window/multi-session setups
+      // resolve the origin pane correctly.
+      expect(execFileSyncMock).toHaveBeenCalledWith(
+        "tmux",
+        ["list-panes", "-t", "%5", "-F", "#{pane_id}\t#{@vde_sidebar}"],
+        expect.anything(),
+      )
+    })
+
+    it("falls back to <dynamic> when the sidebar has no normal pane to measure", () => {
+      execFileSyncMock.mockImplementation((_command: string, args: string[]) => {
+        if (args[3] === "%5" && args[4] === "#{pane_width} #{pane_height} #{@vde_sidebar}") {
+          return "10 20 1"
+        }
+        if (args[0] === "list-panes") {
+          return "%5\t1"
+        }
+        throw new Error(`unexpected tmux call: ${args.join(" ")}`)
+      })
+
+      const backend = createTmuxBackend(createContext())
+      const steps = backend.getDryRunSteps(withDynamicCellsEmission())
+
+      expect(steps[0]).toEqual({
+        backend: "tmux",
+        summary: "split",
+        command: "tmux split-window -h -t root -l <dynamic>",
+      })
+    })
+
+    it("uses the current pane's own size directly when it is not the sidebar (no regression)", () => {
+      execFileSyncMock.mockImplementation((_command: string, args: string[]) => {
+        if (args[3] === "%5" && args[4] === "#{pane_width} #{pane_height} #{@vde_sidebar}") {
+          return "120 40"
+        }
+        throw new Error(`unexpected tmux call: ${args.join(" ")}`)
+      })
+
+      const backend = createTmuxBackend(createContext())
+      const steps = backend.getDryRunSteps(withDynamicCellsEmission())
+
+      expect(steps[0]).toEqual({
+        backend: "tmux",
+        summary: "split",
+        command: "tmux split-window -h -t root -l 40",
+      })
+      expect(execFileSyncMock).not.toHaveBeenCalledWith(
+        "tmux",
+        expect.arrayContaining(["list-panes"]),
+        expect.anything(),
+      )
+    })
   })
 
   it("throws MISSING_TARGET when dry-run split step omits target metadata", () => {

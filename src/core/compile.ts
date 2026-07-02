@@ -44,11 +44,16 @@ type CompiledPresetMetadata = {
   readonly source: string
 }
 
+export type CompiledPresetHooks = {
+  readonly afterApply?: string
+}
+
 export type CompiledPreset = {
   readonly name: string
   readonly version: string
   readonly command?: string
   readonly layout?: CompiledLayoutNode
+  readonly hooks?: CompiledPresetHooks
   readonly metadata: CompiledPresetMetadata
 }
 
@@ -107,9 +112,20 @@ const compilePresetValue = ({ value, source }: CompilePresetFromValueInput): Com
       version: "legacy",
       command: typeof parsed.command === "string" ? parsed.command : undefined,
       layout: layout ?? undefined,
+      hooks: parseHooks(parsed.hooks),
       metadata: { source },
     },
   }
+}
+
+const parseHooks = (hooks: unknown): CompiledPresetHooks | undefined => {
+  if (!isRecord(hooks)) {
+    return undefined
+  }
+
+  const afterApply = typeof hooks.afterApply === "string" && hooks.afterApply.length > 0 ? hooks.afterApply : undefined
+
+  return afterApply === undefined ? undefined : { afterApply }
 }
 
 const validateLayoutDefinition = (
