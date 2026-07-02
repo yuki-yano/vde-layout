@@ -168,6 +168,12 @@ const detectTmuxVersion = async (tmuxExecutor: ReturnType<typeof createTmuxExecu
   }
 }
 
+// This is windowMode-independent: it only reads process.env.TMUX_PANE/TMUX and is
+// invoked purely to seed dry-run size estimates, regardless of whether the plan will
+// eventually be applied in "current-window" or "new-window" mode. The sidebar
+// correction below therefore applies unconditionally whenever the process happens to
+// be running with its current pane inside a real tmux sidebar, not just when
+// windowMode is "current-window".
 const resolveInitialTmuxPaneSize = (): PaneDimensions | undefined => {
   const tmuxPane = process.env.TMUX_PANE
   const tmuxSession = process.env.TMUX
@@ -191,8 +197,9 @@ const resolveInitialTmuxPaneSize = (): PaneDimensions | undefined => {
 
   // The current pane is the protected sidebar. Dry-run sizing must reflect the
   // pane the layout will actually be built from (see plan-runner's split-origin
-  // resolution), not the sidebar itself. A real split is never performed here:
-  // when the window has no other pane yet, sizing is simply left unresolved.
+  // resolution, which applies the same correction when windowMode is
+  // "current-window"), not the sidebar itself. A real split is never performed
+  // here: when the window has no other pane yet, sizing is simply left unresolved.
   const originPaneId = resolveDryRunOriginPaneId()
   if (originPaneId === undefined) {
     return undefined

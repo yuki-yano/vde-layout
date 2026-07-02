@@ -356,6 +356,77 @@ describe("executePlan", () => {
     }
   })
 
+  it("throws TMUX_COMMAND_FAILED when splitting a pane beside the sidebar fails", async () => {
+    const originalPane = process.env.TMUX_PANE
+    process.env.TMUX_PANE = "%9"
+
+    try {
+      const executor = {
+        execute: vi.fn(async (command: string | string[]) => {
+          const args = typeof command === "string" ? command.split(" ").slice(1) : command
+          if (args[0] === "list-panes") {
+            return "%9\t1"
+          }
+          if (args[0] === "split-window") {
+            throw new Error("tmux split-window failed")
+          }
+          return ""
+        }),
+        executeMany: vi.fn(async () => {}),
+        isDryRun: () => true,
+        logCommand: vi.fn(),
+      }
+
+      await expect(
+        executePlan({ emission: baseEmission, executor, windowMode: "current-window" }),
+      ).rejects.toMatchObject({
+        code: ErrorCodes.TMUX_COMMAND_FAILED,
+        path: "root.0",
+      })
+    } finally {
+      if (originalPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalPane
+      }
+    }
+  })
+
+  it("throws INVALID_PANE when the pane created beside the sidebar cannot be determined", async () => {
+    const originalPane = process.env.TMUX_PANE
+    process.env.TMUX_PANE = "%9"
+
+    try {
+      const executor = {
+        execute: vi.fn(async (command: string | string[]) => {
+          const args = typeof command === "string" ? command.split(" ").slice(1) : command
+          if (args[0] === "list-panes") {
+            // Always reports only the sidebar pane, simulating a split that never
+            // produced a new (or newly-visible) normal pane.
+            return "%9\t1"
+          }
+          return ""
+        }),
+        executeMany: vi.fn(async () => {}),
+        isDryRun: () => true,
+        logCommand: vi.fn(),
+      }
+
+      await expect(
+        executePlan({ emission: baseEmission, executor, windowMode: "current-window" }),
+      ).rejects.toMatchObject({
+        code: ErrorCodes.INVALID_PANE,
+        path: "root.0",
+      })
+    } finally {
+      if (originalPane === undefined) {
+        delete process.env.TMUX_PANE
+      } else {
+        process.env.TMUX_PANE = originalPane
+      }
+    }
+  })
+
   it("supports resolving ancestor and descendant virtual pane identifiers", async () => {
     const nestedEmission: PlanEmission = {
       steps: [
