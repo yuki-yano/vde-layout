@@ -153,6 +153,7 @@ export const createWeztermBackend = (context: WeztermTerminalBackendContext): Te
       executedSteps,
       focusPaneId,
       paneNameToRealId: buildNameToRealIdMap(emission.terminals, paneMap),
+      windowId,
     }
   }
 

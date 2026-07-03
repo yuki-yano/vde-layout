@@ -5,6 +5,11 @@ import type { EmittedTerminal } from "../core/emitter"
  * - {{pane_id:<name>}} - resolves to a specific pane's ID by name
  * - {{this_pane}} - references the current pane receiving the command
  * - {{focus_pane}} - references the intended focus pane
+ * - {{window_id}} - references the real window ID the layout was applied into
+ *   (e.g. tmux's `@5`). Only resolved by callers that supply `windowId`
+ *   (currently hooks.afterApply); callers that omit it - e.g. pane
+ *   `command:` preparation - get a TemplateTokenError if the token is used,
+ *   the same as an unresolved {{pane_id:<name>}}.
  */
 
 type ReplaceTemplateTokensInput = {
@@ -12,6 +17,7 @@ type ReplaceTemplateTokensInput = {
   readonly currentPaneRealId: string
   readonly focusPaneRealId: string
   readonly nameToRealIdMap: ReadonlyMap<string, string>
+  readonly windowId?: string
 }
 
 export type TemplateTokenError = Error & {
@@ -53,17 +59,19 @@ export const TemplateTokenError = TemplateTokenErrorImpl as TemplateTokenErrorCo
  *
  * @param input - Object containing the command and pane ID mappings
  * @returns The command string with all template tokens replaced
- * @throws TemplateTokenError if a referenced pane name is not found in the mapping
+ * @throws TemplateTokenError if a referenced pane name is not found in the mapping,
+ *   or if {{window_id}} is used but no `windowId` was supplied
  */
 export const replaceTemplateTokens = ({
   command,
   currentPaneRealId,
   focusPaneRealId,
   nameToRealIdMap,
+  windowId,
 }: ReplaceTemplateTokensInput): string => {
   // Single-pass regex that matches all token types
   // This prevents nested token issues by replacing everything in one pass
-  const tokenPattern = /\{\{(this_pane|focus_pane|pane_id:([^}]+))\}\}/g
+  const tokenPattern = /\{\{(this_pane|focus_pane|window_id|pane_id:([^}]+))\}\}/g
 
   return command.replace(tokenPattern, (match, tokenContent: string, paneName?: string) => {
     if (tokenContent === "this_pane") {
@@ -72,6 +80,16 @@ export const replaceTemplateTokens = ({
 
     if (tokenContent === "focus_pane") {
       return focusPaneRealId
+    }
+
+    if (tokenContent === "window_id") {
+      if (windowId === undefined) {
+        throw new TemplateTokenError(
+          "Window ID is not available. {{window_id}} can only be resolved in hooks.afterApply.",
+          "window_id",
+        )
+      }
+      return windowId
     }
 
     // Must be pane_id:<name> token

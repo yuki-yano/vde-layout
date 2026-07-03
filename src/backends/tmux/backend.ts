@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { type PaneDimensions, updatePaneSizes } from "../pane-tracking"
-import { createTmuxExecutor } from "./executor"
+import { createTmuxExecutor, type TmuxExecutor } from "./executor"
 import type { CommandStep, PlanEmission } from "../../core/emitter"
 import { isCoreError } from "../../core/errors"
 import { executePlan } from "../../executor/plan-runner"
@@ -73,11 +73,13 @@ export const createTmuxBackend = (context: TmuxTerminalBackendContext): Terminal
     // name/focus without knowing tmux's virtual ids. Tests may stub executePlan
     // without a paneMap, so fall back to an empty one rather than throwing.
     const paneMap = executionResult.paneMap ?? new Map<string, string>()
+    const focusPaneId = paneMap.get(emission.summary.focusPaneId)
 
     return {
       executedSteps: executionResult.executedSteps,
-      focusPaneId: paneMap.get(emission.summary.focusPaneId),
+      focusPaneId,
       paneNameToRealId: buildNameToRealIdMap(emission.terminals, paneMap),
+      windowId: await resolveTmuxWindowId({ tmuxExecutor, focusPaneId }),
     }
   }
 
@@ -85,6 +87,32 @@ export const createTmuxBackend = (context: TmuxTerminalBackendContext): Terminal
     verifyEnvironment,
     applyPlan,
     getDryRunSteps: buildDryRunSteps,
+  }
+}
+
+// Resolves the real tmux window id (e.g. "@5") the layout was applied into, so
+// callers such as hooks.afterApply can pass it to external tools via {{window_id}}.
+// tmux's `-t` does not expand formats, so this literal must be resolved here rather
+// than left for the consuming command to figure out. Issued once, after the plan has
+// finished applying; any failure (e.g. the pane has since gone away) is swallowed so
+// it never affects the outcome of applyPlan itself.
+const resolveTmuxWindowId = async ({
+  tmuxExecutor,
+  focusPaneId,
+}: {
+  readonly tmuxExecutor: TmuxExecutor
+  readonly focusPaneId: string | undefined
+}): Promise<string | undefined> => {
+  if (focusPaneId === undefined) {
+    return undefined
+  }
+
+  try {
+    const output = await tmuxExecutor.execute(["display-message", "-p", "-t", focusPaneId, "#{window_id}"])
+    const trimmed = output.trim()
+    return trimmed.length > 0 ? trimmed : undefined
+  } catch {
+    return undefined
   }
 }
 

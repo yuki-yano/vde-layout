@@ -16,6 +16,7 @@ export type ApplyPlanResult = {
   readonly executedSteps: number
   readonly focusPaneId?: string
   readonly paneNameToRealId?: ReadonlyMap<string, string>
+  readonly windowId?: string
 }
 
 export type DryRunStep = {

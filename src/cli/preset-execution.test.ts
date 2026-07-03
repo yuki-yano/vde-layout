@@ -274,6 +274,47 @@ describe("executePreset", () => {
     })
   })
 
+  it("passes the resolved window id from applyPlan through to hooks.afterApply", async () => {
+    const logger = createMockLogger()
+    const presetManager = createMockPresetManager(basePreset)
+    const core = createMockCore(baseEmission, {
+      hooks: { afterApply: "vde-tmux-sidebar layout-applied --window '{{window_id}}'" },
+    })
+    const executor = createMockExecutor()
+    const backend: TerminalBackend = {
+      verifyEnvironment: vi.fn(async () => {}),
+      applyPlan: vi.fn(async () => ({ executedSteps: 2, focusPaneId: "%0", windowId: "@5" })),
+      getDryRunSteps: vi.fn(() => []),
+    }
+    createTerminalBackendMock.mockReturnValue(backend)
+
+    const exitCode = await executePreset({
+      presetName: "dev",
+      options: {
+        verbose: false,
+        dryRun: false,
+        currentWindow: false,
+        newWindow: true,
+      },
+      presetManager,
+      createCommandExecutor: vi.fn(() => executor),
+      core,
+      logger,
+      handleError: vi.fn(() => 1),
+      handlePipelineFailure: vi.fn(() => 1),
+      output: vi.fn(),
+      cwd: "/workspace",
+      env: {},
+    })
+
+    expect(exitCode).toBe(0)
+    expect(runAfterApplyHookMock).toHaveBeenCalledWith({
+      hookCommand: "vde-tmux-sidebar layout-applied --window '{{window_id}}'",
+      context: { cwd: "/workspace", focusPaneId: "%0", paneNameToRealId: undefined, windowId: "@5" },
+      logger,
+    })
+  })
+
   it("skips hooks.afterApply during dry-run and renders it as a planned step instead", async () => {
     const logger = createMockLogger()
     const presetManager = createMockPresetManager(basePreset)
