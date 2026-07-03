@@ -5,6 +5,10 @@ import type { EmittedTerminal } from "../core/emitter"
  * - {{pane_id:<name>}} - resolves to a specific pane's ID by name
  * - {{this_pane}} - references the current pane receiving the command
  * - {{focus_pane}} - references the intended focus pane
+ * - {{window_id}} - references the real window ID the layout was applied into
+ *   (e.g. tmux's `@5`). Only resolved by callers that supply `windowId`
+ *   (currently hooks.afterApply); other callers omit it and the token
+ *   substitutes to an empty string.
  */
 
 type ReplaceTemplateTokensInput = {
@@ -12,6 +16,7 @@ type ReplaceTemplateTokensInput = {
   readonly currentPaneRealId: string
   readonly focusPaneRealId: string
   readonly nameToRealIdMap: ReadonlyMap<string, string>
+  readonly windowId?: string
 }
 
 export type TemplateTokenError = Error & {
@@ -60,10 +65,11 @@ export const replaceTemplateTokens = ({
   currentPaneRealId,
   focusPaneRealId,
   nameToRealIdMap,
+  windowId,
 }: ReplaceTemplateTokensInput): string => {
   // Single-pass regex that matches all token types
   // This prevents nested token issues by replacing everything in one pass
-  const tokenPattern = /\{\{(this_pane|focus_pane|pane_id:([^}]+))\}\}/g
+  const tokenPattern = /\{\{(this_pane|focus_pane|window_id|pane_id:([^}]+))\}\}/g
 
   return command.replace(tokenPattern, (match, tokenContent: string, paneName?: string) => {
     if (tokenContent === "this_pane") {
@@ -72,6 +78,10 @@ export const replaceTemplateTokens = ({
 
     if (tokenContent === "focus_pane") {
       return focusPaneRealId
+    }
+
+    if (tokenContent === "window_id") {
+      return windowId ?? ""
     }
 
     // Must be pane_id:<name> token

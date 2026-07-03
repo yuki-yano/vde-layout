@@ -140,6 +140,7 @@ export const executePreset = async ({
               cwd,
               focusPaneId: executionResult.focusPaneId,
               paneNameToRealId: executionResult.paneNameToRealId,
+              windowId: executionResult.windowId,
             },
             logger,
           })

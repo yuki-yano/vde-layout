@@ -166,6 +166,7 @@ You can reference dynamically-assigned pane IDs within pane commands using templ
 - **`{{this_pane}}`** - References the current pane receiving the command
 - **`{{focus_pane}}`** - References the pane that will receive focus
 - **`{{pane_id:<name>}}`** - References a specific pane by its name
+- **`{{window_id}}`** - References the real window ID the layout was applied into (e.g. tmux's `@5`). Only resolved in `hooks.afterApply` (see [Hooks](#hooks)); it is not resolved in pane `command`.
 
 Example:
 ```yaml
@@ -213,6 +214,14 @@ presets:
 - If the command fails, or if a template token inside it cannot be resolved, vde-layout logs a warning and the preset apply is still reported as successful (exit code is unaffected).
 - The command is killed and treated as a failure (logged as a warning) if it runs for longer than 30 seconds.
 - Template tokens are supported, but `{{pane_id:<name>}}` only resolves against the pane names created by *this apply's* own `layout` — it cannot address an existing external pane such as a sidebar. This is especially easy to get wrong in `current-window` mode: the reused current pane is bound to the layout tree's first pane name, so a hook that tries `{{pane_id:sidebar}}` for a preset pane named `sidebar` would silently resolve to the current pane, not the real sidebar. Because the hook doesn't run "in" any specific pane, `{{this_pane}}` and `{{focus_pane}}` both resolve to the pane that ended up focused after the apply.
+- `{{window_id}}` resolves to the real window ID the layout was applied into (tmux's `@5`-style ID, or wezterm's window ID). This is the recommended way to hand off to an external tool such as [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar) that needs to target the applied window — tmux's `-t` does not expand formats, so vde-layout resolves it to a literal before running the hook:
+
+  ```yaml
+  hooks:
+    afterApply: "command -v vde-tmux-sidebar >/dev/null 2>&1 && vde-tmux-sidebar layout-applied --window '{{window_id}}' || true"
+  ```
+
+  If `{{window_id}}` is used but the window ID could not be resolved, the hook is skipped (logged as a warning) rather than run with a blank value.
 
 ### Ephemeral Panes
 Ephemeral panes automatically close after their command completes. This is useful for one-time tasks like builds, tests, or initialization scripts.

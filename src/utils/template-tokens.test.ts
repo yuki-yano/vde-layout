@@ -61,6 +61,27 @@ describe("replaceTemplateTokens", () => {
     expect(result).toBe("%1 and %1 again")
   })
 
+  it("should replace {{window_id}} with the provided window ID", () => {
+    const result = replaceTemplateTokens({
+      command: "vde-tmux-sidebar layout-applied --window '{{window_id}}'",
+      currentPaneRealId: "%1",
+      focusPaneRealId: "%2",
+      nameToRealIdMap: new Map(),
+      windowId: "@5",
+    })
+    expect(result).toBe("vde-tmux-sidebar layout-applied --window '@5'")
+  })
+
+  it("should replace {{window_id}} with an empty string when windowId is not provided", () => {
+    const result = replaceTemplateTokens({
+      command: "notify --window {{window_id}}",
+      currentPaneRealId: "%1",
+      focusPaneRealId: "%2",
+      nameToRealIdMap: new Map(),
+    })
+    expect(result).toBe("notify --window ")
+  })
+
   it("should handle commands with no template tokens", () => {
     const result = replaceTemplateTokens({
       command: "echo 'Hello, world!'",

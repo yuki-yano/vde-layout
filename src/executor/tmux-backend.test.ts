@@ -195,6 +195,54 @@ describe("createTmuxBackend", () => {
     })
   })
 
+  it("resolves the real window id via a single display-message query after apply", async () => {
+    const emission = createEmission()
+    executePlanMock.mockResolvedValue({
+      executedSteps: 2,
+      paneMap: new Map([["root", "%0"]]),
+    })
+    const context = createContext()
+    getExecutorMock.mockReturnValue(context.executor)
+    executeMock.mockResolvedValue("@5\n")
+
+    const backend = createTmuxBackend(context)
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(result.windowId).toBe("@5")
+    expect(executeMock).toHaveBeenCalledWith(["display-message", "-p", "-t", "%0", "#{window_id}"])
+  })
+
+  it("falls back to an undefined window id when the display-message query fails", async () => {
+    const emission = createEmission()
+    executePlanMock.mockResolvedValue({
+      executedSteps: 2,
+      paneMap: new Map([["root", "%0"]]),
+    })
+    const context = createContext()
+    getExecutorMock.mockReturnValue(context.executor)
+    executeMock.mockRejectedValue(new Error("tmux display-message failed"))
+
+    const backend = createTmuxBackend(context)
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(result.windowId).toBeUndefined()
+    expect(result.executedSteps).toBe(2)
+    expect(result.focusPaneId).toBe("%0")
+  })
+
+  it("skips the window id query when no real focus pane id was resolved", async () => {
+    const emission = createEmission()
+    executePlanMock.mockResolvedValue({ executedSteps: 2 })
+    const context = createContext()
+    getExecutorMock.mockReturnValue(context.executor)
+
+    const backend = createTmuxBackend(context)
+    const result = await backend.applyPlan({ emission, windowMode: "new-window" })
+
+    expect(result.windowId).toBeUndefined()
+    expect(executeMock).not.toHaveBeenCalled()
+  })
+
   it("falls back to an empty pane name map when the plan runner omits pane mapping", async () => {
     const emission = createEmission()
     executePlanMock.mockResolvedValue({ executedSteps: 2 })

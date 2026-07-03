@@ -13,6 +13,7 @@ export type AfterApplyHookContext = {
   readonly cwd: string
   readonly focusPaneId?: string
   readonly paneNameToRealId?: ReadonlyMap<string, string>
+  readonly windowId?: string
 }
 
 type RunAfterApplyHookInput = {
@@ -25,6 +26,11 @@ type RunAfterApplyHookInput = {
 // Matches the {{this_pane}}/{{focus_pane}} tokens that this module resolves to
 // context.focusPaneId (see the comment below on why they share one value).
 const FOCUS_PANE_TOKEN_PATTERN = /\{\{(?:this_pane|focus_pane)\}\}/
+
+// Matches {{window_id}}, resolved to context.windowId (the real tmux/wezterm window
+// id the layout was applied into, e.g. tmux's "@5"). tmux's `-t` does not expand
+// formats, so tools like vde-tmux-sidebar need this literal passed in.
+const WINDOW_ID_TOKEN_PATTERN = /\{\{window_id\}\}/
 
 /**
  * Runs the `hooks.afterApply` preset command once, after a preset has been applied
@@ -54,6 +60,16 @@ export const runAfterApplyHook = async ({
     return
   }
 
+  // {{window_id}} resolves to context.windowId, but replaceTemplateTokens substitutes
+  // it verbatim even when given an empty string (see the focus pane id comment above
+  // for why the same guard pattern applies here).
+  if (context.windowId === undefined && WINDOW_ID_TOKEN_PATTERN.test(hookCommand)) {
+    logger.warn(
+      "hooks.afterApply skipped: failed to resolve template tokens ({{window_id}} requires a window id, but none was available)",
+    )
+    return
+  }
+
   let resolvedCommand: string
   try {
     resolvedCommand = replaceTemplateTokens({
@@ -66,6 +82,7 @@ export const runAfterApplyHook = async ({
       currentPaneRealId: context.focusPaneId ?? "",
       focusPaneRealId: context.focusPaneId ?? "",
       nameToRealIdMap: context.paneNameToRealId ?? new Map<string, string>(),
+      windowId: context.windowId,
     })
   } catch (error) {
     const reason = error instanceof TemplateTokenError ? error.message : String(error)

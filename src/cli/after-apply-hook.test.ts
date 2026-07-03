@@ -79,6 +79,39 @@ describe("runAfterApplyHook", () => {
     expect(runHostCommand).toHaveBeenCalledWith("notify-focus %1 %1", { cwd: "/workspace" })
   })
 
+  it("resolves {{window_id}} to the applied window id", async () => {
+    const logger = createMockLogger()
+    const runHostCommand = vi.fn(async () => {})
+
+    await runAfterApplyHook({
+      hookCommand: "vde-tmux-sidebar layout-applied --window '{{window_id}}'",
+      context: { cwd: "/workspace", focusPaneId: "%1", windowId: "@5" },
+      logger,
+      runHostCommand,
+    })
+
+    expect(runHostCommand).toHaveBeenCalledWith("vde-tmux-sidebar layout-applied --window '@5'", {
+      cwd: "/workspace",
+    })
+    expect(logger.warn).not.toHaveBeenCalled()
+  })
+
+  it("warns and skips execution when {{window_id}} is used but no window id is available", async () => {
+    const logger = createMockLogger()
+    const runHostCommand = vi.fn(async () => {})
+
+    await runAfterApplyHook({
+      hookCommand: "vde-tmux-sidebar layout-applied --window '{{window_id}}'",
+      context: { cwd: "/workspace", focusPaneId: "%1" },
+      logger,
+      runHostCommand,
+    })
+
+    expect(runHostCommand).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("window id"))
+  })
+
   it("warns and skips execution when a template token cannot be resolved", async () => {
     const logger = createMockLogger()
     const runHostCommand = vi.fn(async () => {})

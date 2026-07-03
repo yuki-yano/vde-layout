@@ -358,6 +358,7 @@ describe("createWeztermBackend", () => {
       expect.objectContaining({ message: "Failed to spawn wezterm tab" }),
     )
     expect(result.focusPaneId).toBe("42")
+    expect(result.windowId).toBe("7")
   })
 
   it("resolves the pane name map from the final virtual-to-real pane mapping", async () => {
