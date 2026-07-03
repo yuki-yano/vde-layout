@@ -226,6 +226,33 @@ describe("prepareTerminalCommands", () => {
     ).toThrow("root.0:pane_id")
   })
 
+  it("delegates {{window_id}} in a pane command to the template token error mapper instead of silently blanking it", () => {
+    const terminals: ReadonlyArray<EmittedTerminal> = [
+      {
+        virtualPaneId: "root.0",
+        cwd: undefined,
+        env: undefined,
+        command: "echo {{window_id}}",
+        focus: true,
+        name: "main",
+      },
+    ]
+
+    expect(() =>
+      prepareTerminalCommands({
+        terminals,
+        focusPaneVirtualId: "root.0",
+        resolveRealPaneId: createResolvePaneId({
+          "root.0": "%0",
+        }),
+        onTemplateTokenError: ({ terminal, error }): never => {
+          const typedError = error as TemplateTokenError
+          throw new Error(`${terminal.virtualPaneId}:${typedError.tokenType}`)
+        },
+      }),
+    ).toThrow("root.0:window_id")
+  })
+
   it("throws for invalid environment variable names", () => {
     const terminals: ReadonlyArray<EmittedTerminal> = [
       {

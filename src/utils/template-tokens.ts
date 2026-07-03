@@ -7,8 +7,9 @@ import type { EmittedTerminal } from "../core/emitter"
  * - {{focus_pane}} - references the intended focus pane
  * - {{window_id}} - references the real window ID the layout was applied into
  *   (e.g. tmux's `@5`). Only resolved by callers that supply `windowId`
- *   (currently hooks.afterApply); other callers omit it and the token
- *   substitutes to an empty string.
+ *   (currently hooks.afterApply); callers that omit it - e.g. pane
+ *   `command:` preparation - get a TemplateTokenError if the token is used,
+ *   the same as an unresolved {{pane_id:<name>}}.
  */
 
 type ReplaceTemplateTokensInput = {
@@ -58,7 +59,8 @@ export const TemplateTokenError = TemplateTokenErrorImpl as TemplateTokenErrorCo
  *
  * @param input - Object containing the command and pane ID mappings
  * @returns The command string with all template tokens replaced
- * @throws TemplateTokenError if a referenced pane name is not found in the mapping
+ * @throws TemplateTokenError if a referenced pane name is not found in the mapping,
+ *   or if {{window_id}} is used but no `windowId` was supplied
  */
 export const replaceTemplateTokens = ({
   command,
@@ -81,7 +83,13 @@ export const replaceTemplateTokens = ({
     }
 
     if (tokenContent === "window_id") {
-      return windowId ?? ""
+      if (windowId === undefined) {
+        throw new TemplateTokenError(
+          "Window ID is not available. {{window_id}} can only be resolved in hooks.afterApply.",
+          "window_id",
+        )
+      }
+      return windowId
     }
 
     // Must be pane_id:<name> token

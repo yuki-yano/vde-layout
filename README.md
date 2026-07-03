@@ -166,7 +166,7 @@ You can reference dynamically-assigned pane IDs within pane commands using templ
 - **`{{this_pane}}`** - References the current pane receiving the command
 - **`{{focus_pane}}`** - References the pane that will receive focus
 - **`{{pane_id:<name>}}`** - References a specific pane by its name
-- **`{{window_id}}`** - References the real window ID the layout was applied into (e.g. tmux's `@5`). Only resolved in `hooks.afterApply` (see [Hooks](#hooks)); it is not resolved in pane `command`.
+- **`{{window_id}}`** - References the real window ID the layout was applied into (e.g. tmux's `@5`). Only resolved in `hooks.afterApply` (see [Hooks](#hooks)) — using it in a pane `command` raises a template token error rather than resolving, the same as referencing an unknown `{{pane_id:<name>}}`.
 
 Example:
 ```yaml

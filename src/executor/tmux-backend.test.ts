@@ -210,6 +210,7 @@ describe("createTmuxBackend", () => {
 
     expect(result.windowId).toBe("@5")
     expect(executeMock).toHaveBeenCalledWith(["display-message", "-p", "-t", "%0", "#{window_id}"])
+    expect(executeMock).toHaveBeenCalledTimes(1)
   })
 
   it("falls back to an undefined window id when the display-message query fails", async () => {

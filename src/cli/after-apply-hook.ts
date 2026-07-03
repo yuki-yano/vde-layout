@@ -60,9 +60,10 @@ export const runAfterApplyHook = async ({
     return
   }
 
-  // {{window_id}} resolves to context.windowId, but replaceTemplateTokens substitutes
-  // it verbatim even when given an empty string (see the focus pane id comment above
-  // for why the same guard pattern applies here).
+  // {{window_id}} resolves to context.windowId. replaceTemplateTokens already throws
+  // TemplateTokenError for this case (caught below), but that generic message doesn't
+  // mention "window id" specifically; this guard produces a clearer warning up front
+  // and doubles as defense-in-depth if that throw behavior ever changes.
   if (context.windowId === undefined && WINDOW_ID_TOKEN_PATTERN.test(hookCommand)) {
     logger.warn(
       "hooks.afterApply skipped: failed to resolve template tokens ({{window_id}} requires a window id, but none was available)",
