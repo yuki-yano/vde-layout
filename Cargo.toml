@@ -1,0 +1,41 @@
+[package]
+name = "vde-layout"
+version = "2.0.0"
+edition = "2024"
+description = "Terminal multiplexer layout management tool for VDE"
+license = "MIT"
+repository = "https://github.com/yuki-yano/vde-layout"
+readme = "README.md"
+
+[lib]
+name = "vde_layout"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vde-layout"
+path = "src/bin/vde-layout.rs"
+
+[[bin]]
+name = "vl"
+path = "src/bin/vl.rs"
+
+[dependencies]
+base64 = "0.22"
+clap = { version = "4.6", features = ["derive"] }
+dirs = "6"
+indexmap = { version = "2.14", features = ["serde"] }
+regex = "1.12"
+serde = { version = "1", features = ["derive"] }
+serde-saphyr = "0.0.29"
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+shlex = "1.3"
+thiserror = "2"
+unicode-width = "0.2"
+wait-timeout = "0.2"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+pretty_assertions = "1.4"
+tempfile = "3"
