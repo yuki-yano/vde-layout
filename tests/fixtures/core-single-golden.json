@@ -1,0 +1,35 @@
+{
+  "plan": {
+    "root": {
+      "kind": "terminal",
+      "id": "root",
+      "name": "Single Fixture",
+      "command": "fish",
+      "focus": true
+    },
+    "focusPaneId": "root"
+  },
+  "emission": {
+    "steps": [
+      {
+        "id": "root:focus",
+        "kind": "focus",
+        "summary": "select pane root",
+        "targetPaneId": "root"
+      }
+    ],
+    "summary": {
+      "stepsCount": 1,
+      "focusPaneId": "root",
+      "initialPaneId": "root"
+    },
+    "terminals": [
+      {
+        "virtualPaneId": "root",
+        "command": "fish",
+        "focus": true,
+        "name": "Single Fixture"
+      }
+    ]
+  }
+}

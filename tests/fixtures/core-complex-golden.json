@@ -1,0 +1,150 @@
+{
+  "plan": {
+    "root": {
+      "kind": "split",
+      "id": "root",
+      "orientation": "horizontal",
+      "ratio": [
+        { "kind": "fixed-cells", "cells": 90 },
+        { "kind": "weight", "weight": 2 },
+        { "kind": "weight", "weight": 1 }
+      ],
+      "panes": [
+        {
+          "kind": "terminal",
+          "id": "root.0",
+          "name": "main",
+          "command": "nvim",
+          "cwd": "/workspace",
+          "env": { "MODE": "dev" },
+          "delay": 250,
+          "title": "Main Pane",
+          "focus": true,
+          "ephemeral": true,
+          "closeOnError": true,
+          "options": { "layoutHint": "floating" }
+        },
+        {
+          "kind": "split",
+          "id": "root.1",
+          "orientation": "vertical",
+          "ratio": [
+            { "kind": "weight", "weight": 1 },
+            { "kind": "weight", "weight": 2.5 }
+          ],
+          "panes": [
+            {
+              "kind": "terminal",
+              "id": "root.1.0",
+              "name": "logs",
+              "command": "tail -f app.log",
+              "focus": false
+            },
+            {
+              "kind": "terminal",
+              "id": "root.1.1",
+              "name": "shell",
+              "env": { "SHELL_MODE": "debug" },
+              "focus": false
+            }
+          ]
+        },
+        {
+          "kind": "terminal",
+          "id": "root.2",
+          "name": "repl",
+          "command": "node",
+          "focus": false
+        }
+      ]
+    },
+    "focusPaneId": "root.0"
+  },
+  "emission": {
+    "steps": [
+      {
+        "id": "root:split:1",
+        "kind": "split",
+        "summary": "split root.0 (-h)",
+        "targetPaneId": "root.0",
+        "createdPaneId": "root.1",
+        "orientation": "horizontal",
+        "splitSizing": {
+          "mode": "dynamic-cells",
+          "target": { "kind": "fixed-cells", "cells": 90 },
+          "remainingFixedCells": 0,
+          "remainingWeight": 3,
+          "remainingWeightPaneCount": 2
+        }
+      },
+      {
+        "id": "root:split:2",
+        "kind": "split",
+        "summary": "split root.1 (-h)",
+        "targetPaneId": "root.1",
+        "createdPaneId": "root.2",
+        "orientation": "horizontal",
+        "splitSizing": {
+          "mode": "dynamic-cells",
+          "target": { "kind": "weight", "weight": 2 },
+          "remainingFixedCells": 0,
+          "remainingWeight": 1,
+          "remainingWeightPaneCount": 1
+        }
+      },
+      {
+        "id": "root.1:split:1",
+        "kind": "split",
+        "summary": "split root.1.0 (-v)",
+        "targetPaneId": "root.1.0",
+        "createdPaneId": "root.1.1",
+        "orientation": "vertical",
+        "percentage": 71,
+        "splitSizing": { "mode": "percent", "percentage": 71 }
+      },
+      {
+        "id": "root.0:focus",
+        "kind": "focus",
+        "summary": "select pane root.0",
+        "targetPaneId": "root.0"
+      }
+    ],
+    "summary": {
+      "stepsCount": 4,
+      "focusPaneId": "root.0",
+      "initialPaneId": "root.0"
+    },
+    "terminals": [
+      {
+        "virtualPaneId": "root.0",
+        "command": "nvim",
+        "cwd": "/workspace",
+        "env": { "MODE": "dev" },
+        "delay": 250,
+        "title": "Main Pane",
+        "focus": true,
+        "name": "main",
+        "ephemeral": true,
+        "closeOnError": true
+      },
+      {
+        "virtualPaneId": "root.1.0",
+        "command": "tail -f app.log",
+        "focus": false,
+        "name": "logs"
+      },
+      {
+        "virtualPaneId": "root.1.1",
+        "env": { "SHELL_MODE": "debug" },
+        "focus": false,
+        "name": "shell"
+      },
+      {
+        "virtualPaneId": "root.2",
+        "command": "node",
+        "focus": false,
+        "name": "repl"
+      }
+    ]
+  }
+}

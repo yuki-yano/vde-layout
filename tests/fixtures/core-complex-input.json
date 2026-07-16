@@ -1,0 +1,30 @@
+{
+  "name": "Complex Fixture",
+  "layout": {
+    "type": "horizontal",
+    "ratio": ["90c", 2, 1],
+    "panes": [
+      {
+        "name": "main",
+        "command": "nvim",
+        "cwd": "/workspace",
+        "env": { "MODE": "dev", "COUNT": 2 },
+        "delay": 250,
+        "title": "Main Pane",
+        "focus": true,
+        "ephemeral": true,
+        "closeOnError": true,
+        "layoutHint": "floating"
+      },
+      {
+        "type": "vertical",
+        "ratio": [1, 2.5],
+        "panes": [
+          { "name": "logs", "command": "tail -f app.log" },
+          { "name": "shell", "env": { "SHELL_MODE": "debug" } }
+        ]
+      },
+      { "name": "repl", "command": "node" }
+    ]
+  }
+}
