@@ -24,6 +24,7 @@ vde-layout 1.1.3 の実装を TypeScript / Node.js から Rust へ完全移植�
 - fzf preview は Node.js の `node -e` を廃止し、実行中バイナリの非公開 `__preview` subcommand で base64 payload を表示する。
 - npm 配布と Node.js ランチャーを廃止する。Rust 2.0.0 以降は GitHub Release の native artifact と `cargo install --git` を配布経路とし、npm registry 上の既存 package はこの作業では変更しない。
 - plan hash は外部契約ではないため、言語間で hash 値そのものは一致させない。正規化した plan 構造の一致を parity 条件とし、Rust 内では canonical JSON の SHA-256 を決定的 hash とする。
+- terminal の `delay` は `2^31-1` ms を上限とし、超過時は `INVALID_PLAN` とする。Node.js の timeout overflow による 1 ms 実行は、誤設定したコマンドの即時実行を招くため再現しない。
 
 ## 3. 現行ベースライン
 
@@ -151,7 +152,7 @@ selector は `std::env::current_exe()` で現在の `vde-layout` または `vl` 
 
 - command runner、pane map、template token、terminal command preparation を移植する。
 - tmux の環境検証、new/current window、sidebar 保護、split sizing、pane command、focus を移植する。
-- dry-run と実行の同一 plan 利用を検証する。
+- dry-run と実行の同一 plan 利用、実 tmux pane の初期サイズ解決、sidebar pane から実際の split origin へのサイズ補正、解決不能時の `<dynamic>` 表示を検証する。
 - fake tmux で失敗注入を行い、error code と途中状態を検証する。
 - 隔離した tmux socket の test は `#[ignore]` に分離し、ローカルと tmux を導入した Ubuntu CI で `cargo test --test tmux_live -- --ignored --nocapture` を明示実行する。
 
@@ -172,6 +173,7 @@ selector は `std::env::current_exe()` で現在の `vde-layout` または `vl` 
 ### Phase 5: CLI、selector、hook、二つのコマンド
 
 - 全 CLI option、preset/list/default、verbose/debug、`VDE_DEBUG` / `VDE_VERBOSE`、current-window 確認、構造化 error 表示を移植する。
+- `CoreError` の文字列 code を CLI の `ErrorCode` へ変換し、tmux 環境エラーを既存 guidance と終了コードへ接続する。
 - fzf selector の auto/inline/tmux-popup、Rust `__preview`、追加引数を移植する。
 - afterApply hook の token、cwd、warning-only failure、30 秒 timeout を移植する。
 - `vde-layout` と `vl` が同一の library entrypoint を呼ぶようにする。

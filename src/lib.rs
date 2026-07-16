@@ -1,6 +1,7 @@
 pub mod config;
 pub mod core;
 pub mod error;
+pub mod executor;
 pub mod model;
 pub mod preset;
 
