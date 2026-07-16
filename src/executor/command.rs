@@ -63,6 +63,8 @@ impl CommandExecutor for ProcessCommandExecutor {
                     json!({
                         "command": self.command_string(args),
                         "stderr": error.to_string(),
+                        "binary": self.binary,
+                        "ioErrorKind": format!("{:?}", error.kind()),
                     })
                     .as_object()
                     .cloned()

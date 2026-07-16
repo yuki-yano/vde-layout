@@ -1,6 +1,3 @@
-use std::thread;
-use std::time::Duration;
-
 use indexmap::IndexMap;
 use serde_json::json;
 
@@ -13,12 +10,11 @@ use super::command::CommandExecutor;
 use super::split::{
     ResolvedSplitSize, SplitSizeResolutionContext, resolve_split_orientation, resolve_split_size,
 };
-use super::terminal::prepare_terminal_commands;
+use super::terminal::{prepare_terminal_commands, wait_for_terminal_delay};
 
 pub const SIDEBAR_LIST_PANES_FORMAT: &str = "#{pane_id}\t#{@vde_sidebar}";
 const CURRENT_PANE_SIZE_FORMAT: &str = "#{pane_width} #{pane_height} #{@vde_sidebar}";
 const PANE_SIZE_FORMAT: &str = "#{pane_width} #{pane_height}";
-const MAX_TIMER_DELAY_MS: f64 = 2_147_483_647.0;
 pub type ConfirmKillCallback<'a> = dyn FnMut(&[String], bool) -> bool + 'a;
 
 pub struct ExecuteTmuxPlanOptions<'a> {
@@ -649,33 +645,11 @@ fn execute_terminal_commands(
             )?;
         }
         if let Some(command) = set.command {
-            if command.delay_ms > MAX_TIMER_DELAY_MS {
-                return Err(execution_error(
-                    "INVALID_PLAN",
-                    "Terminal command delay exceeds the supported maximum",
-                    &set.terminal.virtual_pane_id,
-                )
-                .with_details(
-                    json!({
-                        "delayMs": command.delay_ms,
-                        "maximumDelayMs": MAX_TIMER_DELAY_MS,
-                    })
-                    .as_object()
-                    .cloned()
-                    .unwrap_or_default(),
-                ));
-            }
-            if command.delay_ms > 0.0 && !executor.is_dry_run() {
-                let duration =
-                    Duration::try_from_secs_f64(command.delay_ms / 1000.0).map_err(|_| {
-                        execution_error(
-                            "INVALID_PLAN",
-                            "Terminal command delay is outside the supported range",
-                            &set.terminal.virtual_pane_id,
-                        )
-                    })?;
-                thread::sleep(duration);
-            }
+            wait_for_terminal_delay(
+                command.delay_ms,
+                executor.is_dry_run(),
+                &set.terminal.virtual_pane_id,
+            )?;
             send_keys(
                 executor,
                 &set.real_pane_id,

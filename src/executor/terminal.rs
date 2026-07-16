@@ -1,4 +1,6 @@
 use std::sync::OnceLock;
+use std::thread;
+use std::time::Duration;
 
 use regex::Regex;
 use serde_json::json;
@@ -6,6 +8,8 @@ use serde_json::json;
 use crate::core::{CoreError, CoreErrorKind, EmittedTerminal};
 
 use super::template::{build_name_to_real_id_map, replace_template_tokens};
+
+pub const MAX_TIMER_DELAY_MS: f64 = 2_147_483_647.0;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedEnvCommand {
@@ -135,6 +139,39 @@ pub fn prepare_terminal_commands(
 
 pub fn shell_quote_literal(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+pub fn wait_for_terminal_delay(delay_ms: f64, dry_run: bool, path: &str) -> Result<(), CoreError> {
+    if delay_ms > MAX_TIMER_DELAY_MS {
+        return Err(CoreError::new(
+            CoreErrorKind::Execution,
+            "INVALID_PLAN",
+            "Terminal command delay exceeds the supported maximum",
+        )
+        .with_path(path)
+        .with_details(
+            json!({
+                "delayMs": delay_ms,
+                "maximumDelayMs": MAX_TIMER_DELAY_MS,
+            })
+            .as_object()
+            .cloned()
+            .unwrap_or_default(),
+        ));
+    }
+    if delay_ms <= 0.0 || dry_run {
+        return Ok(());
+    }
+    let duration = Duration::try_from_secs_f64(delay_ms / 1000.0).map_err(|_| {
+        CoreError::new(
+            CoreErrorKind::Execution,
+            "INVALID_PLAN",
+            "Terminal command delay is outside the supported range",
+        )
+        .with_path(path)
+    })?;
+    thread::sleep(duration);
+    Ok(())
 }
 
 fn apply_ephemeral_suffix(command: String, terminal: &EmittedTerminal) -> String {
