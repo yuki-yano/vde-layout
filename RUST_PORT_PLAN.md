@@ -24,7 +24,8 @@ vde-layout 1.1.3 の実装を TypeScript / Node.js から Rust へ完全移植�
 - fzf preview は Node.js の `node -e` を廃止し、実行中バイナリの非公開 `__preview` subcommand で base64 payload を表示する。
 - npm 配布と Node.js ランチャーを廃止する。Rust 2.0.0 以降は GitHub Release の native artifact と `cargo install --git` を配布経路とし、npm registry 上の既存 package はこの作業では変更しない。
 - plan hash は外部契約ではないため、言語間で hash 値そのものは一致させない。正規化した plan 構造の一致を parity 条件とし、Rust 内では canonical JSON の SHA-256 を決定的 hash とする。
-- terminal の `delay` は `2^31-1` ms を上限とし、超過時は `INVALID_PLAN` とする。Node.js の timeout overflow による 1 ms 実行は、誤設定したコマンドの即時実行を招くため再現しない。
+- terminal の `delay` は `2^31-1` ms を上限とし、dry-run を含めて超過時は `INVALID_PLAN` とする。Node.js の timeout overflow による 1 ms 実行は、誤設定したコマンドの即時実行を招くため再現しない。
+- `chalk` 依存の撤去に伴い、通常の CLI 出力に付けていた色装飾は廃止する。文字列の内容と stdout / stderr の出力先は維持し、fzf selector 内の識別用 ANSI 装飾のみ Rust 実装で維持する。
 
 ## 3. 現行ベースライン
 

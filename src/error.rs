@@ -126,7 +126,7 @@ pub fn format_error(error: &VdeError) -> String {
                 "\n\nThis command must be run inside a tmux session.\nStart tmux first with: tmux\n",
             );
         }
-        ErrorCode::TmuxNotInstalled => {
+        ErrorCode::TmuxNotFound | ErrorCode::TmuxNotInstalled => {
             message.push_str(
                 "\n\ntmux is required but not installed.\nInstall tmux using your package manager:\n  - macOS: brew install tmux\n  - Ubuntu/Debian: sudo apt-get install tmux\n  - Fedora: sudo dnf install tmux\n",
             );
