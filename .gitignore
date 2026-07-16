@@ -1,5 +1,1 @@
-dist
-tmp
-node_modules
-*.tsbuildinfo
 target

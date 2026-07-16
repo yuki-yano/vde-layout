@@ -23,6 +23,15 @@ pub fn run_after_apply_hook(
     context: &AfterApplyHookContext<'_>,
     logger: &CliLogger,
 ) {
+    run_after_apply_hook_with_timeout(hook_command, context, logger, AFTER_APPLY_HOOK_TIMEOUT);
+}
+
+fn run_after_apply_hook_with_timeout(
+    hook_command: Option<&str>,
+    context: &AfterApplyHookContext<'_>,
+    logger: &CliLogger,
+    timeout: Duration,
+) {
     let Some(command) = hook_command.filter(|command| !command.is_empty()) else {
         return;
     };
@@ -72,14 +81,45 @@ pub fn run_after_apply_hook(
             return;
         }
     };
-    match child.wait_timeout(AFTER_APPLY_HOOK_TIMEOUT) {
+    match child.wait_timeout(timeout) {
         Ok(Some(status)) if status.success() => {}
         Ok(Some(status)) => logger.warn(format!("hooks.afterApply failed: {status}")),
         Ok(None) => {
             let _ = child.kill();
             let _ = child.wait();
-            logger.warn("hooks.afterApply failed: command timed out after 30 seconds");
+            logger.warn(format!(
+                "hooks.afterApply failed: command timed out after {} seconds",
+                timeout.as_secs()
+            ));
         }
         Err(error) => logger.warn(format!("hooks.afterApply failed: {error}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Instant;
+
+    use indexmap::IndexMap;
+    use tempfile::TempDir;
+
+    use super::*;
+
+    #[test]
+    fn kills_a_hook_process_after_the_timeout() {
+        let directory = TempDir::new().unwrap();
+        let started = Instant::now();
+        run_after_apply_hook_with_timeout(
+            Some("exec sleep 5"),
+            &AfterApplyHookContext {
+                cwd: directory.path(),
+                focus_pane_id: None,
+                pane_name_to_real_id: &IndexMap::new(),
+                window_id: None,
+            },
+            &CliLogger::from_environment(false),
+            Duration::from_millis(20),
+        );
+        assert!(started.elapsed() < Duration::from_secs(1));
     }
 }

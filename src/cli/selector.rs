@@ -1,5 +1,5 @@
 use std::io::{IsTerminal, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
@@ -173,21 +173,31 @@ pub fn select_preset(
             "Preset selection requires an interactive terminal".to_owned(),
         ));
     }
-    ensure_fzf_available()?;
+    let fzf = Path::new("fzf");
+    ensure_fzf_available(fzf)?;
     let rows = build_selector_rows(preset_manager)?;
     if rows.is_empty() {
         return Err(SelectorError::Message("No presets defined".to_owned()));
     }
     let args = build_fzf_args(options)?;
     logger.debug(format!("Preset selection UI: {:?}", options.ui_mode).to_lowercase());
+    run_fzf_selector(&rows, options, &args, fzf)
+}
+
+fn run_fzf_selector(
+    rows: &[PresetSelectorRow],
+    options: &SelectorOptions,
+    args: &[String],
+    executable: &Path,
+) -> Result<SelectPresetResult, SelectorError> {
     let input = rows
         .iter()
         .enumerate()
         .map(|(index, row)| format!("{index}\t{}\t{}", row.display, row.preview_base64))
         .collect::<Vec<_>>()
         .join("\n");
-    let mut child = Command::new("fzf")
-        .args(&args)
+    let mut child = Command::new(executable)
+        .args(args)
         .current_dir(&options.cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -251,8 +261,8 @@ fn validate_extra_fzf_args(args: &[String]) -> Result<(), SelectorError> {
     Ok(())
 }
 
-fn ensure_fzf_available() -> Result<(), SelectorError> {
-    let mut child = match Command::new("fzf")
+fn ensure_fzf_available(executable: &Path) -> Result<(), SelectorError> {
+    let mut child = match Command::new(executable)
         .arg("--version")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -299,4 +309,61 @@ fn sanitize(value: &str) -> String {
             character => character,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+
+    use tempfile::TempDir;
+
+    use super::*;
+
+    #[test]
+    fn fake_fzf_process_selects_a_preset_row() {
+        let directory = TempDir::new().unwrap();
+        let executable = directory.path().join("fzf");
+        fs::write(
+            &executable,
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf '0.60.0\n'
+  exit 0
+fi
+IFS= read -r line
+printf '%s\n' "$line"
+"#,
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&executable, permissions).unwrap();
+
+        ensure_fzf_available(&executable).unwrap();
+        let rows = vec![
+            PresetSelectorRow {
+                key: "dev".to_owned(),
+                display: "Development".to_owned(),
+                preview_base64: "ZGV2".to_owned(),
+            },
+            PresetSelectorRow {
+                key: "logs".to_owned(),
+                display: "Logs".to_owned(),
+                preview_base64: "bG9ncw==".to_owned(),
+            },
+        ];
+        let options = SelectorOptions {
+            ui_mode: SelectUiMode::Fzf,
+            surface_mode: SelectSurfaceMode::Inline,
+            tmux_popup_options: None,
+            fzf_extra_args: Vec::new(),
+            cwd: directory.path().to_owned(),
+            current_exe: PathBuf::from("/bin/true"),
+            in_tmux: false,
+        };
+        let args = build_fzf_args(&options).unwrap();
+        let selected = run_fzf_selector(&rows, &options, &args, &executable).unwrap();
+        assert_eq!(selected, SelectPresetResult::Selected("dev".to_owned()));
+    }
 }

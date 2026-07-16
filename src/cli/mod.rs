@@ -224,7 +224,10 @@ where
         .into_iter()
         .map(Into::into)
         .collect::<Vec<OsString>>();
-    let normalized = normalize_select_args(raw);
+    let mut normalized = normalize_select_args(raw);
+    if let Some(program_name) = normalized.first_mut() {
+        *program_name = OsString::from("vde-layout");
+    }
     let parsed = match CliArguments::try_parse_from(normalized) {
         Ok(parsed) => parsed,
         Err(error) => {

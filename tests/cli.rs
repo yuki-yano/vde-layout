@@ -31,6 +31,7 @@ presets:
   wez:
     name: WezTerm Layout
     backend: wezterm
+    windowMode: current-window
     command: fish
   list:
     name: Positional List
@@ -78,23 +79,23 @@ esac
 #[test]
 fn both_binaries_expose_the_same_version_and_help() {
     let expected = env!("CARGO_PKG_VERSION");
+    let mut help_outputs = Vec::new();
     for name in ["vde-layout", "vl"] {
         binary(name)
             .arg("--version")
             .assert()
             .success()
             .stdout(format!("{expected}\n"));
-        binary(name)
-            .arg("--help")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains(
-                "VDE (Vibrant Development Environment)",
-            ))
-            .stdout(predicate::str::contains("Usage:"))
-            .stdout(predicate::str::contains("list"))
-            .stdout(predicate::str::contains("--dry-run"));
+        let help = binary(name).arg("--help").output().unwrap();
+        assert!(help.status.success());
+        let help_text = String::from_utf8(help.stdout.clone()).unwrap();
+        assert!(help_text.contains("VDE (Vibrant Development Environment)"));
+        assert!(help_text.contains("Usage:"));
+        assert!(help_text.contains("list"));
+        assert!(help_text.contains("--dry-run"));
+        help_outputs.push(help.stdout);
     }
+    assert_eq!(help_outputs[0], help_outputs[1]);
 }
 
 #[test]
@@ -249,6 +250,76 @@ fn verbose_environment_and_cli_flag_enable_runtime_logs() {
             .stdout(predicate::str::contains("Window mode: new-window"))
             .stdout(predicate::str::contains("Terminal backend: tmux"));
     }
+}
+
+#[test]
+fn backend_and_window_mode_sources_follow_cli_preset_defaults_and_fallback_precedence() {
+    let (_directory, path) = config();
+    binary("vde-layout")
+        .args([
+            "wez",
+            "--config",
+            path.to_str().unwrap(),
+            "--backend",
+            "tmux",
+            "--new-window",
+            "--verbose",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Window mode: new-window (source: cli)",
+        ))
+        .stdout(predicate::str::contains("Terminal backend: tmux"));
+    binary("vde-layout")
+        .args([
+            "wez",
+            "--config",
+            path.to_str().unwrap(),
+            "--verbose",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Window mode: current-window (source: preset)",
+        ))
+        .stdout(predicate::str::contains("Terminal backend: wezterm"));
+    binary("vde-layout")
+        .args([
+            "dev",
+            "--config",
+            path.to_str().unwrap(),
+            "--verbose",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Window mode: new-window (source: defaults)",
+        ));
+
+    let fallback_directory = TempDir::new().unwrap();
+    let fallback_path = fallback_directory.path().join("fallback.yml");
+    fs::write(
+        &fallback_path,
+        "presets:\n  shell:\n    name: Shell\n    command: bash\n",
+    )
+    .unwrap();
+    binary("vde-layout")
+        .args([
+            "shell",
+            "--config",
+            fallback_path.to_str().unwrap(),
+            "--verbose",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Window mode: new-window (source: fallback)",
+        ));
 }
 
 #[test]

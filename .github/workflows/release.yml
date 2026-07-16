@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-15
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup override set stable
+          rustup target add "${{ matrix.target }}"
+
+      - name: Verify tag version
+        shell: bash
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          cargo_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+          test "$tag_version" = "$cargo_version"
+
+      - name: Build release binaries
+        run: cargo build --locked --release --bins --target "${{ matrix.target }}"
+
+      - name: Smoke test native binaries
+        run: |
+          "target/${{ matrix.target }}/release/vde-layout" --version
+          "target/${{ matrix.target }}/release/vl" --version
+          "target/${{ matrix.target }}/release/vde-layout" --help > vde-layout.help
+          "target/${{ matrix.target }}/release/vl" --help > vl.help
+          diff vde-layout.help vl.help
+        shell: bash
+
+      - name: Package binaries and checksum
+        shell: bash
+        run: |
+          asset="vde-layout-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          mkdir -p "dist/$asset"
+          cp "target/${{ matrix.target }}/release/vde-layout" "dist/$asset/"
+          cp "target/${{ matrix.target }}/release/vl" "dist/$asset/"
+          cp LICENSE README.md "dist/$asset/"
+          tar -C dist -czf "dist/$asset.tar.gz" "$asset"
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd dist && sha256sum "$asset.tar.gz" > "$asset.tar.gz.sha256")
+          else
+            (cd dist && shasum -a 256 "$asset.tar.gz" > "$asset.tar.gz.sha256")
+          fi
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: vde-layout-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download release assets
+        uses: actions/download-artifact@v8
+        with:
+          pattern: vde-layout-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create GitHub Release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber

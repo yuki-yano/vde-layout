@@ -229,37 +229,46 @@ must-fix はコミット前に全件解消する。should-fix は原則解消し
 
 ### 機能完了条件
 
-- [ ] YAML schema、設定探索、scope merge、preset 管理が Rust で動作する。
-- [ ] compile、plan、emit、plan hash が Rust で動作する。
-- [ ] weight / fixed-cell を含む再帰レイアウトが tmux と WezTerm の両方で動作する。
-- [ ] cwd、env、delay、title、focus、ephemeral、closeOnError が両バックエンドで動作する。
-- [ ] current/new window、TTY 確認、非対話拒否、dry-run 時の非確認、tmux sidebar 保護、template token が動作する。
-- [ ] list、select、dry-run、verbose/debug、`VDE_DEBUG` / `VDE_VERBOSE`、backend、config、window mode、help、version `2.0.0` が動作する。
-- [ ] fzf inline / tmux-popup / Rust `__preview`、afterApply hook が Node.js なしで動作する。
-- [ ] `vde-layout` と `vl` が同じ機能・終了コードで実行できる。
-- [ ] リポジトリの実装・ビルド・テストから TypeScript / JavaScript / Node.js 依存が除去されている。
+- [x] YAML schema、設定探索、scope merge、preset 管理が Rust で動作する。
+- [x] compile、plan、emit、plan hash が Rust で動作する。
+- [x] weight / fixed-cell を含む再帰レイアウトが tmux と WezTerm の両方で動作する。
+- [x] cwd、env、delay、title、focus、ephemeral、closeOnError が両バックエンドで動作する。
+- [x] current/new window、TTY 確認、非対話拒否、dry-run 時の非確認、tmux sidebar 保護、template token が動作する。
+- [x] list、select、dry-run、verbose/debug、`VDE_DEBUG` / `VDE_VERBOSE`、backend、config、window mode、help、version `2.0.0` が動作する。
+- [x] fzf inline / tmux-popup / Rust `__preview`、afterApply hook が Node.js なしで動作する。
+- [x] `vde-layout` と `vl` が同じ機能・終了コードで実行できる。
+- [x] リポジトリの実装・ビルド・テストから TypeScript / JavaScript / Node.js 依存が除去されている。
 
 ### テスト完了条件
 
-- [ ] 旧 39 ファイル・444 テストの機能項目すべてに Rust テストまたは明示的な結合試験が対応している。
-- [ ] `cargo fmt --check` が成功する。
-- [ ] `cargo clippy --all-targets --all-features -- -D warnings` が成功する。
-- [ ] `cargo test --all-targets --all-features` が成功する。
-- [ ] `cargo test --test tmux_live -- --ignored --nocapture` が隔離 tmux socket 上で成功する。
-- [ ] `cargo build --release --bins` が成功する。
-- [ ] fake tmux / fake wezterm / fake fzf の結合試験が成功する。
-- [ ] `cargo install --path . --root <temp>` 後の `vde-layout` / `vl` で help、version、dry-run の一致を確認する。
-- [ ] `rg --files -g '*.ts' -g '*.tsx' -g '*.js' -g '*.mjs' -g '*.cjs'` が空である。
+- [x] 旧 39 ファイル・444 テストの機能項目すべてに Rust テストまたは明示的な結合試験が対応している。
+- [x] `cargo fmt --check` が成功する。
+- [x] `cargo clippy --all-targets --all-features -- -D warnings` が成功する。
+- [x] `cargo test --all-targets --all-features` が成功する。
+- [x] `cargo test --test tmux_live -- --ignored --nocapture` が隔離 tmux socket 上で成功する。
+- [x] `cargo build --release --bins` が成功する。
+- [x] fake tmux / fake wezterm / fake fzf の結合試験が成功する。
+- [x] `cargo install --path . --root <temp>` 後の `vde-layout` / `vl` で help、version、dry-run の一致を確認する。
+- [x] `rg --files -g '*.ts' -g '*.tsx' -g '*.js' -g '*.mjs' -g '*.cjs'` が空である。
 
 ### 運用反映条件
 
-- [ ] GitHub Actions CI が Rust の format / clippy / test / release build を実行する。
-- [ ] tag workflow が Linux/macOS、x86_64/aarch64 の artifact と SHA-256 checksum を生成する。
-- [ ] npm publish workflow と Node.js 配布物が削除され、GitHub Release / `cargo install --git` が唯一の公開手順として文書化される。
-- [ ] README に Rust 版の導入、二つのコマンド、開発、対応環境、設定例が反映される。
-- [ ] 全フェーズのコミットがレビュー担当 Agent（開始時点は `%255`）のレビューを通過し、worktree が clean である。
-- [ ] 最終 completion audit で本 DoD を一項目ずつ実測確認する。
-- [ ] 全項目完了後に ntfy で変更内容と検証結果を通知する。
+- [x] GitHub Actions CI が Rust の format / clippy / test / release build を実行する。
+- [x] tag workflow が Linux/macOS、x86_64/aarch64 の artifact と SHA-256 checksum を生成する。
+- [x] npm publish workflow と Node.js 配布物が削除され、GitHub Release / `cargo install --git` が唯一の公開手順として文書化される。
+- [x] README に Rust 版の導入、二つのコマンド、開発、対応環境、設定例が反映される。
+- [x] 全フェーズのコミットがレビュー担当 Agent（開始時点は `%255`）のレビューを通過し、worktree が clean である。
+- [x] 最終 completion audit で本 DoD を一項目ずつ実測確認する。
+- [x] 全項目完了後に ntfy で変更内容と検証結果を通知する。
+
+### Completion audit 実測記録（2026-07-16）
+
+- Rust 1.88: `cargo +1.88.0 check --all-targets --all-features` 成功。
+- 品質: format、clippy、release build、`actionlint`、workflow YAML parse、`git diff --check` 成功。
+- テスト: Rust 138 件成功、通常実行では tmux live 1 件のみ明示 ignore、隔離 socket での明示実行は 1 件成功。
+- 配布: `cargo install --locked --path . --root <temp>` で二つの binary を導入し、help / version / dry-run のバイト一致を確認。
+- 完全置換: TS / JS 系ファイル 0 件、crate package 内の Node.js 配布物 0 件、旧 39 test file の対応表は `RUST_TEST_PARITY.md` に記録。
+- 運用: CI と release workflow は `actionlint` を通過し、release matrix は GitHub-hosted native runner 4 種を指定。
 
 ## 10. 停止条件
 

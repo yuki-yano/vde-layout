@@ -4,36 +4,54 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  ci:
-    runs-on: ubuntu-latest
+  rust:
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24.13.0
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes tmux
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup override set stable
 
-      - name: Use pnpm
-        run: corepack prepare pnpm@10.28.2 --activate
+      - name: Check minimum supported Rust version
+        run: cargo +1.88.0 check --all-targets --all-features
 
-      - name: Get pnpm store directory
-        id: pnpm-store
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Run tests
+        run: cargo test --all-targets --all-features
 
-      - name: Run CI
-        run: pnpm run ci
+      - name: Run isolated tmux smoke test
+        run: cargo test --test tmux_live -- --ignored --nocapture
+
+      - name: Build release binaries
+        run: cargo build --locked --release --bins
+
+      - name: Verify cargo install and both commands
+        shell: bash
+        run: |
+          install_root="$(mktemp -d)"
+          cargo install --locked --path . --root "$install_root"
+          "$install_root/bin/vde-layout" --version
+          "$install_root/bin/vl" --version
+          "$install_root/bin/vde-layout" --help > "$install_root/vde-layout.help"
+          "$install_root/bin/vl" --help > "$install_root/vl.help"
+          diff "$install_root/vde-layout.help" "$install_root/vl.help"
+          "$install_root/bin/vde-layout" simple --config examples/basic-layout.yml --dry-run > "$install_root/vde-layout.dry-run"
+          "$install_root/bin/vl" simple --config examples/basic-layout.yml --dry-run > "$install_root/vl.dry-run"
+          diff "$install_root/vde-layout.dry-run" "$install_root/vl.dry-run"

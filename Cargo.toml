@@ -2,6 +2,7 @@
 name = "vde-layout"
 version = "2.0.0"
 edition = "2024"
+rust-version = "1.88"
 description = "Terminal multiplexer layout management tool for VDE"
 license = "MIT"
 repository = "https://github.com/yuki-yano/vde-layout"

@@ -6,28 +6,40 @@ vde-layout is a CLI that reproduces terminal layouts (tmux or WezTerm) from YAML
 - Keep reusable presets for development, monitoring, reviews, and more.
 - Build nested horizontal/vertical splits with ratio-based sizing and fixed-cell panes.
 - Launch commands in each pane with custom working directories, environment variables, delays, and titles.
-- Preview every tmux step in dry-run mode before you apply a preset.
+- Preview every backend step in dry-run mode before you apply a preset.
 - Target tmux or WezTerm backends with the same preset definitions.
 - Switch between configuration files by flag or environment variables.
 
 ## Installation
+
+Download the archive for your platform from [GitHub Releases](https://github.com/yuki-yano/vde-layout/releases), extract it, and place both `vde-layout` and `vl` on your `PATH`.
+
+Supported release targets:
+
+- Linux x86_64 / aarch64
+- macOS x86_64 / Apple Silicon
+
+Each release includes a `.sha256` checksum beside its archive.
+
+You can also build and install both commands directly from Git:
+
 ```bash
-npm install -g vde-layout
-# or
-pnpm add -g vde-layout
+cargo install --locked --git https://github.com/yuki-yano/vde-layout
 ```
 
+Rust 2.x releases are not published to npm. The existing npm 1.x package remains unchanged.
+
 ## Development
+
 ```bash
-pnpm install
-pnpm run build
-pnpm run format:check
-pnpm run typecheck
-pnpm run lint
-pnpm run test
-# run all checks in sequence
-pnpm run ci
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-targets --all-features
+cargo test --test tmux_live -- --ignored --nocapture
+cargo build --locked --release --bins
 ```
+
+The live smoke test creates and removes an isolated tmux socket. It does not touch the active tmux session.
 
 ## Quick Start
 1. Create a YAML file at `~/.config/vde/layout/config.yml` (legacy `~/.config/vde/layout.yml` is also supported; see "Configuration Search Order").
@@ -65,8 +77,14 @@ pnpm run ci
    vde-layout web-dev
    ```
 
+`vl` is a short alias with the same options, output, and exit codes:
+
+```bash
+vl web-dev
+```
+
 ## CLI Commands
-- `vde-layout [preset]` - Apply the named preset. When omitted, vde-layout uses the `default` preset; if none exists it lists available presets and exits.
+- `vde-layout [preset]` - Apply the named preset. When omitted, vde-layout uses the `default` preset, or the first defined preset when no `default` key exists.
 - `vde-layout list` - Show available presets with descriptions.
 - `vde-layout --select` - Open an interactive preset selector (auto mode; currently uses `fzf`).
 - `vde-layout --select --select-ui fzf` - Force the selector backend (`auto` or `fzf`).
@@ -82,6 +100,8 @@ pnpm run ci
 - `vde-layout --help` - Show usage.
 - `vde-layout --version` / `vde-layout -v` - Print package version.
 
+Every command above can use `vl` in place of `vde-layout`.
+
 > **Note:** Applying a preset (without `--dry-run`) must be done inside an active tmux session when using the tmux backend. For the WezTerm backend, ensure a WezTerm window is running and focused so the CLI can discover it.
 >
 > **Selector UI note:** `--select` requires an interactive terminal and `fzf` on `$PATH`. `--select-surface tmux-popup` requires running inside tmux (`fzf --tmux`, tmux 3.3+ recommended).
@@ -95,13 +115,13 @@ vde-layout resolves backends in the following order: CLI flag (`--backend`), pre
   - `--new-window` spawns a new tab in the active window when one is available, otherwise creates a fresh window.
 
 ## Configuration Search Order
-When no `--config` flag is provided, vde-layout checks candidate files in this order for `findConfigFile()`:
+When no `--config` flag is provided, vde-layout checks candidate files in this order:
 1. Project scope discovered by walking up from the current directory; for each directory, vde-layout checks `.vde/layout/config.yml` first, then `.vde/layout.yml`.
 2. `$VDE_CONFIG_PATH/layout.yml` (if `VDE_CONFIG_PATH` is set).
 3. `$XDG_CONFIG_HOME/vde/layout/config.yml` (or `~/.config/vde/layout/config.yml` when `XDG_CONFIG_HOME` is unset).
 4. `$XDG_CONFIG_HOME/vde/layout.yml` fallback (or `~/.config/vde/layout.yml`).
 
-For `loadConfig()`, vde-layout merges shared scopes first and project scope last:
+When loading configuration, vde-layout merges shared scopes first and project scope last:
 1. `$VDE_CONFIG_PATH/layout.yml`
 2. XDG scope (`.../vde/layout/config.yml` or fallback `.../vde/layout.yml`; first existing file only)
 3. Project scope (`<project-root>/.vde/layout/config.yml` or fallback `<project-root>/.vde/layout.yml`, discovered by walking up from the current directory)
@@ -296,21 +316,25 @@ presets:
 
 
 ## Runtime Behavior
-- Dry-run mode prints every tmux command and preserves the execution order you would see in a real run.
-- Applying a preset creates (or reuses) a tmux window, splits panes according to the plan, sets environment variables, changes directories, and runs commands sequentially.
+
+- Dry-run mode prints every backend command and preserves the execution order you would see in a real run.
+- Applying a preset creates or reuses a tmux window or WezTerm tab, splits panes according to the plan, sets environment variables, changes directories, and runs commands sequentially.
 - If an error occurs (for example, a tmux command fails or the configuration is invalid), vde-layout returns a structured error with the failing step and guidance.
 
 ## Environment Variables
 - `VDE_CONFIG_PATH` - Override the base directory for configuration files.
 - `XDG_CONFIG_HOME` - XDG base directory root; defaults to `~/.config` when unset.
-- `VDE_DEBUG=true` - Enable debug-level logs (includes stack traces).
+- `VDE_DEBUG=true` - Enable debug-level logs and structured error details.
 - `VDE_VERBOSE=true` - Enable info-level logs without full debug output.
 - `TMUX` - Automatically set by tmux. vde-layout checks this to ensure execution happens inside a session.
 
 ## Requirements
-- Node.js 22 or higher
-- tmux 2.0 or higher (required for the tmux backend)
+
+- No Node.js runtime is required.
+- Rust 1.88 or newer is required only when installing from source.
+- tmux 2.0 or higher is required for the tmux backend.
 - WezTerm nightly build with `wezterm` on `$PATH` (required for the WezTerm backend)
+- `fzf` is required only for `--select`; tmux 3.3 or newer is recommended for the popup selector.
 
 ## Contributing
 Please submit bug reports and feature requests through [GitHub Issues](https://github.com/yuki-yano/vde-layout/issues).
