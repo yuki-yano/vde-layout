@@ -6,7 +6,7 @@ type ResolveBackendOptions = {
   readonly env: NodeJS.ProcessEnv
 }
 
-const KNOWN_BACKENDS: TerminalBackendKind[] = ["tmux", "wezterm"]
+const KNOWN_BACKENDS: TerminalBackendKind[] = ["tmux", "wezterm", "herdr"]
 
 export const resolveTerminalBackendKind = ({
   cliFlag,

@@ -1,13 +1,13 @@
 # vde-layout
 
-vde-layout is a CLI that reproduces terminal layouts (tmux or WezTerm) from YAML presets. Define the panes you need once, then bring them back with a single command.
+vde-layout is a CLI that reproduces terminal layouts (tmux, WezTerm, or herdr) from YAML presets. Define the panes you need once, then bring them back with a single command.
 
 ## Key Capabilities
 - Keep reusable presets for development, monitoring, reviews, and more.
 - Build nested horizontal/vertical splits with ratio-based sizing and fixed-cell panes.
 - Launch commands in each pane with custom working directories, environment variables, delays, and titles.
-- Preview every tmux step in dry-run mode before you apply a preset.
-- Target tmux or WezTerm backends with the same preset definitions.
+- Preview every terminal-backend step in dry-run mode before you apply a preset.
+- Target tmux, WezTerm, or herdr backends with the same preset definitions.
 - Switch between configuration files by flag or environment variables.
 
 ## Installation
@@ -73,16 +73,16 @@ pnpm run ci
 - `vde-layout --select --select-surface tmux-popup` - Render selector in a tmux popup (`fzf --tmux`).
 - `vde-layout --select --select-tmux-popup-opts "80%,70%"` - Pass popup sizing/placement to `fzf --tmux=<opts>`.
 - `vde-layout --select --fzf-arg "--cycle" --fzf-arg "--info=inline"` - Pass additional argument(s) to `fzf` (repeatable).
-- `vde-layout dev --dry-run` - Display the tmux steps without executing them.
+- `vde-layout dev --dry-run` - Display backend commands without executing them.
 - `vde-layout dev --verbose` - Print informational logs, including resolved presets and plan details.
-- `vde-layout dev --backend wezterm` - Use the WezTerm backend (defaults to `tmux` when omitted).
-- `vde-layout dev --current-window` - Reuse the current tmux window (or active WezTerm tab) after confirming that other panes can be closed.
-- `vde-layout dev --new-window` - Force creation of a new tmux window or WezTerm tab even when presets or defaults request reuse.
+- `vde-layout dev --backend wezterm` - Use the WezTerm backend (use `herdr` for herdr; defaults to `tmux` when omitted).
+- `vde-layout dev --current-window` - Reuse the current tmux window or active WezTerm/herdr tab after confirming that other panes can be closed.
+- `vde-layout dev --new-window` - Force creation of a new tmux window or WezTerm/herdr tab even when presets or defaults request reuse.
 - `vde-layout --config /path/to/config.yml` - Load presets from a specific file.
 - `vde-layout --help` - Show usage.
 - `vde-layout --version` / `vde-layout -v` - Print package version.
 
-> **Note:** Applying a preset (without `--dry-run`) must be done inside an active tmux session when using the tmux backend. For the WezTerm backend, ensure a WezTerm window is running and focused so the CLI can discover it.
+> **Note:** Applying a preset (without `--dry-run`) must be done inside an active tmux session when using the tmux backend. For WezTerm, ensure a window is running and focused. For herdr, ensure the herdr server is running; invoking vde-layout from a herdr pane supplies the preferred pane and workspace automatically.
 >
 > **Selector UI note:** `--select` requires an interactive terminal and `fzf` on `$PATH`. `--select-surface tmux-popup` requires running inside tmux (`fzf --tmux`, tmux 3.3+ recommended).
 
@@ -93,6 +93,10 @@ vde-layout resolves backends in the following order: CLI flag (`--backend`), pre
 - **WezTerm** - Requires the `wezterm` CLI to be available (nightly channel recommended). Start WezTerm beforehand so at least one window exists.  
   - `--current-window` targets the active tab and confirms before closing other panes.  
   - `--new-window` spawns a new tab in the active window when one is available, otherwise creates a fresh window.
+- **herdr** - Requires herdr 0.7.4 or higher and a running herdr server.
+  - `--current-window` targets the current herdr tab and confirms before closing its other panes.
+  - `--new-window` creates and focuses a new tab in `HERDR_WORKSPACE_ID` when available, otherwise in herdr's active workspace.
+  - herdr constrains each side of a split to 10%–90%. vde-layout rejects layouts outside that range instead of accepting herdr's implicit clamping.
 
 ## Configuration Search Order
 When no `--config` flag is provided, vde-layout checks candidate files in this order for `findConfigFile()`:
@@ -113,7 +117,7 @@ presets:
   preset-key:
     name: "Display Name"        # required
     description: "Summary"      # optional
-    backend: wezterm            # optional; "tmux" (default) or "wezterm"
+    backend: wezterm            # optional; "tmux" (default), "wezterm", or "herdr"
     windowMode: new-window       # optional; "new-window" (default) or "current-window"
     layout:                     # optional; omit for single command presets
       # see Layout Structure
@@ -214,7 +218,7 @@ presets:
 - If the command fails, or if a template token inside it cannot be resolved, vde-layout logs a warning and the preset apply is still reported as successful (exit code is unaffected).
 - The command is killed and treated as a failure (logged as a warning) if it runs for longer than 30 seconds.
 - Template tokens are supported, but `{{pane_id:<name>}}` only resolves against the pane names created by *this apply's* own `layout` — it cannot address an existing external pane such as a sidebar. This is especially easy to get wrong in `current-window` mode: the reused current pane is bound to the layout tree's first pane name, so a hook that tries `{{pane_id:sidebar}}` for a preset pane named `sidebar` would silently resolve to the current pane, not the real sidebar. Because the hook doesn't run "in" any specific pane, `{{this_pane}}` and `{{focus_pane}}` both resolve to the pane that ended up focused after the apply.
-- `{{window_id}}` resolves to the real window ID the layout was applied into (tmux's `@5`-style ID, or wezterm's window ID). This is the recommended way to hand off to an external tool such as [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar) that needs to target the applied window — tmux's `-t` does not expand formats, so vde-layout resolves it to a literal before running the hook:
+- `{{window_id}}` resolves to the real window/tab ID the layout was applied into (tmux's `@5`-style ID, WezTerm's window ID, or herdr's tab ID). This is the recommended way to hand off to an external tool such as [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar) that needs to target the applied window — tmux's `-t` does not expand formats, so vde-layout resolves it to a literal before running the hook:
 
   ```yaml
   hooks:
@@ -296,9 +300,9 @@ presets:
 
 
 ## Runtime Behavior
-- Dry-run mode prints every tmux command and preserves the execution order you would see in a real run.
-- Applying a preset creates (or reuses) a tmux window, splits panes according to the plan, sets environment variables, changes directories, and runs commands sequentially.
-- If an error occurs (for example, a tmux command fails or the configuration is invalid), vde-layout returns a structured error with the failing step and guidance.
+- Dry-run mode prints every backend command and preserves the execution order you would see in a real run.
+- Applying a preset creates or reuses the backend's window/tab, splits panes according to the plan, sets environment variables, changes directories, and runs commands sequentially.
+- If a backend command fails or the configuration is invalid, vde-layout returns a structured error with the failing step and guidance.
 
 ## Environment Variables
 - `VDE_CONFIG_PATH` - Override the base directory for configuration files.
@@ -306,11 +310,14 @@ presets:
 - `VDE_DEBUG=true` - Enable debug-level logs (includes stack traces).
 - `VDE_VERBOSE=true` - Enable info-level logs without full debug output.
 - `TMUX` - Automatically set by tmux. vde-layout checks this to ensure execution happens inside a session.
+- `HERDR_PANE_ID` - Automatically set by herdr and used as the current pane for `--current-window`.
+- `HERDR_WORKSPACE_ID` - Automatically set by herdr and used as the target workspace for `--new-window`.
 
 ## Requirements
 - Node.js 22 or higher
 - tmux 2.0 or higher (required for the tmux backend)
 - WezTerm nightly build with `wezterm` on `$PATH` (required for the WezTerm backend)
+- herdr 0.7.4 or higher with `herdr` on `$PATH` and its server running (required for the herdr backend)
 
 ## Contributing
 Please submit bug reports and feature requests through [GitHub Issues](https://github.com/yuki-yano/vde-layout/issues).

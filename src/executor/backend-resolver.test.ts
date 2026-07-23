@@ -30,6 +30,18 @@ vi.mock("../backends/wezterm/backend.ts", () => {
   }
 })
 
+vi.mock("../backends/herdr/backend.ts", () => {
+  return {
+    createHerdrBackend: vi.fn((): TerminalBackend => {
+      return {
+        verifyEnvironment: vi.fn(),
+        applyPlan: vi.fn(),
+        getDryRunSteps: vi.fn(),
+      }
+    }),
+  }
+})
+
 describe("resolveTerminalBackendKind", () => {
   it("prefers CLI flag when provided", () => {
     const backend = resolveTerminalBackendKind({ cliFlag: "tmux", env: {} })
@@ -39,6 +51,10 @@ describe("resolveTerminalBackendKind", () => {
   it("uses preset backend when CLI flag is not provided", () => {
     const backend = resolveTerminalBackendKind({ presetBackend: "wezterm", env: {} })
     expect(backend).toBe("wezterm")
+  })
+
+  it("accepts herdr from the CLI flag", () => {
+    expect(resolveTerminalBackendKind({ cliFlag: "herdr", env: {} })).toBe("herdr")
   })
 
   it("keeps CLI flag precedence over preset backend", () => {
@@ -108,6 +124,19 @@ describe("createTerminalBackend", () => {
     const backend = createTerminalBackend("wezterm", context)
     expect(backend).toBeDefined()
     expect(typeof backend.verifyEnvironment).toBe("function")
+  })
+
+  it("creates a herdr backend when requested", () => {
+    const backend = createTerminalBackend("herdr", {
+      logger: createMockLogger(),
+      dryRun: false,
+      verbose: false,
+      cwd: "/workspace",
+      paneId: "pane-1",
+      workspaceId: "workspace-1",
+    })
+    expect(backend).toBeDefined()
+    expect(typeof backend.applyPlan).toBe("function")
   })
 })
 const createMockLogger = (): Logger => {

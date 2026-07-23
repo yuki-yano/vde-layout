@@ -4,7 +4,7 @@ import type { CommandExecutor } from "../contracts"
 import type { Logger } from "../utils/logger"
 import type { ConfirmPaneClosure } from "../contracts"
 
-export type TerminalBackendKind = "tmux" | "wezterm"
+export type TerminalBackendKind = "tmux" | "wezterm" | "herdr"
 
 export type ApplyPlanParameters = {
   readonly emission: PlanEmission
@@ -46,4 +46,11 @@ export type TmuxTerminalBackendContext = TerminalBackendBaseContext & {
 
 export type WeztermTerminalBackendContext = TerminalBackendBaseContext
 
-export type TerminalBackendContext = TmuxTerminalBackendContext | WeztermTerminalBackendContext
+export type HerdrTerminalBackendContext = TerminalBackendBaseContext & {
+  readonly workspaceId?: string
+}
+
+export type TerminalBackendContext =
+  | TmuxTerminalBackendContext
+  | WeztermTerminalBackendContext
+  | HerdrTerminalBackendContext

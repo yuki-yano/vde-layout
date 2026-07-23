@@ -186,6 +186,20 @@ describe("error helpers", () => {
     expect(unsupportedWithoutVersionsFormatted).toContain("Unsupported wezterm version detected.")
   })
 
+  it("formats herdr installation and version guidance", () => {
+    const missing = createEnvironmentError("backend not found", ErrorCodes.BACKEND_NOT_FOUND, {
+      backend: "herdr",
+    })
+    const unsupported = createEnvironmentError("herdr version", ErrorCodes.UNSUPPORTED_HERDR_VERSION, {
+      detectedVersion: "0.7.3",
+      requiredVersion: "0.7.4",
+    })
+
+    expect(formatError(missing)).toContain("herdr is required but not installed")
+    expect(formatError(unsupported)).toContain("Detected version: 0.7.3")
+    expect(formatError(unsupported)).toContain("Required version: 0.7.4 or higher")
+  })
+
   it("formats split size resolution errors with pane/version details", () => {
     const error = createEnvironmentError("split size failed", ErrorCodes.SPLIT_SIZE_RESOLUTION_FAILED, {
       paneId: "100",

@@ -24,6 +24,8 @@ export const ErrorCodes = {
   TEMPLATE_TOKEN_ERROR: "TEMPLATE_TOKEN_ERROR",
   WEZTERM_NOT_FOUND: "WEZTERM_NOT_FOUND",
   UNSUPPORTED_WEZTERM_VERSION: "UNSUPPORTED_WEZTERM_VERSION",
+  HERDR_NOT_FOUND: "HERDR_NOT_FOUND",
+  UNSUPPORTED_HERDR_VERSION: "UNSUPPORTED_HERDR_VERSION",
   USER_CANCELLED: "USER_CANCELLED",
   SPLIT_SIZE_RESOLUTION_FAILED: "SPLIT_SIZE_RESOLUTION_FAILED",
 } as const
@@ -140,7 +142,11 @@ const formatters: Record<string, (error: VDELayoutError) => string> = {
             "  - Ubuntu/Debian: sudo apt-get install wezterm",
             "  - Fedora: sudo dnf install wezterm",
           ].join("\n")
-        : ""
+        : backend === "herdr"
+          ? ["", "herdr is required but not installed.", "Install herdr by following its release instructions."].join(
+              "\n",
+            )
+          : ""
     return `\nMissing binary: ${binary}${suggestion}`
   },
   [ErrorCodes.WEZTERM_NOT_FOUND]: () => {
@@ -156,6 +162,21 @@ const formatters: Record<string, (error: VDELayoutError) => string> = {
     const requiredVersion = typeof error.details.requiredVersion === "string" ? error.details.requiredVersion : ""
     const detected = typeof error.details.detectedVersion === "string" ? error.details.detectedVersion : ""
     const lines = ["", "Unsupported wezterm version detected."]
+    if (detected) {
+      lines.push(`Detected version: ${detected}`)
+    }
+    if (requiredVersion) {
+      lines.push(`Required version: ${requiredVersion} or higher`)
+    }
+    return lines.join("\n")
+  },
+  [ErrorCodes.HERDR_NOT_FOUND]: () => {
+    return "\nherdr command was not found.\nInstall herdr 0.7.4 or higher and ensure it is on $PATH.\n"
+  },
+  [ErrorCodes.UNSUPPORTED_HERDR_VERSION]: (error) => {
+    const requiredVersion = typeof error.details.requiredVersion === "string" ? error.details.requiredVersion : ""
+    const detected = typeof error.details.detectedVersion === "string" ? error.details.detectedVersion : ""
+    const lines = ["", "Unsupported herdr version detected."]
     if (detected) {
       lines.push(`Detected version: ${detected}`)
     }

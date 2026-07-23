@@ -191,6 +191,15 @@ describe("Zod schema validation", () => {
       expect(result.success).toBe(true)
     })
 
+    it("accepts herdr backend in preset definition", () => {
+      const result = PresetSchema.safeParse({
+        name: "Herdr Preset",
+        backend: "herdr",
+      })
+
+      expect(result.success).toBe(true)
+    })
+
     it("rejects unknown backend value in preset definition", () => {
       const result = validatePreset({
         name: "Invalid Backend Preset",

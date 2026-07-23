@@ -85,16 +85,23 @@ export const executePreset = async ({
       verbose: options.verbose,
       prompt: confirmPaneClosure,
       cwd,
-      paneId: env.WEZTERM_PANE,
+      paneId: backendKind === "herdr" ? env.HERDR_PANE_ID : env.WEZTERM_PANE,
     } as const
 
-    const backend =
-      backendKind === "tmux"
-        ? createTerminalBackend("tmux", {
-            ...backendContextBase,
-            executor,
-          })
-        : createTerminalBackend("wezterm", backendContextBase)
+    let backend
+    if (backendKind === "tmux") {
+      backend = createTerminalBackend("tmux", {
+        ...backendContextBase,
+        executor,
+      })
+    } else if (backendKind === "wezterm") {
+      backend = createTerminalBackend("wezterm", backendContextBase)
+    } else {
+      backend = createTerminalBackend("herdr", {
+        ...backendContextBase,
+        workspaceId: env.HERDR_WORKSPACE_ID,
+      })
+    }
 
     await backend.verifyEnvironment()
 

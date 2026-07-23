@@ -38,7 +38,7 @@ export type CLI = {
   run(args?: string[]): Promise<number>
 }
 
-const backendValues = ["tmux", "wezterm"] as const
+const backendValues = ["tmux", "wezterm", "herdr"] as const
 const listCommandName = "list"
 const EXIT_CODE_CANCELLED = 130
 
@@ -275,7 +275,7 @@ export const createCli = (options: CLIOptions = {}): CLI => {
     backend: {
       type: "enum",
       options: [...backendValues],
-      description: "Select terminal backend (tmux or wezterm)",
+      description: "Select terminal backend (tmux, wezterm, or herdr)",
     },
     config: {
       type: "string",

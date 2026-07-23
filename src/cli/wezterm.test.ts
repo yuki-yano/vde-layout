@@ -173,6 +173,7 @@ describe("CLI WezTerm backend integration", () => {
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     vi.restoreAllMocks()
   })
 
@@ -242,6 +243,24 @@ describe("CLI WezTerm backend integration", () => {
     runExitCode = await cli.run(["--dry-run"])
 
     expect(createTerminalBackendMock).toHaveBeenCalledWith("wezterm", expect.objectContaining({ dryRun: true }))
+    expect(runExitCode).toBe(0)
+  })
+
+  it("passes herdr pane and workspace context to the herdr backend", async () => {
+    vi.stubEnv("HERDR_PANE_ID", "pane-7")
+    vi.stubEnv("HERDR_WORKSPACE_ID", "workspace-3")
+    createTerminalBackendMock.mockReturnValue({
+      verifyEnvironment: vi.fn(async () => {}),
+      applyPlan: vi.fn(),
+      getDryRunSteps: vi.fn(() => []),
+    })
+
+    runExitCode = await cli.run(["dev", "--backend", "herdr", "--dry-run"])
+
+    expect(createTerminalBackendMock).toHaveBeenCalledWith(
+      "herdr",
+      expect.objectContaining({ paneId: "pane-7", workspaceId: "workspace-3", dryRun: true }),
+    )
     expect(runExitCode).toBe(0)
   })
 

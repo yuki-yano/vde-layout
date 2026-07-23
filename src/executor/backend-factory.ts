@@ -2,14 +2,17 @@ import type {
   TerminalBackend,
   TerminalBackendContext,
   TerminalBackendKind,
+  HerdrTerminalBackendContext,
   TmuxTerminalBackendContext,
   WeztermTerminalBackendContext,
 } from "./terminal-backend"
 import { createTmuxBackend } from "../backends/tmux/backend"
 import { createWeztermBackend } from "../backends/wezterm/backend"
+import { createHerdrBackend } from "../backends/herdr/backend"
 
 export function createTerminalBackend(kind: "tmux", context: TmuxTerminalBackendContext): TerminalBackend
 export function createTerminalBackend(kind: "wezterm", context: WeztermTerminalBackendContext): TerminalBackend
+export function createTerminalBackend(kind: "herdr", context: HerdrTerminalBackendContext): TerminalBackend
 export function createTerminalBackend(kind: TerminalBackendKind, context: TerminalBackendContext): TerminalBackend {
   if (kind === "tmux") {
     if (!("executor" in context)) {
@@ -20,6 +23,10 @@ export function createTerminalBackend(kind: TerminalBackendKind, context: Termin
 
   if (kind === "wezterm") {
     return createWeztermBackend(context)
+  }
+
+  if (kind === "herdr") {
+    return createHerdrBackend(context)
   }
 
   throw new Error(`Unsupported backend "${kind}"`)
