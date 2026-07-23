@@ -42,6 +42,9 @@ jobs:
       - name: Build release binaries
         run: cargo build --locked --release --bins
 
+      - name: Verify crates.io package
+        run: cargo publish --locked --dry-run
+
       - name: Verify cargo install and both commands
         shell: bash
         run: |

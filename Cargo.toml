@@ -3,10 +3,24 @@ name = "vde-layout"
 version = "2.0.0"
 edition = "2024"
 rust-version = "1.88"
-description = "Terminal multiplexer layout management tool for VDE"
+description = "Recreate tmux, WezTerm, and Herdr pane layouts from YAML presets"
 license = "MIT"
+homepage = "https://github.com/yuki-yano/vde-layout"
 repository = "https://github.com/yuki-yano/vde-layout"
 readme = "README.md"
+keywords = ["terminal", "tmux", "wezterm", "layout", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+publish = ["crates-io"]
+include = [
+  "/src/**",
+  "/tests/**",
+  "/examples/**",
+  "/Cargo.toml",
+  "/Cargo.lock",
+  "/README.md",
+  "/README.ja.md",
+  "/LICENSE",
+]
 
 [lib]
 name = "vde_layout"
