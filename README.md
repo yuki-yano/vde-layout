@@ -366,6 +366,8 @@ The hook:
 | `VDE_VERBOSE=true` | Enable informational logs |
 | `VDE_DEBUG=true` | Enable debug logs and structured error details |
 | `TMUX` | Used to validate an active tmux session |
+| `TMUX_PANE` | Current tmux pane used by current-window mode |
+| `WEZTERM_PANE` | Current WezTerm pane used by current-window mode |
 | `HERDR_PANE_ID` | Preferred pane for Herdr current-window mode |
 | `HERDR_WORKSPACE_ID` | Target workspace for a new Herdr tab |
 

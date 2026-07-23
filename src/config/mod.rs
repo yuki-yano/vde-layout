@@ -492,7 +492,7 @@ fn parse_terminal(
 fn positive_integer(value: &Value) -> Option<u64> {
     const U64_EXCLUSIVE_MAX_AS_F64: f64 = 18_446_744_073_709_551_616.0;
 
-    value.as_u64().or_else(|| {
+    value.as_u64().filter(|value| *value > 0).or_else(|| {
         let value = value.as_f64()?;
         (value.is_finite()
             && value > 0.0

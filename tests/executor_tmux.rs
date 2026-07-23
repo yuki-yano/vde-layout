@@ -296,6 +296,29 @@ fn resolves_ancestor_and_descendant_virtual_pane_mappings() {
     .unwrap();
     assert_eq!(result.pane_map["root.1.0"], "%11");
     assert_eq!(result.pane_map["root.1.1"], "%12");
+
+    let single_child = emission(
+        "name: nested-single\nlayout:\n  type: horizontal\n  ratio: [1, 1]\n  panes:\n    - { name: one }\n    - type: vertical\n      ratio: [1]\n      panes:\n        - { name: nested, command: echo-nested, focus: true }\n",
+    );
+    let mut fake = FakeTmux::new();
+    let result = execute_tmux_plan(
+        &single_child,
+        &mut fake,
+        ExecuteTmuxPlanOptions {
+            window_mode: WindowMode::NewWindow,
+            window_name: None,
+            tmux_pane: None,
+            detected_version: None,
+            on_confirm_kill: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(result.pane_map["root.1.0"], "%11");
+    assert!(
+        fake.commands
+            .iter()
+            .any(|command| { command == &["send-keys", "-t", "%11", "echo-nested", "Enter",] })
+    );
 }
 
 #[test]
@@ -624,4 +647,13 @@ fn rejects_missing_plan_metadata_and_unresolvable_panes_without_panicking() {
     .unwrap_err();
     assert_eq!(error.code, "INVALID_PLAN");
     assert_eq!(error.details["maximumDelayMs"], 2_147_483_647.0);
+
+    let mut dry_run_overflow = emission("name: delayed\ncommand: echo\n");
+    dry_run_overflow.terminals[0].delay = Some(3_000_000_000.0);
+    assert_eq!(
+        build_tmux_dry_run_steps(&dry_run_overflow, None, None)
+            .unwrap_err()
+            .code,
+        "INVALID_PLAN"
+    );
 }

@@ -500,6 +500,30 @@ presets:
             .iter()
             .any(|issue| issue["path"] == "presets.one.layout.panes.0.delay")
     );
+
+    for zero in ["0", "0.0"] {
+        let error = validate_yaml(&format!(
+            r#"
+presets:
+  one:
+    name: one
+    layout:
+      type: horizontal
+      ratio: [1]
+      panes:
+        - name: delayed
+          delay: {zero}
+"#
+        ))
+        .unwrap_err();
+        assert!(
+            error.details["issues"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|issue| issue["path"] == "presets.one.layout.panes.0.delay")
+        );
+    }
 }
 
 #[test]

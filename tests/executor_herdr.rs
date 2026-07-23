@@ -350,6 +350,37 @@ fn splits_with_reversed_percent_ratio_and_focuses_during_creation() {
 }
 
 #[test]
+fn resolves_single_child_terminal_ids_through_split_ancestors() {
+    let mut fake = FakeHerdr::new()
+        .tabs([tab_created("pane-1", "tab-1")])
+        .splits([pane_result(pane("pane-2", "tab-1", true))]);
+    let plan = emission(
+        "name: nested-single\nlayout:\n  type: horizontal\n  ratio: [1, 1]\n  panes:\n    - { name: left }\n    - type: vertical\n      ratio: [1]\n      panes:\n        - { name: nested, command: echo-nested, focus: true }\n",
+    );
+
+    let result = execute_herdr_plan(
+        &plan,
+        &mut fake,
+        ExecuteHerdrPlanOptions {
+            window_mode: WindowMode::NewWindow,
+            cwd: Some("/repo"),
+            pane_id: None,
+            workspace_id: None,
+            window_name: None,
+            on_confirm_kill: None,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.pane_map["root.1.0"], "pane-2");
+    assert_eq!(result.pane_name_to_real_id["nested"], "pane-2");
+    assert!(command_exists(
+        &fake,
+        &["pane", "run", "pane-2", "echo-nested"]
+    ));
+}
+
+#[test]
 fn resolves_fixed_cells_from_herdr_layout_dimensions() {
     let mut fake = FakeHerdr::new()
         .tabs([tab_created("pane-1", "tab-1")])

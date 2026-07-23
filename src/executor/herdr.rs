@@ -16,8 +16,9 @@ use super::split::{
     ResolvedSplitSize, SplitSizeResolutionContext, resolve_split_orientation, resolve_split_size,
 };
 use super::template::build_name_to_real_id_map;
-use super::terminal::{prepare_terminal_commands, shell_quote_literal, wait_for_terminal_delay};
-use super::tmux::resolve_pane_mapping;
+use super::terminal::{
+    prepare_terminal_commands, resolve_pane_mapping, shell_quote_literal, wait_for_terminal_delay,
+};
 
 pub const HERDR_MINIMUM_VERSION: &str = "0.7.4";
 const MIN_HERDR_RATIO: f64 = 0.1;
@@ -202,7 +203,7 @@ pub fn execute_herdr_plan(
     apply_terminal_commands(
         &emission.terminals,
         executor,
-        &pane_map,
+        &mut pane_map,
         &emission.summary.focus_pane_id,
     )?;
 
@@ -528,9 +529,27 @@ fn resolve_herdr_ratio(
 fn apply_terminal_commands(
     terminals: &[EmittedTerminal],
     executor: &mut dyn CommandExecutor,
-    pane_map: &IndexMap<String, String>,
+    pane_map: &mut IndexMap<String, String>,
     focus_virtual: &str,
 ) -> Result<(), CoreError> {
+    resolve_pane_mapping(pane_map, focus_virtual).ok_or_else(|| {
+        execution_error(
+            "INVALID_PANE",
+            format!("Unknown focus pane: {focus_virtual}"),
+            Some(focus_virtual),
+            json!({}),
+        )
+    })?;
+    for terminal in terminals {
+        resolve_pane_mapping(pane_map, &terminal.virtual_pane_id).ok_or_else(|| {
+            execution_error(
+                "INVALID_PANE",
+                format!("Unknown terminal pane: {}", terminal.virtual_pane_id),
+                Some(&terminal.virtual_pane_id),
+                json!({}),
+            )
+        })?;
+    }
     let prepared = prepare_terminal_commands(terminals, focus_virtual, pane_map)?;
     for set in prepared.commands {
         let pane = &set.real_pane_id;

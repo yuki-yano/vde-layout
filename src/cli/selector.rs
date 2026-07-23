@@ -180,7 +180,10 @@ pub fn select_preset(
         return Err(SelectorError::Message("No presets defined".to_owned()));
     }
     let args = build_fzf_args(options)?;
-    logger.debug(format!("Preset selection UI: {:?}", options.ui_mode).to_lowercase());
+    logger.debug(format!(
+        "Preset selection UI: {}",
+        format!("{:?}", options.ui_mode).to_lowercase()
+    ));
     run_fzf_selector(&rows, options, &args, fzf)
 }
 
@@ -204,10 +207,13 @@ fn run_fzf_selector(
         .stderr(Stdio::inherit())
         .spawn()
         .map_err(|error| SelectorError::Message(format!("Failed to run fzf: {error}")))?;
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(input.as_bytes()).map_err(|error| {
-            SelectorError::Message(format!("Failed to write fzf input: {error}"))
-        })?;
+    if let Some(mut stdin) = child.stdin.take()
+        && let Err(error) = stdin.write_all(input.as_bytes())
+        && error.kind() != std::io::ErrorKind::BrokenPipe
+    {
+        return Err(SelectorError::Message(format!(
+            "Failed to write fzf input: {error}"
+        )));
     }
     let output = child
         .wait_with_output()
@@ -365,5 +371,35 @@ printf '%s\n' "$line"
         let args = build_fzf_args(&options).unwrap();
         let selected = run_fzf_selector(&rows, &options, &args, &executable).unwrap();
         assert_eq!(selected, SelectPresetResult::Selected("dev".to_owned()));
+    }
+
+    #[test]
+    fn immediate_fzf_cancellation_wins_over_a_broken_input_pipe() {
+        let directory = TempDir::new().unwrap();
+        let executable = directory.path().join("fzf");
+        fs::write(&executable, "#!/bin/sh\nexit 130\n").unwrap();
+        let mut permissions = fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&executable, permissions).unwrap();
+
+        let rows = vec![PresetSelectorRow {
+            key: "dev".to_owned(),
+            display: "x".repeat(1_000_000),
+            preview_base64: "ZGV2".to_owned(),
+        }];
+        let options = SelectorOptions {
+            ui_mode: SelectUiMode::Fzf,
+            surface_mode: SelectSurfaceMode::Inline,
+            tmux_popup_options: None,
+            fzf_extra_args: Vec::new(),
+            cwd: directory.path().to_owned(),
+            current_exe: PathBuf::from("/bin/true"),
+            in_tmux: false,
+        };
+
+        assert_eq!(
+            run_fzf_selector(&rows, &options, &[], &executable).unwrap(),
+            SelectPresetResult::Cancelled
+        );
     }
 }

@@ -364,6 +364,8 @@ hookは次の規則で動作します。
 | `VDE_VERBOSE=true` | 情報logを有効化 |
 | `VDE_DEBUG=true` | debug logと構造化error情報を有効化 |
 | `TMUX` | tmux session内での実行確認 |
+| `TMUX_PANE` | current-window modeで使用する現在のtmux pane |
+| `WEZTERM_PANE` | current-window modeで使用する現在のWezTerm pane |
 | `HERDR_PANE_ID` | Herdrのcurrent-window modeで使用するpane |
 | `HERDR_WORKSPACE_ID` | Herdrで新しいtabを作成するworkspace |
 

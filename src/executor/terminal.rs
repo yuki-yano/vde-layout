@@ -2,6 +2,7 @@ use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 
+use indexmap::IndexMap;
 use regex::Regex;
 use serde_json::json;
 
@@ -42,14 +43,26 @@ pub struct PreparedTerminalCommands {
 pub fn prepare_terminal_commands(
     terminals: &[EmittedTerminal],
     focus_pane_virtual_id: &str,
-    pane_map: &indexmap::IndexMap<String, String>,
+    pane_map: &IndexMap<String, String>,
 ) -> Result<PreparedTerminalCommands, CoreError> {
-    let focus_pane_real_id = resolve_pane(pane_map, focus_pane_virtual_id, focus_pane_virtual_id)?;
-    let names = build_name_to_real_id_map(terminals, pane_map);
+    let mut resolved_pane_map = pane_map.clone();
+    let focus_pane_real_id = resolve_pane(
+        &mut resolved_pane_map,
+        focus_pane_virtual_id,
+        focus_pane_virtual_id,
+    )?;
+    for terminal in terminals {
+        resolve_pane(
+            &mut resolved_pane_map,
+            &terminal.virtual_pane_id,
+            &terminal.virtual_pane_id,
+        )?;
+    }
+    let names = build_name_to_real_id_map(terminals, &resolved_pane_map);
     let mut commands = Vec::with_capacity(terminals.len());
     for terminal in terminals {
         let real_pane_id = resolve_pane(
-            pane_map,
+            &mut resolved_pane_map,
             &terminal.virtual_pane_id,
             &terminal.virtual_pane_id,
         )?;
@@ -186,22 +199,49 @@ fn apply_ephemeral_suffix(command: String, terminal: &EmittedTerminal) -> String
 }
 
 fn resolve_pane(
-    pane_map: &indexmap::IndexMap<String, String>,
+    pane_map: &mut IndexMap<String, String>,
     virtual_id: &str,
     path: &str,
 ) -> Result<String, CoreError> {
-    pane_map
-        .get(virtual_id)
-        .filter(|id| !id.is_empty())
-        .cloned()
-        .ok_or_else(|| {
-            CoreError::new(
-                CoreErrorKind::Execution,
-                "INVALID_PANE",
-                format!("Unknown terminal pane: {virtual_id}"),
-            )
-            .with_path(path)
-        })
+    resolve_pane_mapping(pane_map, virtual_id).ok_or_else(|| {
+        CoreError::new(
+            CoreErrorKind::Execution,
+            "INVALID_PANE",
+            format!("Unknown terminal pane: {virtual_id}"),
+        )
+        .with_path(path)
+    })
+}
+
+pub fn resolve_pane_mapping(
+    pane_map: &mut IndexMap<String, String>,
+    virtual_id: &str,
+) -> Option<String> {
+    if let Some(direct) = pane_map.get(virtual_id).filter(|pane| !pane.is_empty()) {
+        return Some(direct.clone());
+    }
+    let mut ancestor = virtual_id;
+    while let Some((parent, _)) = ancestor.rsplit_once('.') {
+        ancestor = parent;
+        if let Some(candidate) = pane_map
+            .get(ancestor)
+            .filter(|pane| !pane.is_empty())
+            .cloned()
+        {
+            pane_map.insert(virtual_id.to_owned(), candidate.clone());
+            return Some(candidate);
+        }
+    }
+    let prefix = format!("{virtual_id}.");
+    if let Some(candidate) = pane_map
+        .iter()
+        .find(|(key, value)| key.starts_with(&prefix) && !value.is_empty())
+        .map(|(_, value)| value.clone())
+    {
+        pane_map.insert(virtual_id.to_owned(), candidate.clone());
+        return Some(candidate);
+    }
+    None
 }
 
 fn env_key_pattern() -> &'static Regex {

@@ -843,11 +843,14 @@ fn format_core_error(error: &CoreError) -> String {
         ));
     }
     if let Some(code) = error_code_from_str(&error.code) {
+        let mut guidance_details = (*error.details).clone();
+        guidance_details.remove("command");
+        guidance_details.remove("stderr");
         let guidance = format_error(&VdeError::new(
             ErrorKind::Execution,
             code,
             &error.message,
-            (*error.details).clone(),
+            guidance_details,
         ));
         let first_line = format!("Error: {}", error.message);
         if let Some(extra) = guidance.strip_prefix(&first_line)
@@ -915,5 +918,34 @@ impl From<CliSelectSurface> for SelectSurfaceMode {
             CliSelectSurface::Inline => Self::Inline,
             CliSelectSurface::TmuxPopup => Self::TmuxPopup,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn core_error_details_are_rendered_once() {
+        let error = CoreError::new(
+            CoreErrorKind::Execution,
+            "TMUX_COMMAND_FAILED",
+            "tmux failed",
+        )
+        .with_details(
+            json!({
+                "command": ["tmux", "split-window"],
+                "stderr": "injected failure",
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+        );
+
+        let rendered = format_core_error(&error).to_lowercase();
+        assert_eq!(rendered.matches("command:").count(), 1);
+        assert_eq!(rendered.matches("stderr:").count(), 1);
     }
 }

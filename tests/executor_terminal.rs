@@ -95,3 +95,49 @@ fn maps_template_failures_to_typed_execution_errors() {
     assert_eq!(error.code, "TEMPLATE_TOKEN_ERROR");
     assert_eq!(error.details["tokenType"], "window_id");
 }
+
+#[test]
+fn resolves_terminal_ids_through_single_child_split_ancestors() {
+    let terminals = vec![
+        EmittedTerminal {
+            virtual_pane_id: "root.0".to_owned(),
+            command: Some("echo {{pane_id:nested}}".to_owned()),
+            cwd: None,
+            env: None,
+            delay: None,
+            title: None,
+            focus: false,
+            name: "main".to_owned(),
+            ephemeral: None,
+            close_on_error: None,
+        },
+        EmittedTerminal {
+            virtual_pane_id: "root.1.0".to_owned(),
+            command: Some("echo {{this_pane}}".to_owned()),
+            cwd: None,
+            env: None,
+            delay: None,
+            title: None,
+            focus: true,
+            name: "nested".to_owned(),
+            ephemeral: None,
+            close_on_error: None,
+        },
+    ];
+    let panes = indexmap! {
+        "root.0".to_owned() => "%1".to_owned(),
+        "root.1".to_owned() => "%2".to_owned(),
+    };
+
+    let prepared = prepare_terminal_commands(&terminals, "root.1.0", &panes).unwrap();
+    assert_eq!(prepared.focus_pane_real_id, "%2");
+    assert_eq!(
+        prepared.commands[0].command.as_ref().unwrap().text,
+        "echo %2"
+    );
+    assert_eq!(prepared.commands[1].real_pane_id, "%2");
+    assert_eq!(
+        prepared.commands[1].command.as_ref().unwrap().text,
+        "echo %2"
+    );
+}

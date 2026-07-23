@@ -20,14 +20,14 @@ pub use split::{
 pub use template::{TemplateTokenError, build_name_to_real_id_map, replace_template_tokens};
 pub use terminal::{
     MAX_TIMER_DELAY_MS, PreparedCommand, PreparedEnvCommand, PreparedTerminalCommand,
-    PreparedTerminalCommands, prepare_terminal_commands, shell_quote_literal,
+    PreparedTerminalCommands, prepare_terminal_commands, resolve_pane_mapping, shell_quote_literal,
     wait_for_terminal_delay,
 };
 pub use tmux::{
     ApplyTmuxPlanResult, ConfirmKillCallback, ExecuteTmuxPlanOptions, ExecuteTmuxPlanResult,
     PaneDimensions, SIDEBAR_LIST_PANES_FORMAT, TmuxDryRunStep, apply_tmux_plan,
     build_tmux_dry_run_steps, classify_window_panes, execute_tmux_plan,
-    resolve_initial_tmux_pane_size, resolve_pane_mapping, verify_tmux_environment,
+    resolve_initial_tmux_pane_size, verify_tmux_environment,
 };
 pub use wezterm::{
     ApplyWeztermPlanResult, ConfirmWeztermKillCallback, ExecuteWeztermPlanOptions,

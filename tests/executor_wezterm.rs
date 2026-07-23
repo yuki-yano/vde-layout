@@ -554,6 +554,55 @@ fn applies_dynamic_split_focus_and_registers_new_pane() {
 }
 
 #[test]
+fn resolves_single_child_terminal_ids_through_split_ancestors() {
+    let initial = array_list(json!([
+        { "window_id": "w1", "tab_id": "t", "pane_id": "10", "is_active": true },
+    ]));
+    let spawned = array_list(json!([
+        { "window_id": "w1", "tab_id": "t", "pane_id": "10" },
+        { "window_id": "w1", "tab_id": "t2", "pane_id": "100", "is_active": true },
+    ]));
+    let after = array_list(json!([
+        { "window_id": "w1", "tab_id": "t2", "pane_id": "100" },
+        { "window_id": "w1", "tab_id": "t2", "pane_id": "101", "is_active": true },
+    ]));
+    let mut fake = FakeWezterm::new()
+        .lists([initial, spawned.clone(), spawned, after])
+        .spawns(["100 w1\n"]);
+    let plan = emission(
+        "name: nested-single\nlayout:\n  type: horizontal\n  ratio: [1, 1]\n  panes:\n    - { name: left }\n    - type: vertical\n      ratio: [1]\n      panes:\n        - { name: nested, command: echo-nested, focus: true }\n",
+    );
+
+    let result = execute_wezterm_plan(
+        &plan,
+        &mut fake,
+        ExecuteWeztermPlanOptions {
+            window_mode: WindowMode::NewWindow,
+            cwd: None,
+            pane_id: None,
+            detected_version: None,
+            on_confirm_kill: None,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.pane_map["root.1.0"], "101");
+    assert_eq!(result.pane_name_to_real_id["nested"], "101");
+    assert!(command_exists(
+        &fake,
+        &[
+            "cli",
+            "send-text",
+            "--pane-id",
+            "101",
+            "--no-paste",
+            "--",
+            "echo-nested\r",
+        ]
+    ));
+}
+
+#[test]
 fn sends_terminal_setup_and_commands_with_carriage_returns() {
     let initial = array_list(json!([
         { "window_id": "w", "tab_id": "t", "pane_id": "1", "is_active": true },

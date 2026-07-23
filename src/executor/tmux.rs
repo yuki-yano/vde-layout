@@ -10,7 +10,7 @@ use super::command::CommandExecutor;
 use super::split::{
     ResolvedSplitSize, SplitSizeResolutionContext, resolve_split_orientation, resolve_split_size,
 };
-use super::terminal::{prepare_terminal_commands, wait_for_terminal_delay};
+use super::terminal::{prepare_terminal_commands, resolve_pane_mapping, wait_for_terminal_delay};
 
 pub const SIDEBAR_LIST_PANES_FORMAT: &str = "#{pane_id}\t#{@vde_sidebar}";
 const CURRENT_PANE_SIZE_FORMAT: &str = "#{pane_width} #{pane_height} #{@vde_sidebar}";
@@ -141,6 +141,7 @@ pub fn build_tmux_dry_run_steps(
     initial_size: Option<PaneDimensions>,
     detected_version: Option<&str>,
 ) -> Result<Vec<TmuxDryRunStep>, CoreError> {
+    validate_terminal_commands_for_dry_run(emission)?;
     let mut sizes = IndexMap::new();
     if let Some(size) = initial_size {
         sizes.insert(emission.summary.initial_pane_id.clone(), size);
@@ -159,6 +160,34 @@ pub fn build_tmux_dry_run_steps(
             })
         })
         .collect()
+}
+
+fn validate_terminal_commands_for_dry_run(emission: &PlanEmission) -> Result<(), CoreError> {
+    let mut virtual_map = emission
+        .terminals
+        .iter()
+        .map(|terminal| {
+            (
+                terminal.virtual_pane_id.clone(),
+                terminal.virtual_pane_id.clone(),
+            )
+        })
+        .collect::<IndexMap<_, _>>();
+    virtual_map.insert(
+        emission.summary.focus_pane_id.clone(),
+        emission.summary.focus_pane_id.clone(),
+    );
+    let prepared = prepare_terminal_commands(
+        &emission.terminals,
+        &emission.summary.focus_pane_id,
+        &virtual_map,
+    )?;
+    for set in prepared.commands {
+        if let Some(command) = set.command {
+            wait_for_terminal_delay(command.delay_ms, true, &set.terminal.virtual_pane_id)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn execute_tmux_plan(
@@ -801,37 +830,6 @@ fn resolve_pane(
             virtual_id,
         )
     })
-}
-
-pub fn resolve_pane_mapping(
-    pane_map: &mut IndexMap<String, String>,
-    virtual_id: &str,
-) -> Option<String> {
-    if let Some(direct) = pane_map.get(virtual_id).filter(|pane| !pane.is_empty()) {
-        return Some(direct.clone());
-    }
-    let mut ancestor = virtual_id;
-    while let Some((parent, _)) = ancestor.rsplit_once('.') {
-        ancestor = parent;
-        if let Some(candidate) = pane_map
-            .get(ancestor)
-            .filter(|pane| !pane.is_empty())
-            .cloned()
-        {
-            pane_map.insert(virtual_id.to_owned(), candidate.clone());
-            return Some(candidate);
-        }
-    }
-    let prefix = format!("{virtual_id}.");
-    if let Some(candidate) = pane_map
-        .iter()
-        .find(|(key, value)| key.starts_with(&prefix) && !value.is_empty())
-        .map(|(_, value)| value.clone())
-    {
-        pane_map.insert(virtual_id.to_owned(), candidate.clone());
-        return Some(candidate);
-    }
-    None
 }
 
 fn normalize_pane_id(raw: &str) -> String {
