@@ -144,6 +144,9 @@ options and has the same output and exit codes.
 or Herdr tab before applying the preset. An interactive run asks for
 confirmation first.
 
+Declining that confirmation or cancelling the preset selector exits with status
+`130`.
+
 tmux panes marked with the user option `@vde_sidebar=1` are protected. They
 remain open, and the new layout is built in the non-sidebar area.
 

@@ -145,6 +145,8 @@ VDE_DEBUG=true vde-layout dev
 
 対話実行では、paneを閉じる前に確認を求めます。
 
+確認を拒否した場合やpreset selectorをキャンセルした場合は、終了code`130`を返します。
+
 tmuxでは、user optionの`@vde_sidebar=1`を持つpaneを保護します。
 
 保護したpaneは閉じず、残りの領域に新しいlayoutを作成します。
