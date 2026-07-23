@@ -99,6 +99,30 @@ fn formats_backend_and_wezterm_guidance() {
 }
 
 #[test]
+fn formats_herdr_guidance() {
+    let backend = VdeError::new(
+        ErrorKind::Environment,
+        ErrorCode::BackendNotFound,
+        "backend not found",
+        object_details(json!({ "backend": "herdr" })),
+    );
+    assert!(format_error(&backend).contains("herdr is required but not installed"));
+
+    let unsupported = VdeError::new(
+        ErrorKind::Environment,
+        ErrorCode::UnsupportedHerdrVersion,
+        "herdr version",
+        object_details(json!({
+            "detectedVersion": "0.7.3",
+            "requiredVersion": "0.7.4"
+        })),
+    );
+    let formatted = format_error(&unsupported);
+    assert!(formatted.contains("Detected version: 0.7.3"));
+    assert!(formatted.contains("Required version: 0.7.4 or higher"));
+}
+
+#[test]
 fn formats_split_resolution_details() {
     let error = VdeError::new(
         ErrorKind::Environment,

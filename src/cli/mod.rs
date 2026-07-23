@@ -15,11 +15,12 @@ use crate::core::{
 };
 use crate::error::{ErrorCode, ErrorKind, VdeError, format_error};
 use crate::executor::{
-    ApplyTmuxPlanResult, ApplyWeztermPlanResult, CommandExecutor, ExecuteTmuxPlanOptions,
-    ExecuteWeztermPlanOptions, ProcessCommandExecutor, WeztermDryRunOptions, apply_tmux_plan,
-    build_tmux_dry_run_steps, build_wezterm_dry_run_steps, execute_wezterm_plan,
-    resolve_initial_tmux_pane_size, resolve_initial_wezterm_pane_size, verify_tmux_environment,
-    verify_wezterm_environment,
+    ApplyHerdrPlanResult, ApplyTmuxPlanResult, ApplyWeztermPlanResult, CommandExecutor,
+    ExecuteHerdrPlanOptions, ExecuteTmuxPlanOptions, ExecuteWeztermPlanOptions,
+    ProcessCommandExecutor, WeztermDryRunOptions, apply_tmux_plan, build_herdr_dry_run_steps,
+    build_tmux_dry_run_steps, build_wezterm_dry_run_steps, execute_herdr_plan,
+    execute_wezterm_plan, resolve_initial_tmux_pane_size, resolve_initial_wezterm_pane_size,
+    verify_herdr_environment, verify_tmux_environment, verify_wezterm_environment,
 };
 use crate::model::{Preset, SelectSurfaceMode, SelectUiMode, TerminalBackendKind, WindowMode};
 use crate::preset::PresetManager;
@@ -140,6 +141,7 @@ enum CliCommand {
 enum CliBackend {
     Tmux,
     Wezterm,
+    Herdr,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -400,6 +402,7 @@ fn execute_preset(
     let backend_name = match backend {
         TerminalBackendKind::Tmux => "tmux",
         TerminalBackendKind::Wezterm => "wezterm",
+        TerminalBackendKind::Herdr => "herdr",
     };
     logger.info(format!("Terminal backend: {backend_name}"));
 
@@ -450,6 +453,7 @@ fn execute_preset(
         match backend {
             TerminalBackendKind::Tmux => "tmux",
             TerminalBackendKind::Wezterm => "wezterm",
+            TerminalBackendKind::Herdr => "herdr",
         }
     ));
     run_after_apply_hook(
@@ -482,6 +486,10 @@ fn verify_backend_environment(
         TerminalBackendKind::Wezterm => {
             let mut executor = LoggingExecutor::new("wezterm", false, logger);
             verify_wezterm_environment(&mut executor, false).map_err(AppError::Core)
+        }
+        TerminalBackendKind::Herdr => {
+            let mut executor = LoggingExecutor::new("herdr", false, logger);
+            verify_herdr_environment(&mut executor, false).map_err(AppError::Core)
         }
     }
 }
@@ -528,6 +536,15 @@ fn render_dry_run(
                     step.summary,
                     step.command
                 );
+            }
+        }
+        TerminalBackendKind::Herdr => {
+            for (index, step) in build_herdr_dry_run_steps(emission)
+                .map_err(AppError::Core)?
+                .into_iter()
+                .enumerate()
+            {
+                println!(" {}. [herdr] {}: {}", index + 1, step.summary, step.command);
             }
         }
     }
@@ -581,6 +598,27 @@ fn apply_backend(
             .map_err(AppError::Core)?;
             Ok(wezterm_backend_result(result))
         }
+        TerminalBackendKind::Herdr => {
+            let mut executor = LoggingExecutor::new("herdr", false, logger);
+            let mut confirm =
+                |panes: &[String], dry_run: bool| confirm_pane_kill(panes, dry_run, logger);
+            let pane_id = std::env::var("HERDR_PANE_ID").ok();
+            let workspace_id = std::env::var("HERDR_WORKSPACE_ID").ok();
+            let result = execute_herdr_plan(
+                emission,
+                &mut executor,
+                ExecuteHerdrPlanOptions {
+                    window_mode,
+                    cwd: cwd.to_str(),
+                    pane_id: pane_id.as_deref(),
+                    workspace_id: workspace_id.as_deref(),
+                    window_name: Some(window_name),
+                    on_confirm_kill: Some(&mut confirm),
+                },
+            )
+            .map_err(AppError::Core)?;
+            Ok(herdr_backend_result(result))
+        }
     }
 }
 
@@ -596,6 +634,17 @@ fn tmux_backend_result(result: ApplyTmuxPlanResult) -> BackendResult {
 }
 
 fn wezterm_backend_result(result: ApplyWeztermPlanResult) -> BackendResult {
+    BackendResult {
+        summary: ExecutionSummary {
+            executed_steps: result.executed_steps,
+        },
+        focus_pane_id: result.focus_pane_id,
+        pane_name_to_real_id: result.pane_name_to_real_id,
+        window_id: Some(result.window_id),
+    }
+}
+
+fn herdr_backend_result(result: ApplyHerdrPlanResult) -> BackendResult {
     BackendResult {
         summary: ExecutionSummary {
             executed_steps: result.executed_steps,
@@ -832,6 +881,8 @@ fn error_code_from_str(code: &str) -> Option<ErrorCode> {
         "TEMPLATE_TOKEN_ERROR" => ErrorCode::TemplateTokenError,
         "WEZTERM_NOT_FOUND" => ErrorCode::WeztermNotFound,
         "UNSUPPORTED_WEZTERM_VERSION" => ErrorCode::UnsupportedWeztermVersion,
+        "HERDR_NOT_FOUND" => ErrorCode::HerdrNotFound,
+        "UNSUPPORTED_HERDR_VERSION" => ErrorCode::UnsupportedHerdrVersion,
         "USER_CANCELLED" => ErrorCode::UserCancelled,
         "SPLIT_SIZE_RESOLUTION_FAILED" => ErrorCode::SplitSizeResolutionFailed,
         _ => return None,
@@ -843,6 +894,7 @@ impl From<CliBackend> for TerminalBackendKind {
         match value {
             CliBackend::Tmux => Self::Tmux,
             CliBackend::Wezterm => Self::Wezterm,
+            CliBackend::Herdr => Self::Herdr,
         }
     }
 }

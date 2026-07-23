@@ -163,6 +163,8 @@ fn schema_level_config_allows_empty_presets() {
 fn schema_level_preset_and_pane_validation_are_available() {
     let preset = validate_preset_value(&json!({ "name": "wez", "backend": "wezterm" })).unwrap();
     assert_eq!(preset.backend, Some(TerminalBackendKind::Wezterm));
+    let herdr = validate_preset_value(&json!({ "name": "herdr", "backend": "herdr" })).unwrap();
+    assert_eq!(herdr.backend, Some(TerminalBackendKind::Herdr));
     let pane = validate_pane_value(&json!({
         "type": "horizontal",
         "ratio": ["40c", 1],

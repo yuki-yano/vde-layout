@@ -33,6 +33,10 @@ presets:
     backend: wezterm
     windowMode: current-window
     command: fish
+  herdr:
+    name: Herdr Layout
+    backend: herdr
+    command: fish
   list:
     name: Positional List
     command: echo list
@@ -48,6 +52,8 @@ fn binary(name: &str) -> Command {
         .env_remove("TMUX")
         .env_remove("TMUX_PANE")
         .env_remove("WEZTERM_PANE")
+        .env_remove("HERDR_PANE_ID")
+        .env_remove("HERDR_WORKSPACE_ID")
         .env_remove("VDE_CONFIG_PATH")
         .env_remove("VDE_VERBOSE")
         .env_remove("VDE_DEBUG");
@@ -111,7 +117,7 @@ fn lists_presets_and_applies_explicit_config_to_subcommand() {
 }
 
 #[test]
-fn tmux_and_wezterm_dry_runs_need_no_external_binary() {
+fn all_backend_dry_runs_need_no_external_binary() {
     let (_directory, path) = config();
     binary("vde-layout")
         .args(["dev", "--config", path.to_str().unwrap(), "--dry-run"])
@@ -130,6 +136,14 @@ fn tmux_and_wezterm_dry_runs_need_no_external_binary() {
         .stdout(predicate::str::contains(
             "Applied preset \"WezTerm Layout\"",
         ));
+
+    binary("vde-layout")
+        .args(["herdr", "--config", path.to_str().unwrap(), "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[herdr]"))
+        .stdout(predicate::str::contains("herdr pane run"))
+        .stdout(predicate::str::contains("Applied preset \"Herdr Layout\""));
 }
 
 #[test]

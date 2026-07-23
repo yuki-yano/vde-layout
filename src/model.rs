@@ -22,6 +22,7 @@ impl std::fmt::Display for WindowMode {
 pub enum TerminalBackendKind {
     Tmux,
     Wezterm,
+    Herdr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

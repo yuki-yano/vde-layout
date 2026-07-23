@@ -1,4 +1,5 @@
 mod command;
+mod herdr;
 mod split;
 mod template;
 mod terminal;
@@ -7,6 +8,11 @@ mod wezterm;
 mod wezterm_list;
 
 pub use command::{CommandExecutor, ProcessCommandExecutor};
+pub use herdr::{
+    ApplyHerdrPlanResult, ConfirmHerdrKillCallback, ExecuteHerdrPlanOptions, HERDR_MINIMUM_VERSION,
+    HerdrDryRunStep, build_herdr_dry_run_steps, execute_herdr_plan, run_herdr_cli,
+    verify_herdr_environment,
+};
 pub use split::{
     ResolvedSplitSize, SplitSizeResolutionContext, resolve_split_orientation,
     resolve_split_percentage, resolve_split_size,

@@ -305,7 +305,7 @@ fn parse_preset(value: &Value, path: &str, validator: &mut Validator) -> Option<
         path,
         validator,
         parse_backend,
-        "Invalid enum value. Expected 'tmux' | 'wezterm'",
+        "Invalid enum value. Expected 'tmux' | 'wezterm' | 'herdr'",
     );
     let hooks = match object.get("hooks") {
         None => None,
@@ -756,6 +756,7 @@ fn parse_backend(value: &str) -> Option<TerminalBackendKind> {
     match value {
         "tmux" => Some(TerminalBackendKind::Tmux),
         "wezterm" => Some(TerminalBackendKind::Wezterm),
+        "herdr" => Some(TerminalBackendKind::Herdr),
         _ => None,
     }
 }

@@ -25,6 +25,8 @@ pub enum ErrorCode {
     TemplateTokenError,
     WeztermNotFound,
     UnsupportedWeztermVersion,
+    HerdrNotFound,
+    UnsupportedHerdrVersion,
     UserCancelled,
     SplitSizeResolutionFailed,
 }
@@ -154,6 +156,10 @@ pub fn format_error(error: &VdeError) -> String {
                 message.push_str(
                     "\nwezterm is required but not installed.\nInstall wezterm using your package manager:\n  - macOS: brew install --cask wezterm\n  - Ubuntu/Debian: sudo apt-get install wezterm\n  - Fedora: sudo dnf install wezterm",
                 );
+            } else if backend == "herdr" {
+                message.push_str(
+                    "\nherdr is required but not installed.\nInstall herdr 0.7.4 or higher and ensure it is on $PATH.",
+                );
             }
         }
         ErrorCode::WeztermNotFound => {
@@ -163,6 +169,23 @@ pub fn format_error(error: &VdeError) -> String {
         }
         ErrorCode::UnsupportedWeztermVersion => {
             message.push_str("\n\nUnsupported wezterm version detected.");
+            append_string_detail(
+                &mut message,
+                &error.details,
+                "detectedVersion",
+                "Detected version",
+            );
+            if let Some(required) = error.details.get("requiredVersion").and_then(Value::as_str) {
+                message.push_str(&format!("\nRequired version: {required} or higher"));
+            }
+        }
+        ErrorCode::HerdrNotFound => {
+            message.push_str(
+                "\n\nherdr command was not found.\nInstall herdr 0.7.4 or higher and ensure it is on $PATH.\n",
+            );
+        }
+        ErrorCode::UnsupportedHerdrVersion => {
+            message.push_str("\n\nUnsupported herdr version detected.");
             append_string_detail(
                 &mut message,
                 &error.details,
