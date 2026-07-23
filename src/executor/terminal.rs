@@ -1,0 +1,252 @@
+use std::sync::OnceLock;
+use std::thread;
+use std::time::Duration;
+
+use indexmap::IndexMap;
+use regex::Regex;
+use serde_json::json;
+
+use crate::core::{CoreError, CoreErrorKind, EmittedTerminal};
+
+use super::template::{build_name_to_real_id_map, replace_template_tokens};
+
+pub const MAX_TIMER_DELAY_MS: f64 = 2_147_483_647.0;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreparedEnvCommand {
+    pub key: String,
+    pub command: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreparedCommand {
+    pub text: String,
+    pub delay_ms: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreparedTerminalCommand {
+    pub terminal: EmittedTerminal,
+    pub real_pane_id: String,
+    pub cwd_command: Option<String>,
+    pub env_commands: Vec<PreparedEnvCommand>,
+    pub title: Option<String>,
+    pub command: Option<PreparedCommand>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreparedTerminalCommands {
+    pub focus_pane_real_id: String,
+    pub commands: Vec<PreparedTerminalCommand>,
+}
+
+pub fn prepare_terminal_commands(
+    terminals: &[EmittedTerminal],
+    focus_pane_virtual_id: &str,
+    pane_map: &IndexMap<String, String>,
+) -> Result<PreparedTerminalCommands, CoreError> {
+    let mut resolved_pane_map = pane_map.clone();
+    let focus_pane_real_id = resolve_pane(
+        &mut resolved_pane_map,
+        focus_pane_virtual_id,
+        focus_pane_virtual_id,
+    )?;
+    for terminal in terminals {
+        resolve_pane(
+            &mut resolved_pane_map,
+            &terminal.virtual_pane_id,
+            &terminal.virtual_pane_id,
+        )?;
+    }
+    let names = build_name_to_real_id_map(terminals, &resolved_pane_map);
+    let mut commands = Vec::with_capacity(terminals.len());
+    for terminal in terminals {
+        let real_pane_id = resolve_pane(
+            &mut resolved_pane_map,
+            &terminal.virtual_pane_id,
+            &terminal.virtual_pane_id,
+        )?;
+        let cwd_command = terminal
+            .cwd
+            .as_deref()
+            .filter(|cwd| !cwd.is_empty())
+            .map(|cwd| format!("cd -- {}", shell_quote_literal(cwd)));
+        let mut env_commands = Vec::new();
+        if let Some(env) = terminal.env.as_ref() {
+            for (key, value) in env {
+                if !env_key_pattern().is_match(key) {
+                    return Err(CoreError::new(
+                        CoreErrorKind::Execution,
+                        "INVALID_PANE",
+                        format!("Invalid environment variable name: {key}"),
+                    )
+                    .with_path(&terminal.virtual_pane_id));
+                }
+                env_commands.push(PreparedEnvCommand {
+                    key: key.clone(),
+                    command: format!("export {key}={}", shell_quote_literal(value)),
+                });
+            }
+        }
+        let title = terminal.title.clone().filter(|title| !title.is_empty());
+        let command = terminal
+            .command
+            .as_deref()
+            .filter(|command| !command.is_empty())
+            .map(|command| {
+                replace_template_tokens(
+                    command,
+                    &real_pane_id,
+                    if command.contains("{{focus_pane}}") {
+                        &focus_pane_real_id
+                    } else {
+                        ""
+                    },
+                    &names,
+                    None,
+                )
+                .map(|replaced| PreparedCommand {
+                    text: apply_ephemeral_suffix(replaced, terminal),
+                    delay_ms: terminal
+                        .delay
+                        .filter(|delay| delay.is_finite() && *delay > 0.0)
+                        .unwrap_or(0.0),
+                })
+                .map_err(|error| {
+                    CoreError::new(
+                        CoreErrorKind::Execution,
+                        "TEMPLATE_TOKEN_ERROR",
+                        format!(
+                            "Template token resolution failed for pane {}: {}",
+                            terminal.virtual_pane_id, error.message
+                        ),
+                    )
+                    .with_path(&terminal.virtual_pane_id)
+                    .with_details(
+                        json!({
+                            "command": terminal.command,
+                            "tokenType": error.token_type,
+                            "availablePanes": error.available_panes,
+                        })
+                        .as_object()
+                        .cloned()
+                        .unwrap_or_default(),
+                    )
+                })
+            })
+            .transpose()?;
+        commands.push(PreparedTerminalCommand {
+            terminal: terminal.clone(),
+            real_pane_id,
+            cwd_command,
+            env_commands,
+            title,
+            command,
+        });
+    }
+    Ok(PreparedTerminalCommands {
+        focus_pane_real_id,
+        commands,
+    })
+}
+
+pub fn shell_quote_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+pub fn wait_for_terminal_delay(delay_ms: f64, dry_run: bool, path: &str) -> Result<(), CoreError> {
+    if delay_ms > MAX_TIMER_DELAY_MS {
+        return Err(CoreError::new(
+            CoreErrorKind::Execution,
+            "INVALID_PLAN",
+            "Terminal command delay exceeds the supported maximum",
+        )
+        .with_path(path)
+        .with_details(
+            json!({
+                "delayMs": delay_ms,
+                "maximumDelayMs": MAX_TIMER_DELAY_MS,
+            })
+            .as_object()
+            .cloned()
+            .unwrap_or_default(),
+        ));
+    }
+    if delay_ms <= 0.0 || dry_run {
+        return Ok(());
+    }
+    let duration = Duration::try_from_secs_f64(delay_ms / 1000.0).map_err(|_| {
+        CoreError::new(
+            CoreErrorKind::Execution,
+            "INVALID_PLAN",
+            "Terminal command delay is outside the supported range",
+        )
+        .with_path(path)
+    })?;
+    thread::sleep(duration);
+    Ok(())
+}
+
+fn apply_ephemeral_suffix(command: String, terminal: &EmittedTerminal) -> String {
+    if terminal.ephemeral != Some(true) {
+        return command;
+    }
+    if terminal.close_on_error == Some(true) {
+        format!("{command}; exit")
+    } else {
+        format!("{command}; [ $? -eq 0 ] && exit")
+    }
+}
+
+fn resolve_pane(
+    pane_map: &mut IndexMap<String, String>,
+    virtual_id: &str,
+    path: &str,
+) -> Result<String, CoreError> {
+    resolve_pane_mapping(pane_map, virtual_id).ok_or_else(|| {
+        CoreError::new(
+            CoreErrorKind::Execution,
+            "INVALID_PANE",
+            format!("Unknown terminal pane: {virtual_id}"),
+        )
+        .with_path(path)
+    })
+}
+
+pub fn resolve_pane_mapping(
+    pane_map: &mut IndexMap<String, String>,
+    virtual_id: &str,
+) -> Option<String> {
+    if let Some(direct) = pane_map.get(virtual_id).filter(|pane| !pane.is_empty()) {
+        return Some(direct.clone());
+    }
+    let mut ancestor = virtual_id;
+    while let Some((parent, _)) = ancestor.rsplit_once('.') {
+        ancestor = parent;
+        if let Some(candidate) = pane_map
+            .get(ancestor)
+            .filter(|pane| !pane.is_empty())
+            .cloned()
+        {
+            pane_map.insert(virtual_id.to_owned(), candidate.clone());
+            return Some(candidate);
+        }
+    }
+    let prefix = format!("{virtual_id}.");
+    if let Some(candidate) = pane_map
+        .iter()
+        .find(|(key, value)| key.starts_with(&prefix) && !value.is_empty())
+        .map(|(_, value)| value.clone())
+    {
+        pane_map.insert(virtual_id.to_owned(), candidate.clone());
+        return Some(candidate);
+    }
+    None
+}
+
+fn env_key_pattern() -> &'static Regex {
+    static PATTERN: OnceLock<Regex> = OnceLock::new();
+    PATTERN.get_or_init(|| {
+        Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").expect("environment key regex must compile")
+    })
+}

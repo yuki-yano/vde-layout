@@ -1,0 +1,69 @@
+{
+  "plan": {
+    "root": {
+      "kind": "split",
+      "id": "root",
+      "orientation": "horizontal",
+      "ratio": [
+        { "kind": "weight", "weight": 1 },
+        { "kind": "weight", "weight": 1 }
+      ],
+      "panes": [
+        {
+          "kind": "terminal",
+          "id": "root.0",
+          "name": "main",
+          "command": "nvim",
+          "focus": true
+        },
+        {
+          "kind": "terminal",
+          "id": "root.1",
+          "name": "logs",
+          "command": "htop",
+          "focus": false
+        }
+      ]
+    },
+    "focusPaneId": "root.0"
+  },
+  "emission": {
+    "steps": [
+      {
+        "id": "root:split:1",
+        "kind": "split",
+        "summary": "split root.0 (-h)",
+        "targetPaneId": "root.0",
+        "createdPaneId": "root.1",
+        "orientation": "horizontal",
+        "percentage": 50,
+        "splitSizing": { "mode": "percent", "percentage": 50 }
+      },
+      {
+        "id": "root.0:focus",
+        "kind": "focus",
+        "summary": "select pane root.0",
+        "targetPaneId": "root.0"
+      }
+    ],
+    "summary": {
+      "stepsCount": 2,
+      "focusPaneId": "root.0",
+      "initialPaneId": "root.0"
+    },
+    "terminals": [
+      {
+        "virtualPaneId": "root.0",
+        "command": "nvim",
+        "focus": true,
+        "name": "main"
+      },
+      {
+        "virtualPaneId": "root.1",
+        "command": "htop",
+        "focus": false,
+        "name": "logs"
+      }
+    ]
+  }
+}

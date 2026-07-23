@@ -1,0 +1,11 @@
+{
+  "name": "Fixture Development Layout",
+  "layout": {
+    "type": "horizontal",
+    "ratio": [1, 1],
+    "panes": [
+      { "name": "main", "command": "nvim", "focus": true },
+      { "name": "logs", "command": "htop" }
+    ]
+  }
+}

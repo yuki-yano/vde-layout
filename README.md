@@ -1,326 +1,426 @@
 # vde-layout
 
-vde-layout is a CLI that reproduces terminal layouts (tmux, WezTerm, or herdr) from YAML presets. Define the panes you need once, then bring them back with a single command.
+[日本語](README.ja.md)
 
-## Key Capabilities
-- Keep reusable presets for development, monitoring, reviews, and more.
-- Build nested horizontal/vertical splits with ratio-based sizing and fixed-cell panes.
-- Launch commands in each pane with custom working directories, environment variables, delays, and titles.
-- Preview every terminal-backend step in dry-run mode before you apply a preset.
-- Target tmux, WezTerm, or herdr backends with the same preset definitions.
-- Switch between configuration files by flag or environment variables.
+`vde-layout` turns YAML presets into repeatable terminal workspaces for tmux,
+WezTerm, and Herdr.
 
-## Installation
+Describe the panes, commands, working directories, and split sizes once. Then
+open the same workspace with either `vde-layout` or its short alias, `vl`.
+
+## Install
+
+### Cargo
+
 ```bash
-npm install -g vde-layout
-# or
-pnpm add -g vde-layout
+cargo install vde-layout --locked
 ```
 
-## Development
-```bash
-pnpm install
-pnpm run build
-pnpm run format:check
-pnpm run typecheck
-pnpm run lint
-pnpm run test
-# run all checks in sequence
-pnpm run ci
-```
+Building from source requires Rust 1.88 or newer.
 
-## Quick Start
-1. Create a YAML file at `~/.config/vde/layout/config.yml` (legacy `~/.config/vde/layout.yml` is also supported; see "Configuration Search Order").
-2. Paste a preset definition:
-   ```yaml
-   presets:
-     web-dev:
-       name: Web Development
-       description: Editor, server, and logs
-       layout:
-         type: horizontal
-         ratio: ["90c", 2]
-         panes:
-           - name: editor
-             command: nvim
-             focus: true
-           - type: vertical
-             ratio: [2, 1]
-             panes:
-               - name: server
-                 command: npm run dev
-                 cwd: ~/projects/app
-                 env:
-                   NODE_ENV: development
-               - name: logs
-                 command: tail -f logs/app.log
-                 title: Logs
-                 delay: 500
-     monitor:
-       name: Monitor
-       command: htop
-   ```
-3. Start tmux and run:
-   ```bash
-   vde-layout web-dev
-   ```
+### Prebuilt binaries
 
-## CLI Commands
-- `vde-layout [preset]` - Apply the named preset. When omitted, vde-layout uses the `default` preset; if none exists it lists available presets and exits.
-- `vde-layout list` - Show available presets with descriptions.
-- `vde-layout --select` - Open an interactive preset selector (auto mode; currently uses `fzf`).
-- `vde-layout --select --select-ui fzf` - Force the selector backend (`auto` or `fzf`).
-- `vde-layout --select --select-surface tmux-popup` - Render selector in a tmux popup (`fzf --tmux`).
-- `vde-layout --select --select-tmux-popup-opts "80%,70%"` - Pass popup sizing/placement to `fzf --tmux=<opts>`.
-- `vde-layout --select --fzf-arg "--cycle" --fzf-arg "--info=inline"` - Pass additional argument(s) to `fzf` (repeatable).
-- `vde-layout dev --dry-run` - Display backend commands without executing them.
-- `vde-layout dev --verbose` - Print informational logs, including resolved presets and plan details.
-- `vde-layout dev --backend wezterm` - Use the WezTerm backend (use `herdr` for herdr; defaults to `tmux` when omitted).
-- `vde-layout dev --current-window` - Reuse the current tmux window or active WezTerm/herdr tab after confirming that other panes can be closed.
-- `vde-layout dev --new-window` - Force creation of a new tmux window or WezTerm/herdr tab even when presets or defaults request reuse.
-- `vde-layout --config /path/to/config.yml` - Load presets from a specific file.
-- `vde-layout --help` - Show usage.
-- `vde-layout --version` / `vde-layout -v` - Print package version.
+Download the archive for your platform from
+[GitHub Releases](https://github.com/yuki-yano/vde-layout/releases). Each
+archive contains both `vde-layout` and `vl`, with a SHA-256 checksum published
+beside it.
 
-> **Note:** Applying a preset (without `--dry-run`) must be done inside an active tmux session when using the tmux backend. For WezTerm, ensure a window is running and focused. For herdr, ensure the herdr server is running; invoking vde-layout from a herdr pane supplies the preferred pane and workspace automatically.
->
-> **Selector UI note:** `--select` requires an interactive terminal and `fzf` on `$PATH`. `--select-surface tmux-popup` requires running inside tmux (`fzf --tmux`, tmux 3.3+ recommended).
+Release archives are built for:
 
-## Terminal Backends
-vde-layout resolves backends in the following order: CLI flag (`--backend`), preset configuration, then defaults to `tmux`.
+- Linux x86_64
+- Linux aarch64
+- macOS x86_64
+- macOS Apple Silicon
 
-- **tmux (default)** - Requires an active tmux session for non-dry runs. `--current-window` closes other panes in the selected window after confirmation; `--new-window` always creates a new tmux window.
-- **WezTerm** - Requires the `wezterm` CLI to be available (nightly channel recommended). Start WezTerm beforehand so at least one window exists.  
-  - `--current-window` targets the active tab and confirms before closing other panes.  
-  - `--new-window` spawns a new tab in the active window when one is available, otherwise creates a fresh window.
-- **herdr** - Requires herdr 0.7.4 or higher and a running herdr server.
-  - `--current-window` targets the current herdr tab and confirms before closing its other panes.
-  - `--new-window` creates and focuses a new tab in `HERDR_WORKSPACE_ID` when available, otherwise in herdr's active workspace.
-  - herdr constrains each side of a split to 10%–90%. vde-layout rejects layouts outside that range instead of accepting herdr's implicit clamping.
+## Quick start
 
-## Configuration Search Order
-When no `--config` flag is provided, vde-layout checks candidate files in this order for `findConfigFile()`:
-1. Project scope discovered by walking up from the current directory; for each directory, vde-layout checks `.vde/layout/config.yml` first, then `.vde/layout.yml`.
-2. `$VDE_CONFIG_PATH/layout.yml` (if `VDE_CONFIG_PATH` is set).
-3. `$XDG_CONFIG_HOME/vde/layout/config.yml` (or `~/.config/vde/layout/config.yml` when `XDG_CONFIG_HOME` is unset).
-4. `$XDG_CONFIG_HOME/vde/layout.yml` fallback (or `~/.config/vde/layout.yml`).
-
-For `loadConfig()`, vde-layout merges shared scopes first and project scope last:
-1. `$VDE_CONFIG_PATH/layout.yml`
-2. XDG scope (`.../vde/layout/config.yml` or fallback `.../vde/layout.yml`; first existing file only)
-3. Project scope (`<project-root>/.vde/layout/config.yml` or fallback `<project-root>/.vde/layout.yml`, discovered by walking up from the current directory)
-
-## Preset Structure
-Each preset is an object under the `presets` key:
-```yaml
-presets:
-  preset-key:
-    name: "Display Name"        # required
-    description: "Summary"      # optional
-    backend: wezterm            # optional; "tmux" (default), "wezterm", or "herdr"
-    windowMode: new-window       # optional; "new-window" (default) or "current-window"
-    layout:                     # optional; omit for single command presets
-      # see Layout Structure
-    command: "htop"             # optional; used when layout is omitted
-    hooks:                      # optional; see Hooks
-      afterApply: "vde-tmux-sidebar open"
-```
-
-### Defaults Structure
-Global/project defaults can be defined under `defaults`:
-```yaml
-defaults:
-  windowMode: new-window
-  selector:
-    ui: auto                 # auto | fzf
-    surface: auto            # auto | inline | tmux-popup
-    tmuxPopupOpts: "80%,70%" # passed to fzf as --tmux=<value>
-    fzf:
-      extraArgs:             # additional arguments passed to fzf
-        - --cycle
-        - --info=inline
-```
-
-### Layout Structure
-```yaml
-layout:
-  type: horizontal | vertical   # required
-  ratio: ["90c", 2, 1]          # required; number weight or "<positive-integer>c"
-  panes:                        # required
-    - name: "left"              # required for terminal panes
-      command: "npm run start"  # optional
-      cwd: "~/project"          # optional
-      env:                      # optional
-        API_BASE_URL: http://localhost:3000
-      focus: true               # optional; only one pane should be true
-      delay: 500                # optional; wait (ms) before running command
-      title: "Server"           # optional; tmux pane title
-      ephemeral: true           # optional; close pane after command completes
-      closeOnError: false       # optional; if ephemeral, close on error (default: false)
-    - type: vertical            # nested split
-      ratio: [1, 1]
-      panes:
-        - name: "tests"
-        - name: "shell"
-```
-
-### Template Tokens
-You can reference dynamically-assigned pane IDs within pane commands using template tokens. These tokens are resolved after the layout finishes splitting panes but before commands execute:
-
-- **`{{this_pane}}`** - References the current pane receiving the command
-- **`{{focus_pane}}`** - References the pane that will receive focus
-- **`{{pane_id:<name>}}`** - References a specific pane by its name
-- **`{{window_id}}`** - References the real window ID the layout was applied into (e.g. tmux's `@5`). Only resolved in `hooks.afterApply` (see [Hooks](#hooks)) — using it in a pane `command` raises a template token error rather than resolving, the same as referencing an unknown `{{pane_id:<name>}}`.
-
-Example:
-```yaml
-presets:
-  cross-pane-demo:
-    name: Cross Pane Coordination
-    layout:
-      type: vertical
-      ratio: [2, 1]
-      panes:
-        - name: editor
-          command: 'echo "Editor pane ID: {{this_pane}}"'
-          focus: true
-        - name: terminal
-          command: 'echo "I can reference the editor pane: {{pane_id:editor}}"'
-```
-
-**Common use cases:**
-- Send commands to other panes: `tmux send-keys -t {{pane_id:editor}} "npm test" Enter`
-- Display pane information for debugging: `echo "Current: {{this_pane}}, Focus: {{focus_pane}}"`
-- Coordinate tasks across multiple panes within your preset configuration
-
-### Hooks
-`hooks.afterApply` runs an arbitrary host command once, after a preset has been applied successfully. It is a general-purpose hook (not specific to any tool); one intended use is idempotently opening a sidebar tool such as [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar) once the layout has finished building — the sidebar itself is managed by that separate tool, not defined as a layout pane in vde-layout's preset.
+Create `~/.config/vde/layout/config.yml`:
 
 ```yaml
 presets:
   dev:
-    name: Dev
+    name: Development
+    description: Editor, application server, and logs
     layout:
       type: horizontal
-      ratio: [3, 1]
+      ratio: [2, 1]
       panes:
         - name: editor
           command: nvim
           focus: true
-        - name: repl
-          command: node
-    hooks:
-      afterApply: "vde-tmux-sidebar open"
+        - type: vertical
+          ratio: [2, 1]
+          panes:
+            - name: server
+              command: npm run dev
+            - name: logs
+              command: tail -f logs/app.log
 ```
 
-- Runs exactly once, only after `applyPlan` succeeds; it never runs during `--dry-run` (dry-run instead prints the unresolved command as a planned step).
-- Executes as a host shell command (equivalent to `sh -c "<command>"`, so pipes/args/redirection work) in the directory vde-layout was invoked from (the CLI's `cwd`), not inside any particular tmux pane.
-- If the command fails, or if a template token inside it cannot be resolved, vde-layout logs a warning and the preset apply is still reported as successful (exit code is unaffected).
-- The command is killed and treated as a failure (logged as a warning) if it runs for longer than 30 seconds.
-- Template tokens are supported, but `{{pane_id:<name>}}` only resolves against the pane names created by *this apply's* own `layout` — it cannot address an existing external pane such as a sidebar. This is especially easy to get wrong in `current-window` mode: the reused current pane is bound to the layout tree's first pane name, so a hook that tries `{{pane_id:sidebar}}` for a preset pane named `sidebar` would silently resolve to the current pane, not the real sidebar. Because the hook doesn't run "in" any specific pane, `{{this_pane}}` and `{{focus_pane}}` both resolve to the pane that ended up focused after the apply.
-- `{{window_id}}` resolves to the real window/tab ID the layout was applied into (tmux's `@5`-style ID, WezTerm's window ID, or herdr's tab ID). This is the recommended way to hand off to an external tool such as [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar) that needs to target the applied window — tmux's `-t` does not expand formats, so vde-layout resolves it to a literal before running the hook:
+Start your terminal backend, then apply the preset:
 
-  ```yaml
-  hooks:
-    afterApply: "command -v vde-tmux-sidebar >/dev/null 2>&1 && vde-tmux-sidebar layout-applied --window '{{window_id}}' || true"
-  ```
+```bash
+vde-layout dev
+```
 
-  If `{{window_id}}` is used but the window ID could not be resolved, the hook is skipped (logged as a warning) rather than run with a blank value.
+Use `vl` when you prefer the shorter command:
 
-### Ephemeral Panes
-Ephemeral panes automatically close after their command completes. This is useful for one-time tasks like builds, tests, or initialization scripts.
+```bash
+vl dev
+```
+
+Preview the commands without changing your terminal:
+
+```bash
+vde-layout dev --dry-run
+```
+
+## Choose a terminal backend
+
+tmux is the default. Select a different backend in the preset or on the command
+line:
 
 ```yaml
-panes:
-  - name: build
-    command: npm run build
-    ephemeral: true  # Pane closes when command finishes
+presets:
+  dev:
+    name: Development
+    backend: herdr
 ```
 
-**Error handling:**
-- By default, ephemeral panes remain open if the command fails, allowing you to inspect errors
-- Set `closeOnError: true` to close the pane regardless of success or failure
+```bash
+vde-layout dev --backend wezterm
+```
+
+| Backend | Runtime requirement | New-window behavior |
+| --- | --- | --- |
+| tmux | tmux 2.0+ and an active session | Creates a tmux window |
+| WezTerm | `wezterm` CLI version `20220624-141144-bd1b7c5d` or newer | Creates a tab in the active window, or a new window when none exists |
+| Herdr | `herdr` 0.7.4+ and a running server | Creates a tab in the current workspace |
+
+Herdr limits both sides of a split to 10%–90%. `vde-layout` reports an error
+when a preset exceeds that range instead of relying on Herdr to clamp it.
+
+## Command overview
+
+```text
+vde-layout [OPTIONS] [PRESET]
+vde-layout list
+```
+
+Common commands and options:
+
+```bash
+# List configured presets
+vde-layout list
+
+# Apply the default preset, or the first preset when no "default" key exists
+vde-layout
+
+# Open an interactive fzf selector
+vde-layout --select
+
+# Reuse the current window or tab
+vde-layout dev --current-window
+
+# Always create a new window or tab
+vde-layout dev --new-window
+
+# Use a specific configuration file
+vde-layout dev --config ./team-layouts.yml
+
+# Show resolved presets and execution details
+vde-layout dev --verbose
+
+# Show structured debug details
+VDE_DEBUG=true vde-layout dev
+```
+
+Run `vde-layout --help` for the complete option list. `vl` accepts the same
+options and has the same output and exit codes.
+
+## Reuse the current window safely
+
+`--current-window` closes other panes in the target tmux window, WezTerm tab,
+or Herdr tab before applying the preset. An interactive run asks for
+confirmation first.
+
+Declining that confirmation or cancelling the preset selector exits with status
+`130`.
+
+tmux panes marked with the user option `@vde_sidebar=1` are protected. They
+remain open, and the new layout is built in the non-sidebar area.
+
+Use `--dry-run` before applying a new or shared preset:
+
+```bash
+vde-layout dev --current-window --dry-run
+```
+
+## Configuration
+
+### Presets
+
+Every preset lives under `presets` and requires a display name:
 
 ```yaml
-panes:
-  - name: quick-test
-    command: npm test
-    ephemeral: true
-    closeOnError: false  # Default: stays open on error
-
-  - name: build-and-exit
-    command: npm run build
-    ephemeral: true
-    closeOnError: true  # Closes even if build fails
+presets:
+  api:
+    name: API development
+    description: Editor and API server
+    backend: tmux
+    windowMode: new-window
+    layout:
+      type: horizontal
+      ratio: [3, 2]
+      panes:
+        - name: editor
+          command: nvim
+          cwd: /path/to/api
+          focus: true
+        - name: server
+          command: cargo run
+          cwd: /path/to/api
+          env:
+            RUST_LOG: debug
+          title: API
+          delay: 500
 ```
 
-**Combining with template tokens:**
+Preset fields:
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `name` | yes | Display name |
+| `description` | no | Text shown by `list` and the selector |
+| `backend` | no | `tmux`, `wezterm`, or `herdr`; defaults to tmux |
+| `windowMode` | no | `new-window` or `current-window` |
+| `layout` | no | Nested pane layout |
+| `command` | no | Command for a single-pane preset without `layout` |
+| `hooks.afterApply` | no | Host command run after a successful apply |
+
+When both `layout` and `command` are omitted, the preset opens one pane with its
+default shell.
+
+### Layouts and panes
+
+Split nodes use `horizontal` for left/right panes and `vertical` for top/bottom
+panes. They may be nested to any depth:
+
+```yaml
+layout:
+  type: horizontal
+  ratio: ["90c", 2]
+  panes:
+    - name: editor
+      command: nvim
+    - type: vertical
+      ratio: [1, 1]
+      panes:
+        - name: tests
+          command: cargo test
+        - name: shell
+```
+
+Terminal pane fields:
+
+| Field | Description |
+| --- | --- |
+| `name` | Required pane name |
+| `command` | Command submitted to the pane |
+| `cwd` | Working directory selected before the command |
+| `env` | Environment variables exported before the command |
+| `delay` | Milliseconds to wait before submitting the command |
+| `title` | Pane title or label |
+| `focus` | Give this pane final focus; only one pane may set it |
+| `ephemeral` | Close the pane after its command succeeds |
+| `closeOnError` | Also close an ephemeral pane when its command fails |
+
+### Ratios and fixed cells
+
+Numeric ratio entries are weights:
+
+```yaml
+ratio: [2, 1]
+```
+
+Fixed-cell entries use a positive integer followed by `c`:
+
+```yaml
+ratio: ["90c", 2, 1]
+```
+
+Fixed cells are reserved first, then the remaining space is distributed by
+weight. Each ratio must:
+
+- contain the same number of entries as `panes`
+- contain at least one numeric weight
+- use only positive weights and positive integer cell counts
+
+If the terminal is too small to satisfy a fixed-cell layout, the apply fails
+without silently changing the requested size.
+
+### Defaults
+
+Configuration-wide defaults may define window and selector behavior:
+
+```yaml
+defaults:
+  windowMode: new-window
+  selector:
+    ui: auto
+    surface: auto
+    tmuxPopupOpts: "80%,70%"
+    fzf:
+      extraArgs:
+        - --cycle
+        - --info=inline
+```
+
+Command-line flags take precedence over preset values, and preset values take
+precedence over defaults.
+
+## Find and combine configuration files
+
+Without `--config`, `vde-layout` searches these scopes:
+
+1. Project configuration, walking upward from the current directory:
+   `.vde/layout/config.yml`, then `.vde/layout.yml`
+2. `$VDE_CONFIG_PATH/layout.yml`, when `VDE_CONFIG_PATH` is set
+3. `$XDG_CONFIG_HOME/vde/layout/config.yml`, or
+   `~/.config/vde/layout/config.yml`
+4. The legacy XDG path `$XDG_CONFIG_HOME/vde/layout.yml`, or
+   `~/.config/vde/layout.yml`
+
+Shared configuration is loaded first and project configuration last. Later
+scopes override presets and defaults with the same keys.
+
+## Select a preset interactively
+
+Install `fzf`, then run:
+
+```bash
+vde-layout --select
+```
+
+The selector shows preset names, descriptions, and a YAML preview. Useful
+options include:
+
+```bash
+vde-layout --select --select-surface inline
+vde-layout --select --select-surface tmux-popup
+vde-layout --select --select-tmux-popup-opts "80%,70%"
+vde-layout --select --fzf-arg=--cycle --fzf-arg=--info=inline
+```
+
+The tmux popup surface requires tmux 3.3 or newer.
+
+## Coordinate commands with template tokens
+
+Pane commands can refer to IDs assigned while the layout is being built:
+
+| Token | Value |
+| --- | --- |
+| `{{this_pane}}` | ID of the pane receiving the command |
+| `{{focus_pane}}` | ID of the pane that receives final focus |
+| `{{pane_id:name}}` | ID of the named pane |
+
+Example:
+
 ```yaml
 panes:
   - name: editor
     command: nvim
-  - name: test-runner
-    command: 'tmux send-keys -t {{pane_id:editor}} ":!npm test" Enter'
-    ephemeral: true  # Run once and close
+    focus: true
+  - name: reporter
+    command: 'echo "editor={{pane_id:editor}} focus={{focus_pane}}"'
 ```
 
-### Ratio and Fixed Cells
-- `ratio` supports `number` (weight) and `"<positive-integer>c"` (fixed cells).
-- Fixed-cell entries are reserved first, then the remaining cells are distributed by numeric weights.
-- Each split must include at least one numeric weight.
-- `ratio.length` must match `panes.length`.
+Unknown pane names are errors. `{{window_id}}` is available only to
+`hooks.afterApply`.
 
-Examples:
-- `[1, 1]` -> equal split
-- `["90c", 2, 1]` -> first pane fixed to 90 cells, remaining cells split as 2:1
-- `[1, "40c", 1]` -> middle pane fixed to 40 cells, sides split equally from the remaining cells
+## Run a command after applying a preset
 
-Constraints:
-- `["90c", "40c"]` is invalid (no numeric weight)
-- `0c`, `1.5c`, `"90"` are invalid
-- If runtime pane size is too small to satisfy fixed cells plus minimum remaining panes, execution fails with `SPLIT_SIZE_RESOLUTION_FAILED`
+`hooks.afterApply` runs once on the host after the backend finishes:
 
-### Single Command Presets
-If you omit `layout`, the preset runs a single command in one pane (or opens the default shell when `command` is omitted):
 ```yaml
 presets:
-  shell:
-    name: Default Shell
-  build:
-    name: Build Script
-    command: npm run build
+  dev:
+    name: Development
+    command: nvim
+    hooks:
+      afterApply: 'notify-send "ready in {{window_id}}"'
 ```
 
-### Window Mode Selection
-- `defaults.windowMode` sets the default behavior for presets that omit `windowMode`. Allowed values are `new-window` (default) and `current-window`.
-- Each preset may override the default by specifying its own `windowMode`.
-- CLI flags (`--current-window` / `--new-window`) take highest precedence and override both presets and defaults.
-- When `current-window` mode is used during an actual run, vde-layout prompts for confirmation before closing panes other than the pane running the command. Dry-run mode prints the intended closures without prompting.
-- **Sidebar protection:** panes with the tmux pane user option `@vde_sidebar` set to `1` (as set by tools like [vde-tmux-sidebar](https://github.com/yuki-yano/vde-tmux-sidebar)) are treated as protected sidebar panes in `current-window` mode. They are never killed when reusing the window, and the preset's layout is built in the remaining, non-sidebar area of the window instead of the sidebar pane itself.
+The hook:
 
+- runs through `sh -c` in the directory where `vde-layout` was invoked
+- supports `{{this_pane}}`, `{{focus_pane}}`, `{{pane_id:name}}`, and
+  `{{window_id}}`
+- is printed but not executed during `--dry-run`
+- times out after 30 seconds
+- logs a warning without changing a successful apply into a failure
 
-## Runtime Behavior
-- Dry-run mode prints every backend command and preserves the execution order you would see in a real run.
-- Applying a preset creates or reuses the backend's window/tab, splits panes according to the plan, sets environment variables, changes directories, and runs commands sequentially.
-- If a backend command fails or the configuration is invalid, vde-layout returns a structured error with the failing step and guidance.
+## Environment variables
 
-## Environment Variables
-- `VDE_CONFIG_PATH` - Override the base directory for configuration files.
-- `XDG_CONFIG_HOME` - XDG base directory root; defaults to `~/.config` when unset.
-- `VDE_DEBUG=true` - Enable debug-level logs (includes stack traces).
-- `VDE_VERBOSE=true` - Enable info-level logs without full debug output.
-- `TMUX` - Automatically set by tmux. vde-layout checks this to ensure execution happens inside a session.
-- `HERDR_PANE_ID` - Automatically set by herdr and used as the current pane for `--current-window`.
-- `HERDR_WORKSPACE_ID` - Automatically set by herdr and used as the target workspace for `--new-window`.
+| Variable | Purpose |
+| --- | --- |
+| `VDE_CONFIG_PATH` | Additional shared configuration directory |
+| `XDG_CONFIG_HOME` | Base directory for XDG configuration |
+| `VDE_VERBOSE=true` | Enable informational logs |
+| `VDE_DEBUG=true` | Enable debug logs and structured error details |
+| `TMUX` | Used to validate an active tmux session |
+| `TMUX_PANE` | Current tmux pane used by current-window mode |
+| `WEZTERM_PANE` | Current WezTerm pane used by current-window mode |
+| `HERDR_PANE_ID` | Preferred pane for Herdr current-window mode |
+| `HERDR_WORKSPACE_ID` | Target workspace for a new Herdr tab |
 
-## Requirements
-- Node.js 22 or higher
-- tmux 2.0 or higher (required for the tmux backend)
-- WezTerm nightly build with `wezterm` on `$PATH` (required for the WezTerm backend)
-- herdr 0.7.4 or higher with `herdr` on `$PATH` and its server running (required for the herdr backend)
+Herdr sets its variables automatically for commands launched in managed panes.
 
-## Contributing
-Please submit bug reports and feature requests through [GitHub Issues](https://github.com/yuki-yano/vde-layout/issues).
+## Troubleshooting
+
+### Preview before applying
+
+`--dry-run` does not require the selected backend binary and does not create,
+close, or resize panes:
+
+```bash
+vde-layout dev --backend herdr --dry-run
+```
+
+### A backend cannot be found
+
+Check that the backend CLI is on `PATH`:
+
+```bash
+tmux -V
+wezterm --version
+herdr --version
+```
+
+For WezTerm and Herdr, start the application or server before a non-dry run.
+
+### A fixed-cell layout fails
+
+Increase the terminal size, reduce fixed-cell values, or replace fixed cells
+with numeric weights. Run with `VDE_DEBUG=true` to see the pane size used during
+resolution.
+
+## Development
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-targets --all-features
+cargo test --test tmux_live -- --ignored --nocapture
+cargo publish --locked --dry-run
+```
+
+The tmux live test uses an isolated socket and does not modify the active tmux
+session.
+
+Bug reports and feature requests are welcome in
+[GitHub Issues](https://github.com/yuki-yano/vde-layout/issues).
 
 ## License
+
 MIT
