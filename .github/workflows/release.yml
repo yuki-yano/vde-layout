@@ -94,7 +94,34 @@ jobs:
           cargo_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
           test "$tag_version" = "$cargo_version"
 
+      - name: Check whether the crate version is already published
+        id: crate-version
+        shell: bash
+        run: |
+          crate_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+          status="$(curl \
+            --silent \
+            --show-error \
+            --user-agent "vde-layout-release-workflow (${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY})" \
+            --output crates-io-response.json \
+            --write-out "%{http_code}" \
+            "https://crates.io/api/v1/crates/vde-layout/${crate_version}")"
+          case "$status" in
+            200)
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              cat crates-io-response.json
+              echo "Unexpected crates.io response: HTTP $status" >&2
+              exit 1
+              ;;
+          esac
+
       - name: Publish crate
+        if: steps.crate-version.outputs.exists != 'true'
         run: cargo publish --locked
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
