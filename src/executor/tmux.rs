@@ -476,7 +476,7 @@ fn build_split_command(
     let mut command = strings(&["split-window", direction, "-t", target]);
     match size {
         ResolvedSplitSize::Percent { percentage } => {
-            command.extend(["-p".to_owned(), percentage]);
+            command.extend(["-l".to_owned(), format!("{percentage}%")]);
         }
         ResolvedSplitSize::Cells { cells, .. } => {
             command.extend(["-l".to_owned(), cells]);
@@ -628,8 +628,8 @@ fn build_preview_command(
                     direction,
                     "-t",
                     target,
-                    "-p",
-                    &percentage,
+                    "-l",
+                    &format!("{percentage}%"),
                 ]))
             }
         }

@@ -126,9 +126,10 @@ impl CommandExecutor for FakeTmux {
                 let target = argument_after(args, "-t").unwrap_or("%0").to_owned();
                 let old_size = self.sizes.get(&target).copied().unwrap_or(200);
                 let created_size = if let Some(cells) = argument_after(args, "-l") {
-                    cells.parse::<u64>().unwrap_or(old_size / 2)
-                } else if let Some(percent) = argument_after(args, "-p") {
-                    old_size * percent.parse::<u64>().unwrap_or(50) / 100
+                    cells
+                        .strip_suffix('%')
+                        .map(|percent| old_size * percent.parse::<u64>().unwrap_or(50) / 100)
+                        .unwrap_or_else(|| cells.parse::<u64>().unwrap_or(old_size / 2))
                 } else {
                     old_size / 2
                 };
@@ -346,6 +347,11 @@ fn applies_new_window_plan_and_terminal_commands() {
         fake.commands
             .iter()
             .any(|command| command == &["new-window", "-P", "-F", "#{pane_id}", "-n", "dev"])
+    );
+    assert!(
+        fake.commands
+            .iter()
+            .any(|command| command == &["split-window", "-h", "-t", "%10", "-l", "50%"])
     );
     assert!(
         fake.commands
