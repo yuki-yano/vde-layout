@@ -25,6 +25,10 @@ fn applies_a_plan_on_an_isolated_tmux_socket() {
             "/dev/null",
             "new-session",
             "-d",
+            "-x",
+            "120",
+            "-y",
+            "40",
             "-s",
             &session,
         ])
