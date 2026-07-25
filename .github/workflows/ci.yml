@@ -57,6 +57,6 @@ jobs:
           "$install_root/bin/vde-layout" --help > "$install_root/vde-layout.help"
           "$install_root/bin/vl" --help > "$install_root/vl.help"
           diff "$install_root/vde-layout.help" "$install_root/vl.help"
-          "$install_root/bin/vde-layout" simple --config examples/basic-layout.yml --dry-run > "$install_root/vde-layout.dry-run"
-          "$install_root/bin/vl" simple --config examples/basic-layout.yml --dry-run > "$install_root/vl.dry-run"
+          "$install_root/bin/vde-layout" simple --config examples/basic-layout.yml --backend tmux --dry-run > "$install_root/vde-layout.dry-run"
+          "$install_root/bin/vl" simple --config examples/basic-layout.yml --backend tmux --dry-run > "$install_root/vl.dry-run"
           diff "$install_root/vde-layout.dry-run" "$install_root/vl.dry-run"
