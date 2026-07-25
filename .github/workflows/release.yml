@@ -79,6 +79,7 @@ jobs:
     environment: release
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -120,11 +121,16 @@ jobs:
               ;;
           esac
 
+      - name: Authenticate to crates.io
+        if: steps.crate-version.outputs.exists != 'true'
+        id: crates-io-auth
+        uses: rust-lang/crates-io-auth-action@v1
+
       - name: Publish crate
         if: steps.crate-version.outputs.exists != 'true'
         run: cargo publish --locked
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
 
   publish-release:
     needs:

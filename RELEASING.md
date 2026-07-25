@@ -5,19 +5,29 @@ in `README.md` and `README.ja.md`.
 
 ## One-time repository setup
 
-Create a GitHub Actions environment named `release`. Add the repository
-environment secret `CARGO_REGISTRY_TOKEN` to that environment.
+Create a GitHub Actions environment named `release` and restrict deployments to
+tags matching `v*`. The release workflow uses this environment for crates.io
+publishing.
 
-Create the crates.io token for the `vde-layout` crate with the smallest
-available scope:
+The first version of a new crate cannot use Trusted Publishing. Bootstrap the
+crate once with a crates.io API token that has permission to publish a new
+crate:
 
-- the first release requires permission to publish a new crate
-- later releases require permission to update `vde-layout`
-- do not grant ownership-management permission
+```bash
+cargo publish --locked
+```
 
-The release workflow reads the token only in the `cargo publish` step. Protect
-the `release` environment with the reviewers required by the repository's
-release policy.
+After the first version is available, open the `vde-layout` crate settings on
+crates.io and add a GitHub Trusted Publisher with these exact values:
+
+- repository owner: `yuki-yano`
+- repository name: `vde-layout`
+- workflow filename: `release.yml`
+- environment: `release`
+
+The workflow requests a short-lived token through GitHub OIDC. Do not add a
+`CARGO_REGISTRY_TOKEN` GitHub secret. Revoke the bootstrap API token after
+Trusted Publishing is configured.
 
 ## Release procedure
 
@@ -25,8 +35,7 @@ release policy.
 2. Run the local and CI release checks.
 3. Merge the release commit into `main`.
 4. Create and push the matching `v<version>` tag.
-5. Approve the `release` environment deployment.
-6. Confirm the crate and GitHub Release are available.
+5. Confirm the crate and GitHub Release are available.
 
 The workflow checks whether the exact crate version already exists before
 publishing. Rerunning a partially completed workflow therefore skips an existing
@@ -49,7 +58,10 @@ crate version and continues to the GitHub Release job.
 
 ### Operational completion
 
-- [ ] the `release` environment approval is recorded.
+- [ ] the `release` environment accepts only tags matching `v*`.
+- [ ] the crates.io Trusted Publisher matches `yuki-yano/vde-layout`,
+      `release.yml`, and the `release` environment.
+- [ ] no long-lived crates.io token is stored in GitHub Actions.
 - [ ] the release workflow finishes successfully, including after any required
       rerun.
 - [ ] installation from crates.io and one GitHub Release archive is verified.
