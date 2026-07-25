@@ -74,9 +74,11 @@ vde-layout dev --dry-run
 
 ## terminal backendの選択
 
-default backendはtmuxです。
+`backend`を省略すると、`vde-layout`は実行中のterminal環境を自動検出します。
 
-presetまたはcommand lineで別のbackendを選択できます。
+tmuxを入れ子で使用している場合はtmuxを優先し、次にHerdr、WezTermの順で判定します。
+
+自動検出を上書きする場合は、presetまたはcommand lineでbackendを明示します。
 
 ```yaml
 presets:
@@ -193,7 +195,7 @@ presetで使用できるfieldは次のとおりです。
 | --- | --- | --- |
 | `name` | はい | 表示名 |
 | `description` | いいえ | `list`とselectorに表示する説明 |
-| `backend` | いいえ | `tmux`、`wezterm`、`herdr`のいずれか。defaultはtmux |
+| `backend` | いいえ | `tmux`、`wezterm`、`herdr`のいずれか。省略時は実行中の環境から自動検出 |
 | `windowMode` | いいえ | `new-window`または`current-window` |
 | `layout` | いいえ | 入れ子にできるpane layout |
 | `command` | いいえ | `layout`を省略した単一pane presetで実行するcommand |
@@ -365,11 +367,11 @@ hookは次の規則で動作します。
 | `XDG_CONFIG_HOME` | XDG設定のbase directory |
 | `VDE_VERBOSE=true` | 情報logを有効化 |
 | `VDE_DEBUG=true` | debug logと構造化error情報を有効化 |
-| `TMUX` | tmux session内での実行確認 |
+| `TMUX` | tmux sessionの検出と実行確認 |
 | `TMUX_PANE` | current-window modeで使用する現在のtmux pane |
-| `WEZTERM_PANE` | current-window modeで使用する現在のWezTerm pane |
-| `HERDR_PANE_ID` | Herdrのcurrent-window modeで使用するpane |
-| `HERDR_WORKSPACE_ID` | Herdrで新しいtabを作成するworkspace |
+| `WEZTERM_PANE` | WezTermの検出と現在のpaneの特定 |
+| `HERDR_PANE_ID` | Herdrの検出と使用するpaneの特定 |
+| `HERDR_WORKSPACE_ID` | Herdrの検出と使用するworkspaceの特定 |
 
 Herdrが管理するpaneから起動したcommandには、Herdrが関連する環境変数を自動設定します。
 
@@ -384,6 +386,10 @@ vde-layout dev --backend herdr --dry-run
 ```
 
 ### backendが見つからない
+
+対応するterminal環境を検出できない場合は、tmux、WezTerm、Herdrの中で実行するか、`--backend`を明示してください。
+
+CLIがinstallされているだけではbackendとして自動選択しません。
 
 backendのCLIが`PATH`に含まれることを確認します。
 

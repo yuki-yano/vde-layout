@@ -120,6 +120,7 @@ fn lists_presets_and_applies_explicit_config_to_subcommand() {
 fn all_backend_dry_runs_need_no_external_binary() {
     let (_directory, path) = config();
     binary("vde-layout")
+        .env("TMUX", "detected-session")
         .args(["dev", "--config", path.to_str().unwrap(), "--dry-run"])
         .assert()
         .success()
@@ -186,7 +187,13 @@ fn environment_validation_precedes_core_compilation_for_actual_apply() {
     .unwrap();
 
     binary("vde-layout")
-        .args(["invalid", "--config", path.to_str().unwrap()])
+        .args([
+            "invalid",
+            "--config",
+            path.to_str().unwrap(),
+            "--backend",
+            "tmux",
+        ])
         .assert()
         .code(1)
         .stderr(predicate::str::contains(
@@ -195,7 +202,14 @@ fn environment_validation_precedes_core_compilation_for_actual_apply() {
         .stderr(predicate::str::contains("RATIO_INVALID_VALUE").not());
 
     binary("vde-layout")
-        .args(["invalid", "--config", path.to_str().unwrap(), "--dry-run"])
+        .args([
+            "invalid",
+            "--config",
+            path.to_str().unwrap(),
+            "--backend",
+            "tmux",
+            "--dry-run",
+        ])
         .assert()
         .code(1)
         .stdout(predicate::str::starts_with(
@@ -208,8 +222,16 @@ fn environment_validation_precedes_core_compilation_for_actual_apply() {
 fn alias_produces_identical_dry_run_output() {
     let (_directory, path) = config();
     let args = ["dev", "--config", path.to_str().unwrap(), "--dry-run"];
-    let first = binary("vde-layout").args(args).output().unwrap();
-    let second = binary("vl").args(args).output().unwrap();
+    let first = binary("vde-layout")
+        .env("TMUX", "detected-session")
+        .args(args)
+        .output()
+        .unwrap();
+    let second = binary("vl")
+        .env("TMUX", "detected-session")
+        .args(args)
+        .output()
+        .unwrap();
     assert_eq!(first.status.code(), Some(0));
     assert_eq!(first.stdout, second.stdout);
     assert_eq!(first.stderr, second.stderr);
@@ -257,6 +279,7 @@ fn verbose_environment_and_cli_flag_enable_runtime_logs() {
     let (_directory, path) = config();
     for mut command in [binary("vde-layout"), binary("vl")] {
         command
+            .env("TMUX", "detected-session")
             .env("VDE_VERBOSE", "true")
             .args(["dev", "--config", path.to_str().unwrap(), "--dry-run"])
             .assert()
@@ -267,9 +290,10 @@ fn verbose_environment_and_cli_flag_enable_runtime_logs() {
 }
 
 #[test]
-fn backend_and_window_mode_sources_follow_cli_preset_defaults_and_fallback_precedence() {
+fn backend_and_window_mode_sources_follow_cli_preset_and_environment_precedence() {
     let (_directory, path) = config();
     binary("vde-layout")
+        .env("HERDR_PANE_ID", "pane-1")
         .args([
             "wez",
             "--config",
@@ -301,6 +325,7 @@ fn backend_and_window_mode_sources_follow_cli_preset_defaults_and_fallback_prece
         ))
         .stdout(predicate::str::contains("Terminal backend: wezterm"));
     binary("vde-layout")
+        .env("HERDR_PANE_ID", "pane-1")
         .args([
             "dev",
             "--config",
@@ -312,6 +337,9 @@ fn backend_and_window_mode_sources_follow_cli_preset_defaults_and_fallback_prece
         .success()
         .stdout(predicate::str::contains(
             "Window mode: new-window (source: defaults)",
+        ))
+        .stdout(predicate::str::contains(
+            "Terminal backend: herdr (source: environment)",
         ));
 
     let fallback_directory = TempDir::new().unwrap();
@@ -322,6 +350,7 @@ fn backend_and_window_mode_sources_follow_cli_preset_defaults_and_fallback_prece
     )
     .unwrap();
     binary("vde-layout")
+        .env("WEZTERM_PANE", "42")
         .args([
             "shell",
             "--config",
@@ -333,13 +362,30 @@ fn backend_and_window_mode_sources_follow_cli_preset_defaults_and_fallback_prece
         .success()
         .stdout(predicate::str::contains(
             "Window mode: new-window (source: fallback)",
+        ))
+        .stdout(predicate::str::contains(
+            "Terminal backend: wezterm (source: environment)",
         ));
+}
+
+#[test]
+fn backend_auto_detection_requires_a_supported_terminal_environment() {
+    let (_directory, path) = config();
+    binary("vde-layout")
+        .args(["dev", "--config", path.to_str().unwrap(), "--dry-run"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "Unable to detect an active terminal backend",
+        ))
+        .stderr(predicate::str::contains("--backend <tmux|wezterm|herdr>"));
 }
 
 #[test]
 fn double_dash_keeps_list_as_a_positional_preset() {
     let (_directory, path) = config();
     binary("vde-layout")
+        .env("TMUX", "detected-session")
         .args([
             "--config",
             path.to_str().unwrap(),

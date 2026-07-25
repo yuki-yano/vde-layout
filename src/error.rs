@@ -21,6 +21,7 @@ pub enum ErrorCode {
     TmuxNotInstalled,
     UnsupportedTmuxVersion,
     BackendNotFound,
+    BackendDetectionFailed,
     TerminalCommandFailed,
     TemplateTokenError,
     WeztermNotFound,
@@ -161,6 +162,11 @@ pub fn format_error(error: &VdeError) -> String {
                     "\nherdr is required but not installed.\nInstall herdr 0.7.4 or higher and ensure it is on $PATH.",
                 );
             }
+        }
+        ErrorCode::BackendDetectionFailed => {
+            message.push_str(
+                "\n\nRun vde-layout inside tmux, WezTerm, or Herdr, or select one explicitly:\n  vde-layout <preset> --backend <tmux|wezterm|herdr>",
+            );
         }
         ErrorCode::WeztermNotFound => {
             message.push_str(

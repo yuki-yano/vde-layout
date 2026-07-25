@@ -99,6 +99,19 @@ fn formats_backend_and_wezterm_guidance() {
 }
 
 #[test]
+fn formats_backend_detection_guidance() {
+    let error = VdeError::new(
+        ErrorKind::Environment,
+        ErrorCode::BackendDetectionFailed,
+        "Unable to detect an active terminal backend",
+        empty_details(),
+    );
+    let formatted = format_error(&error);
+    assert!(formatted.contains("Run vde-layout inside tmux, WezTerm, or Herdr"));
+    assert!(formatted.contains("--backend <tmux|wezterm|herdr>"));
+}
+
+#[test]
 fn formats_herdr_guidance() {
     let backend = VdeError::new(
         ErrorKind::Environment,

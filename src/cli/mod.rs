@@ -13,7 +13,7 @@ use serde_json::Value;
 use crate::core::{
     CoreError, CoreErrorKind, compile_preset_from_value, create_layout_plan, emit_plan,
 };
-use crate::error::{ErrorCode, ErrorKind, VdeError, format_error};
+use crate::error::{ErrorCode, ErrorKind, VdeError, format_error, object_details};
 use crate::executor::{
     ApplyHerdrPlanResult, ApplyTmuxPlanResult, ApplyWeztermPlanResult, CommandExecutor,
     ExecuteHerdrPlanOptions, ExecuteTmuxPlanOptions, ExecuteWeztermPlanOptions,
@@ -173,6 +173,20 @@ struct ExecutionSummary {
 struct WindowModeResolution {
     mode: WindowMode,
     source: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BackendResolution {
+    backend: TerminalBackendKind,
+    source: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct BackendEnvironmentSignals {
+    tmux: bool,
+    herdr_pane: bool,
+    herdr_workspace: bool,
+    wezterm_pane: bool,
 }
 
 struct BackendResult {
@@ -394,23 +408,22 @@ fn execute_preset(
         "Window mode: {} (source: {})",
         window_mode.mode, window_mode.source
     ));
-    let backend = arguments
-        .backend
-        .map(Into::into)
-        .or(preset.backend)
-        .unwrap_or(TerminalBackendKind::Tmux);
-    let backend_name = match backend {
+    let backend = resolve_backend(arguments, preset)?;
+    let backend_name = match backend.backend {
         TerminalBackendKind::Tmux => "tmux",
         TerminalBackendKind::Wezterm => "wezterm",
         TerminalBackendKind::Herdr => "herdr",
     };
-    logger.info(format!("Terminal backend: {backend_name}"));
+    logger.info(format!(
+        "Terminal backend: {backend_name} (source: {})",
+        backend.source
+    ));
 
     let detected_version = if arguments.dry_run {
         println!("[DRY RUN] No actual commands will be executed");
         None
     } else {
-        verify_backend_environment(backend, logger)?
+        verify_backend_environment(backend.backend, logger)?
     };
 
     let value = serde_json::to_value(preset)
@@ -425,7 +438,7 @@ fn execute_preset(
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     if arguments.dry_run {
-        render_dry_run(backend, &emission, logger)?;
+        render_dry_run(backend.backend, &emission, logger)?;
         if let Some(hook) = compiled
             .hooks
             .as_ref()
@@ -439,7 +452,7 @@ fn execute_preset(
     }
 
     let result = apply_backend(
-        backend,
+        backend.backend,
         &emission,
         window_mode.mode,
         &preset.name,
@@ -450,7 +463,7 @@ fn execute_preset(
     logger.info(format!(
         "Executed {} {} steps",
         result.summary.executed_steps,
-        match backend {
+        match backend.backend {
             TerminalBackendKind::Tmux => "tmux",
             TerminalBackendKind::Wezterm => "wezterm",
             TerminalBackendKind::Herdr => "herdr",
@@ -693,6 +706,66 @@ fn resolve_window_mode(
     })
 }
 
+fn resolve_backend(
+    arguments: &CliArguments,
+    preset: &Preset,
+) -> Result<BackendResolution, AppError> {
+    if let Some(backend) = arguments.backend {
+        return Ok(BackendResolution {
+            backend: backend.into(),
+            source: "cli",
+        });
+    }
+    if let Some(backend) = preset.backend {
+        return Ok(BackendResolution {
+            backend,
+            source: "preset",
+        });
+    }
+    detect_backend(BackendEnvironmentSignals::from_process()).ok_or_else(|| {
+        AppError::Vde(VdeError::new(
+            ErrorKind::Environment,
+            ErrorCode::BackendDetectionFailed,
+            "Unable to detect an active terminal backend",
+            object_details(serde_json::json!({
+                "checkedEnvironmentVariables": [
+                    "TMUX",
+                    "HERDR_PANE_ID",
+                    "HERDR_WORKSPACE_ID",
+                    "WEZTERM_PANE",
+                ],
+            })),
+        ))
+    })
+}
+
+impl BackendEnvironmentSignals {
+    fn from_process() -> Self {
+        Self {
+            tmux: environment_is_set("TMUX"),
+            herdr_pane: environment_is_set("HERDR_PANE_ID"),
+            herdr_workspace: environment_is_set("HERDR_WORKSPACE_ID"),
+            wezterm_pane: environment_is_set("WEZTERM_PANE"),
+        }
+    }
+}
+
+fn detect_backend(signals: BackendEnvironmentSignals) -> Option<BackendResolution> {
+    let backend = if signals.tmux {
+        TerminalBackendKind::Tmux
+    } else if signals.herdr_pane || signals.herdr_workspace {
+        TerminalBackendKind::Herdr
+    } else if signals.wezterm_pane {
+        TerminalBackendKind::Wezterm
+    } else {
+        return None;
+    };
+    Some(BackendResolution {
+        backend,
+        source: "environment",
+    })
+}
+
 fn confirm_pane_kill(panes: &[String], dry_run: bool, logger: &CliLogger) -> bool {
     if panes.is_empty() {
         return true;
@@ -880,6 +953,7 @@ fn error_code_from_str(code: &str) -> Option<ErrorCode> {
         "TMUX_NOT_INSTALLED" => ErrorCode::TmuxNotInstalled,
         "UNSUPPORTED_TMUX_VERSION" => ErrorCode::UnsupportedTmuxVersion,
         "BACKEND_NOT_FOUND" => ErrorCode::BackendNotFound,
+        "BACKEND_DETECTION_FAILED" => ErrorCode::BackendDetectionFailed,
         "TERMINAL_COMMAND_FAILED" => ErrorCode::TerminalCommandFailed,
         "TEMPLATE_TOKEN_ERROR" => ErrorCode::TemplateTokenError,
         "WEZTERM_NOT_FOUND" => ErrorCode::WeztermNotFound,
@@ -947,5 +1021,49 @@ mod tests {
         let rendered = format_core_error(&error).to_lowercase();
         assert_eq!(rendered.matches("command:").count(), 1);
         assert_eq!(rendered.matches("stderr:").count(), 1);
+    }
+
+    #[test]
+    fn detects_the_innermost_supported_backend_from_environment_signals() {
+        assert_eq!(
+            detect_backend(BackendEnvironmentSignals {
+                tmux: true,
+                herdr_pane: true,
+                herdr_workspace: true,
+                wezterm_pane: true,
+            })
+            .unwrap()
+            .backend,
+            TerminalBackendKind::Tmux
+        );
+        assert_eq!(
+            detect_backend(BackendEnvironmentSignals {
+                herdr_pane: true,
+                wezterm_pane: true,
+                ..Default::default()
+            })
+            .unwrap()
+            .backend,
+            TerminalBackendKind::Herdr
+        );
+        assert_eq!(
+            detect_backend(BackendEnvironmentSignals {
+                herdr_workspace: true,
+                ..Default::default()
+            })
+            .unwrap()
+            .backend,
+            TerminalBackendKind::Herdr
+        );
+        assert_eq!(
+            detect_backend(BackendEnvironmentSignals {
+                wezterm_pane: true,
+                ..Default::default()
+            })
+            .unwrap()
+            .backend,
+            TerminalBackendKind::Wezterm
+        );
+        assert_eq!(detect_backend(BackendEnvironmentSignals::default()), None);
     }
 }

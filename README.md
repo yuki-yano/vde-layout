@@ -77,8 +77,12 @@ vde-layout dev --dry-run
 
 ## Choose a terminal backend
 
-tmux is the default. Select a different backend in the preset or on the command
-line:
+When `backend` is omitted, `vde-layout` detects the active terminal environment.
+An active tmux session takes precedence even inside Herdr or WezTerm, followed
+by Herdr and then WezTerm.
+
+Select a backend explicitly in the preset or on the command line when you want
+to override detection:
 
 ```yaml
 presets:
@@ -192,7 +196,7 @@ Preset fields:
 | --- | --- | --- |
 | `name` | yes | Display name |
 | `description` | no | Text shown by `list` and the selector |
-| `backend` | no | `tmux`, `wezterm`, or `herdr`; defaults to tmux |
+| `backend` | no | `tmux`, `wezterm`, or `herdr`; detected from the active environment when omitted |
 | `windowMode` | no | `new-window` or `current-window` |
 | `layout` | no | Nested pane layout |
 | `command` | no | Command for a single-pane preset without `layout` |
@@ -368,11 +372,11 @@ The hook:
 | `XDG_CONFIG_HOME` | Base directory for XDG configuration |
 | `VDE_VERBOSE=true` | Enable informational logs |
 | `VDE_DEBUG=true` | Enable debug logs and structured error details |
-| `TMUX` | Used to validate an active tmux session |
+| `TMUX` | Detect and validate an active tmux session |
 | `TMUX_PANE` | Current tmux pane used by current-window mode |
-| `WEZTERM_PANE` | Current WezTerm pane used by current-window mode |
-| `HERDR_PANE_ID` | Preferred pane for Herdr current-window mode |
-| `HERDR_WORKSPACE_ID` | Target workspace for a new Herdr tab |
+| `WEZTERM_PANE` | Detect WezTerm and identify the current pane |
+| `HERDR_PANE_ID` | Detect Herdr and identify the preferred pane |
+| `HERDR_WORKSPACE_ID` | Detect Herdr and identify the target workspace |
 
 Herdr sets its variables automatically for commands launched in managed panes.
 
@@ -388,6 +392,10 @@ vde-layout dev --backend herdr --dry-run
 ```
 
 ### A backend cannot be found
+
+If no supported terminal environment is detected, run the command inside tmux,
+WezTerm, or Herdr, or specify `--backend` explicitly. Detection does not select
+a backend merely because its CLI is installed.
 
 Check that the backend CLI is on `PATH`:
 
