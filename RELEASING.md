@@ -25,9 +25,11 @@ crates.io and add a GitHub Trusted Publisher with these exact values:
 - workflow filename: `release.yml`
 - environment: `release`
 
-The workflow requests a short-lived token through GitHub OIDC. Do not add a
-`CARGO_REGISTRY_TOKEN` GitHub secret. Revoke the bootstrap API token after
-Trusted Publishing is configured.
+Enable **Require trusted publishing for all new versions** after adding the
+publisher. The workflow requests a short-lived token through GitHub OIDC. Do
+not add a `CARGO_REGISTRY_TOKEN` GitHub secret. If the API token was created
+solely for the bootstrap publish, revoke it after Trusted Publishing is
+configured.
 
 ## Release procedure
 
@@ -61,6 +63,7 @@ crate version and continues to the GitHub Release job.
 - [ ] the `release` environment accepts only tags matching `v*`.
 - [ ] the crates.io Trusted Publisher matches `yuki-yano/vde-layout`,
       `release.yml`, and the `release` environment.
+- [ ] crates.io requires Trusted Publishing for all new versions.
 - [ ] no long-lived crates.io token is stored in GitHub Actions.
 - [ ] the release workflow finishes successfully, including after any required
       rerun.
