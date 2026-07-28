@@ -101,8 +101,10 @@ vde-layout dev --backend wezterm
 | WezTerm | `wezterm` CLI version `20220624-141144-bd1b7c5d` or newer | Creates a tab in the active window, or a new window when none exists |
 | Herdr | `herdr` 0.7.4+ and a running server | Creates a tab in the current workspace |
 
-Herdr limits both sides of a split to 10%–90%. `vde-layout` reports an error
-when a preset exceeds that range instead of relying on Herdr to clamp it.
+Herdr limits both sides of a split to 10%–90%. When the split ratio resolved
+from weights or fixed-cell sizes exceeds that range, `vde-layout` emits a
+warning and applies the nearest supported ratio. Invalid or otherwise
+unresolvable split sizes remain errors.
 
 ## Command overview
 

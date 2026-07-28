@@ -25,6 +25,7 @@ const MIN_HERDR_RATIO: f64 = 0.1;
 const MAX_HERDR_RATIO: f64 = 0.9;
 
 pub type ConfirmHerdrKillCallback<'a> = dyn FnMut(&[String], bool) -> bool + 'a;
+pub type HerdrWarningCallback<'a> = dyn FnMut(&str) + 'a;
 
 pub struct ExecuteHerdrPlanOptions<'a> {
     pub window_mode: WindowMode,
@@ -33,6 +34,7 @@ pub struct ExecuteHerdrPlanOptions<'a> {
     pub workspace_id: Option<&'a str>,
     pub window_name: Option<&'a str>,
     pub on_confirm_kill: Option<&'a mut ConfirmHerdrKillCallback<'a>>,
+    pub on_warning: Option<&'a mut HerdrWarningCallback<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,6 +50,7 @@ pub struct ApplyHerdrPlanResult {
 pub struct HerdrDryRunStep {
     pub summary: String,
     pub command: String,
+    pub warning: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -192,7 +195,13 @@ pub fn execute_herdr_plan(
     let mut executed_steps = 0;
     for step in &emission.steps {
         match step.kind {
-            CommandStepKind::Split => apply_split_step(step, emission, executor, &mut pane_map)?,
+            CommandStepKind::Split => apply_split_step(
+                step,
+                emission,
+                executor,
+                &mut pane_map,
+                &mut options.on_warning,
+            )?,
             CommandStepKind::Focus => {
                 let target = required_target(step)?;
                 resolve_real_pane_id(&mut pane_map, target, &step.id)?;
@@ -248,13 +257,16 @@ pub fn build_herdr_dry_run_steps(
                         step.summary.clone()
                     },
                     command: format!(
-                        "herdr pane split {target} --direction {direction} --ratio {ratio} {focus}"
+                        "herdr pane split {target} --direction {direction} --ratio {} {focus}",
+                        ratio.value
                     ),
+                    warning: ratio.warning,
                 });
             }
             CommandStepKind::Focus => steps.push(HerdrDryRunStep {
                 summary: step.summary.clone(),
                 command: format!("# herdr focus for {target} is selected during pane creation"),
+                warning: None,
             }),
         }
     }
@@ -407,12 +419,18 @@ fn apply_split_step(
     emission: &PlanEmission,
     executor: &mut dyn CommandExecutor,
     pane_map: &mut IndexMap<String, String>,
+    on_warning: &mut Option<&mut HerdrWarningCallback<'_>>,
 ) -> Result<(), CoreError> {
     let target_virtual = required_target(step)?;
     let target_real = resolve_real_pane_id(pane_map, target_virtual, &step.id)?;
     let orientation = resolve_split_orientation(step)?;
-    let ratio = resolve_herdr_ratio(step, executor, &target_real, orientation)?;
-    assert_supported_ratio(step, ratio)?;
+    let resolved_ratio = resolve_herdr_ratio(step, executor, &target_real, orientation)?;
+    if let Some(warning) = resolved_ratio.warning.as_deref()
+        && let Some(callback) = on_warning.as_deref_mut()
+    {
+        callback(warning);
+    }
+    let ratio = resolved_ratio.value;
     let direction = match orientation {
         Orientation::Horizontal => "right",
         Orientation::Vertical => "down",
@@ -453,20 +471,20 @@ fn resolve_herdr_ratio(
     executor: &mut dyn CommandExecutor,
     pane_id: &str,
     orientation: Orientation,
-) -> Result<f64, CoreError> {
+) -> Result<ResolvedHerdrRatio, CoreError> {
     if !matches!(step.split_sizing, Some(SplitSizing::DynamicCells { .. })) {
         return match resolve_split_size(step, &Default::default())? {
-            ResolvedSplitSize::Percent { percentage } => percentage
-                .parse::<f64>()
-                .map(|percentage| round_ratio(1.0 - percentage / 100.0))
-                .map_err(|_| {
+            ResolvedSplitSize::Percent { percentage } => {
+                let percentage = percentage.parse::<f64>().map_err(|_| {
                     execution_error(
                         "INVALID_PLAN",
                         "Invalid split percentage",
                         Some(&step.id),
                         json!({ "percentage": percentage }),
                     )
-                }),
+                })?;
+                clamp_herdr_ratio(step, round_ratio(1.0 - percentage / 100.0))
+            }
             ResolvedSplitSize::Cells { .. } => Err(execution_error(
                 "INVALID_PLAN",
                 "Unexpected cell split",
@@ -514,9 +532,10 @@ fn resolve_herdr_ratio(
             target_cells,
             created_cells,
             ..
-        } => Ok(round_ratio(
-            target_cells as f64 / (target_cells + created_cells) as f64,
-        )),
+        } => clamp_herdr_ratio(
+            step,
+            round_ratio(target_cells as f64 / (target_cells + created_cells) as f64),
+        ),
         ResolvedSplitSize::Percent { .. } => Err(execution_error(
             "INVALID_PLAN",
             "Unexpected percent split",
@@ -596,13 +615,19 @@ fn run_in_pane(
     Ok(())
 }
 
-fn dry_run_ratio(step: &CommandStep) -> Result<String, CoreError> {
+fn dry_run_ratio(step: &CommandStep) -> Result<ResolvedHerdrRatio<String>, CoreError> {
     if matches!(step.split_sizing, Some(SplitSizing::DynamicCells { .. })) {
-        return Ok("<dynamic>".to_owned());
+        return Ok(ResolvedHerdrRatio {
+            value: "<dynamic>".to_owned(),
+            warning: None,
+        });
     }
     let ResolvedSplitSize::Percent { percentage } = resolve_split_size(step, &Default::default())?
     else {
-        return Ok("<dynamic>".to_owned());
+        return Ok(ResolvedHerdrRatio {
+            value: "<dynamic>".to_owned(),
+            warning: None,
+        });
     };
     let percentage = percentage.parse::<f64>().map_err(|_| {
         execution_error(
@@ -613,24 +638,44 @@ fn dry_run_ratio(step: &CommandStep) -> Result<String, CoreError> {
         )
     })?;
     let ratio = round_ratio(1.0 - percentage / 100.0);
-    assert_supported_ratio(step, ratio)?;
-    Ok(format_ratio(ratio))
+    let ratio = clamp_herdr_ratio(step, ratio)?;
+    Ok(ResolvedHerdrRatio {
+        value: format_ratio(ratio.value),
+        warning: ratio.warning,
+    })
 }
 
-fn assert_supported_ratio(step: &CommandStep, ratio: f64) -> Result<(), CoreError> {
-    if ratio.is_finite() && (MIN_HERDR_RATIO..=MAX_HERDR_RATIO).contains(&ratio) {
-        return Ok(());
+#[derive(Debug, Clone, PartialEq)]
+struct ResolvedHerdrRatio<T = f64> {
+    value: T,
+    warning: Option<String>,
+}
+
+fn clamp_herdr_ratio(
+    step: &CommandStep,
+    requested_ratio: f64,
+) -> Result<ResolvedHerdrRatio, CoreError> {
+    if !requested_ratio.is_finite() {
+        return Err(execution_error(
+            "INVALID_PLAN",
+            "Herdr split ratio must be finite",
+            Some(&step.id),
+            json!({ "ratio": requested_ratio }),
+        ));
     }
-    Err(execution_error(
-        "SPLIT_SIZE_RESOLUTION_FAILED",
-        "Herdr requires both sides of a split to occupy at least 10%",
-        Some(&step.id),
-        json!({
-            "ratio": ratio,
-            "minimumRatio": MIN_HERDR_RATIO,
-            "maximumRatio": MAX_HERDR_RATIO,
-        }),
-    ))
+    let applied_ratio = requested_ratio.clamp(MIN_HERDR_RATIO, MAX_HERDR_RATIO);
+    let warning = (applied_ratio != requested_ratio).then(|| {
+        format!(
+            "Herdr adjusted split {} from ratio {} to {} because both sides must occupy at least 10%",
+            step.id,
+            format_ratio(requested_ratio),
+            format_ratio(applied_ratio),
+        )
+    });
+    Ok(ResolvedHerdrRatio {
+        value: applied_ratio,
+        warning,
+    })
 }
 
 fn result_object(output: &str) -> Result<Map<String, Value>, CoreError> {
@@ -726,6 +771,7 @@ fn preview(summary: String, args: &[&str]) -> HerdrDryRunStep {
                 .collect::<Vec<_>>()
                 .join(" ")
         ),
+        warning: None,
     }
 }
 

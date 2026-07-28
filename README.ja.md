@@ -99,7 +99,9 @@ vde-layout dev --backend wezterm
 
 Herdrでは、splitの両側を10%から90%の範囲に収める必要があります。
 
-この範囲を超えるpresetは、Herdr側で暗黙に補正せず、`vde-layout`がerrorとして報告します。
+weightまたは固定cell sizeから解決したsplit比率がこの範囲を超える場合、`vde-layout`はwarningを表示し、最も近い対応比率を適用します。
+
+不正なsplit sizeや、その他の理由で解決できないsizeは引き続きerrorになります。
 
 ## commandの概要
 

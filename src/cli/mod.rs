@@ -557,6 +557,9 @@ fn render_dry_run(
                 .into_iter()
                 .enumerate()
             {
+                if let Some(warning) = step.warning.as_deref() {
+                    logger.warn(format!("Warning: {warning}"));
+                }
                 println!(" {}. [herdr] {}: {}", index + 1, step.summary, step.command);
             }
         }
@@ -615,6 +618,7 @@ fn apply_backend(
             let mut executor = LoggingExecutor::new("herdr", false, logger);
             let mut confirm =
                 |panes: &[String], dry_run: bool| confirm_pane_kill(panes, dry_run, logger);
+            let mut warn = |message: &str| logger.warn(format!("Warning: {message}"));
             let pane_id = std::env::var("HERDR_PANE_ID").ok();
             let workspace_id = std::env::var("HERDR_WORKSPACE_ID").ok();
             let result = execute_herdr_plan(
@@ -627,6 +631,7 @@ fn apply_backend(
                     workspace_id: workspace_id.as_deref(),
                     window_name: Some(window_name),
                     on_confirm_kill: Some(&mut confirm),
+                    on_warning: Some(&mut warn),
                 },
             )
             .map_err(AppError::Core)?;

@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 use serde_json::{Value, json};
 use vde_layout::WindowMode;
@@ -17,6 +19,7 @@ struct FakeHerdr {
     list_outputs: VecDeque<String>,
     layout_outputs: VecDeque<String>,
     split_outputs: VecDeque<String>,
+    event_log: Option<Rc<RefCell<Vec<String>>>>,
     dry_run: bool,
 }
 
@@ -30,6 +33,7 @@ impl FakeHerdr {
             list_outputs: VecDeque::new(),
             layout_outputs: VecDeque::new(),
             split_outputs: VecDeque::new(),
+            event_log: None,
             dry_run: false,
         }
     }
@@ -63,11 +67,21 @@ impl FakeHerdr {
             .extend(values.into_iter().map(|value| value.to_string()));
         self
     }
+
+    fn events(mut self, event_log: Rc<RefCell<Vec<String>>>) -> Self {
+        self.event_log = Some(event_log);
+        self
+    }
 }
 
 impl CommandExecutor for FakeHerdr {
     fn execute(&mut self, args: &[String]) -> Result<String, CoreError> {
         self.commands.push(args.to_vec());
+        if let Some(event_log) = self.event_log.as_ref() {
+            event_log
+                .borrow_mut()
+                .push(format!("command: {}", args.join(" ")));
+        }
         match args {
             [version] if version == "--version" => self.version_output.clone(),
             [tab, create, ..] if tab == "tab" && create == "create" => self
@@ -202,16 +216,37 @@ fn dry_run_renders_splits_titles_and_commands() {
 }
 
 #[test]
-fn dry_run_rejects_ratios_herdr_would_clamp() {
+fn dry_run_clamps_ratios_herdr_cannot_represent_and_warns() {
     let plan = emission(
         "name: app\nlayout:\n  type: horizontal\n  ratio: [1, 19]\n  panes:\n    - { name: left }\n    - { name: right }\n",
     );
-    let error = build_herdr_dry_run_steps(&plan).unwrap_err();
-    assert_eq!(error.code, "SPLIT_SIZE_RESOLUTION_FAILED");
+    let steps = build_herdr_dry_run_steps(&plan).unwrap();
     assert_eq!(
-        error.message,
-        "Herdr requires both sides of a split to occupy at least 10%"
+        steps[0].command,
+        "herdr pane split root.0 --direction right --ratio 0.1 --no-focus"
     );
+    assert_eq!(
+        steps[0].warning.as_deref(),
+        Some(
+            "Herdr adjusted split root:split:1 from ratio 0.05 to 0.1 because both sides must occupy at least 10%"
+        )
+    );
+}
+
+#[test]
+fn dry_run_preserves_herdr_boundary_ratios_without_warning() {
+    for (ratio, expected) in [("[1, 9]", "0.1"), ("[9, 1]", "0.9")] {
+        let plan = emission(&format!(
+            "name: app\nlayout:\n  type: horizontal\n  ratio: {ratio}\n  panes:\n    - {{ name: left }}\n    - {{ name: right }}\n"
+        ));
+        let steps = build_herdr_dry_run_steps(&plan).unwrap();
+
+        assert_eq!(
+            steps[0].command,
+            format!("herdr pane split root.0 --direction right --ratio {expected} --no-focus")
+        );
+        assert_eq!(steps[0].warning, None);
+    }
 }
 
 #[test]
@@ -240,6 +275,7 @@ fn creates_tab_and_applies_terminal_setup() {
             workspace_id: Some("workspace-1"),
             window_name: Some("Development"),
             on_confirm_kill: None,
+            on_warning: None,
         },
     )
     .unwrap();
@@ -301,6 +337,7 @@ fn reuses_current_tab_and_closes_only_its_siblings() {
             workspace_id: None,
             window_name: None,
             on_confirm_kill: Some(&mut confirm),
+            on_warning: None,
         },
     )
     .unwrap();
@@ -329,6 +366,7 @@ fn splits_with_reversed_percent_ratio_and_focuses_during_creation() {
             workspace_id: None,
             window_name: None,
             on_confirm_kill: None,
+            on_warning: None,
         },
     )
     .unwrap();
@@ -368,6 +406,7 @@ fn resolves_single_child_terminal_ids_through_split_ancestors() {
             workspace_id: None,
             window_name: None,
             on_confirm_kill: None,
+            on_warning: None,
         },
     )
     .unwrap();
@@ -408,6 +447,7 @@ fn resolves_fixed_cells_from_herdr_layout_dimensions() {
             workspace_id: None,
             window_name: None,
             on_confirm_kill: None,
+            on_warning: None,
         },
     )
     .unwrap();
@@ -425,4 +465,80 @@ fn resolves_fixed_cells_from_herdr_layout_dimensions() {
             "--no-focus",
         ]
     ));
+}
+
+#[test]
+fn clamps_fixed_cells_to_herdr_minimum_ratio_and_warns() {
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let mut fake = FakeHerdr::new()
+        .tabs([tab_created("pane-1", "tab-1")])
+        .layouts([json!({
+            "result": {
+                "type": "pane_layout",
+                "layout": {
+                    "workspace_id": "workspace-1",
+                    "tab_id": "tab-1",
+                    "panes": [{ "pane_id": "pane-1", "rect": { "width": 100, "height": 160 } }]
+                }
+            }
+        })])
+        .splits([pane_result(pane("pane-2", "tab-1", false))])
+        .events(events.clone());
+    let plan = emission(
+        "name: split\nlayout:\n  type: vertical\n  ratio: [1, \"12c\"]\n  panes:\n    - { name: main }\n    - { name: prompt }\n",
+    );
+    let mut warnings = Vec::new();
+    {
+        let warning_events = events.clone();
+        let mut warn = |message: &str| {
+            warnings.push(message.to_owned());
+            warning_events
+                .borrow_mut()
+                .push(format!("warning: {message}"));
+        };
+        execute_herdr_plan(
+            &plan,
+            &mut fake,
+            ExecuteHerdrPlanOptions {
+                window_mode: WindowMode::NewWindow,
+                cwd: Some("/repo"),
+                pane_id: None,
+                workspace_id: None,
+                window_name: None,
+                on_confirm_kill: None,
+                on_warning: Some(&mut warn),
+            },
+        )
+        .unwrap();
+    }
+
+    assert!(command_exists(
+        &fake,
+        &[
+            "pane",
+            "split",
+            "pane-1",
+            "--direction",
+            "down",
+            "--ratio",
+            "0.9",
+            "--no-focus",
+        ]
+    ));
+    assert_eq!(
+        warnings,
+        [
+            "Herdr adjusted split root:split:1 from ratio 0.925 to 0.9 because both sides must occupy at least 10%"
+        ]
+    );
+    let events = events.borrow();
+    let warning_index = events
+        .iter()
+        .position(|event| event.starts_with("warning:"))
+        .unwrap();
+    let split_index = events
+        .iter()
+        .position(|event| event.starts_with("command: pane split"))
+        .unwrap();
+    assert!(warning_index < split_index);
 }

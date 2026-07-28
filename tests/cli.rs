@@ -148,6 +148,26 @@ fn all_backend_dry_runs_need_no_external_binary() {
 }
 
 #[test]
+fn herdr_dry_run_warns_when_clamping_an_unsupported_ratio() {
+    let directory = TempDir::new().unwrap();
+    let path = directory.path().join("layout.yml");
+    fs::write(
+        &path,
+        "presets:\n  narrow:\n    name: Narrow\n    backend: herdr\n    layout:\n      type: horizontal\n      ratio: [1, 19]\n      panes:\n        - { name: narrow }\n        - { name: wide }\n",
+    )
+    .unwrap();
+
+    binary("vde-layout")
+        .args(["narrow", "--config", path.to_str().unwrap(), "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--ratio 0.1"))
+        .stderr(predicate::str::contains(
+            "Warning: Herdr adjusted split root:split:1 from ratio 0.05 to 0.1",
+        ));
+}
+
+#[test]
 fn actual_tmux_apply_uses_the_preset_display_name_for_a_new_window() {
     let (_config_directory, path) = config();
     let fake_directory = TempDir::new().unwrap();
